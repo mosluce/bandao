@@ -74,6 +74,7 @@ async fn admin_remove_only_kicks_target_sessions_for_that_org() {
 
     let (admin_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
+    let org_a_id = body_a["current_org"]["id"].as_str().unwrap().to_string();
     let (_owner_b, body_b) = app.register_admin("b-owner@example.com", "OrgB").await;
     let code_b = body_b["current_org"]["code"].as_str().unwrap().to_string();
     let org_b_id = body_b["current_org"]["id"].as_str().unwrap().to_string();
@@ -86,8 +87,16 @@ async fn admin_remove_only_kicks_target_sessions_for_that_org() {
         .send()
         .await
         .unwrap();
+    // /me/memberships swaps current_org to the joined Org per spec, so put the
+    // first session back on OrgA — that's the session the kick should kill.
+    visitor
+        .post(app.url("/me/current-org"))
+        .json(&json!({ "org_id": org_a_id }))
+        .send()
+        .await
+        .unwrap();
 
-    // visitor's first session was scoped to OrgA. Open a second session on OrgB.
+    // Open a second session and pin it to OrgB.
     let (visitor_b, _) = app.login("visitor@example.com", "hunter2hunter2").await;
     visitor_b
         .post(app.url("/me/current-org"))
