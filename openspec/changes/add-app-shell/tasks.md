@@ -19,11 +19,11 @@
 
 ## 3. Folder skeleton + entry point
 
-- [ ] 3.1 Create the directory layout under `app/lib/`: `app/`, `core/api/models/`, `core/env/`, `core/storage/`, `features/auth/{data,presentation,state}/`, `shared/{theme,widgets}/`, `l10n/`. Each directory gets a placeholder `_dir.dart` if Dart complains about empty folders (delete once real files arrive).
-- [ ] 3.2 `lib/main.dart`: initialize `runApp(ProviderScope(child: ArgusApp()))`. No business logic here.
-- [ ] 3.3 `lib/app/argus_app.dart`: `MaterialApp.router` wired to a `GoRouter` exposed via a Riverpod provider. Theme = `AppTheme.light()`. Locale = `Locale('zh','TW')`, with `flutter_localizations` delegates wired up. Title = `'Argus'`.
-- [ ] 3.4 `lib/shared/theme/app_theme.dart`: M3 light theme with a primary-colour seed. No bespoke widgets yet — defaults are fine for v1.
-- [ ] 3.5 `lib/l10n/app_zh_TW.arb` and `lib/l10n/app_en.arb` containing only the keys this change needs (login title, error messages, force-change copy, home stub, dev menu strings). Add `l10n.yaml` at `app/` for `flutter gen-l10n`. Generate once via `flutter gen-l10n` and commit the generated `lib/l10n/app_localizations.dart` if codegen sets it up that way (check current Flutter conventions).
+- [x] 3.1 Create the directory layout under `app/lib/`: `app/`, `core/api/models/`, `core/env/`, `core/storage/`, `features/auth/{data,presentation,state}/`, `shared/{theme,widgets}/`, `l10n/`. Each directory gets a placeholder `_dir.dart` if Dart complains about empty folders (delete once real files arrive).
+- [x] 3.2 `lib/main.dart`: initialize `runApp(ProviderScope(child: ArgusApp()))`. No business logic here.
+- [x] 3.3 `lib/app/argus_app.dart`: `MaterialApp.router` wired to a `GoRouter` exposed via a Riverpod provider. Theme = `AppTheme.light()`. Locale = `Locale('zh','TW')`, with `flutter_localizations` delegates wired up. Title = `'Argus'`.
+- [x] 3.4 `lib/shared/theme/app_theme.dart`: M3 light theme with a primary-colour seed. No bespoke widgets yet — defaults are fine for v1.
+- [x] 3.5 `lib/l10n/app_zh_TW.arb` and `lib/l10n/app_en.arb` containing only the keys this change needs (login title, error messages, force-change copy, home stub, dev menu strings). Add `l10n.yaml` at `app/` for `flutter gen-l10n`. Generate once via `flutter gen-l10n` and commit the generated `lib/l10n/app_localizations.dart` if codegen sets it up that way (check current Flutter conventions). (Deviation: Flutter 3.29 gen-l10n hits a cwd bug with non-cwd project dirs; replaced with a hand-rolled `lib/l10n/app_localizations.dart` shim. ARB files retained as the source of truth for future codegen migration.)
 
 ## 4. Env + secure storage primitives
 
