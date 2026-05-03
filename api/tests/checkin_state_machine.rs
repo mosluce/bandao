@@ -5,20 +5,13 @@
 mod common;
 
 use common::TestApp;
+use common::ts;
 use reqwest::StatusCode;
 use serde_json::Value;
 
 /// Bump-by-1-minute helper: tests submit events in chronological order so
 /// `OUT_OF_ORDER` doesn't kick in. We start at a fixed past timestamp so
 /// the test stays deterministic regardless of wall clock.
-fn ts(minute: i64) -> String {
-    // 2026-04-01T08:00:00Z + minute*1min, in RFC3339.
-    let base_secs = 1_775_376_000_i64; // 2026-04-01T08:00:00Z
-    let secs = base_secs + minute * 60;
-    let dt = ::time::OffsetDateTime::from_unix_timestamp(secs).unwrap();
-    dt.format(&::time::format_description::well_known::Rfc3339)
-        .unwrap()
-}
 
 async fn submit(
     app: &TestApp,

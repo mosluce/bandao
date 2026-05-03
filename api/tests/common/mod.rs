@@ -410,3 +410,14 @@ pub fn user_id(body: &Value) -> String {
         .unwrap_or_else(|| panic!("expected user.id in {body}"))
         .to_string()
 }
+
+/// Build an RFC3339 timestamp `now + minute` minutes (negative = past).
+/// Anchored on `now()` so events stay within the 1h skew threshold regardless
+/// of when the test runs — a fixed unix base would silently flip
+/// `has_skew_warning` once enough wall time elapses.
+pub fn ts(minute: i64) -> String {
+    let now = ::time::OffsetDateTime::now_utc().unix_timestamp();
+    let dt = ::time::OffsetDateTime::from_unix_timestamp(now + minute * 60).unwrap();
+    dt.format(&::time::format_description::well_known::Rfc3339)
+        .unwrap()
+}

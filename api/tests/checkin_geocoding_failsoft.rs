@@ -8,15 +8,10 @@ mod common;
 
 use argus_api::services::reverse_geocoder::StaticReverseGeocoder;
 use common::TestApp;
+use common::ts;
 use reqwest::StatusCode;
 use serde_json::Value;
 
-fn ts(minute: i64) -> String {
-    let base = 1_775_376_000_i64;
-    let dt = ::time::OffsetDateTime::from_unix_timestamp(base + minute * 60).unwrap();
-    dt.format(&::time::format_description::well_known::Rfc3339)
-        .unwrap()
-}
 
 #[tokio::test]
 async fn geocode_none_records_null_region_name() {

@@ -6,14 +6,9 @@ mod common;
 
 use bson::oid::ObjectId;
 use common::TestApp;
+use common::ts;
 use reqwest::StatusCode;
 
-fn ts(minute: i64) -> String {
-    let base = 1_775_376_000_i64;
-    let dt = ::time::OffsetDateTime::from_unix_timestamp(base + minute * 60).unwrap();
-    dt.format(&::time::format_description::well_known::Rfc3339)
-        .unwrap()
-}
 
 #[tokio::test]
 async fn newly_created_app_user_has_off_duty_status_row() {

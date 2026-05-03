@@ -5,15 +5,10 @@
 mod common;
 
 use common::TestApp;
+use common::ts;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-fn ts(minute: i64) -> String {
-    let base = 1_775_376_000_i64;
-    let dt = ::time::OffsetDateTime::from_unix_timestamp(base + minute * 60).unwrap();
-    dt.format(&::time::format_description::well_known::Rfc3339)
-        .unwrap()
-}
 
 #[tokio::test]
 async fn transfer_enabled_patch_succeeds_when_all_off_duty() {
