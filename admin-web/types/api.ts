@@ -12,6 +12,8 @@ export interface OrgDto {
   name: string
   code: string
   owner_id: string
+  timezone: string
+  checkin: { transfer_enabled: boolean }
   slug?: string
   slug_changed_at?: string
 }
@@ -117,6 +119,71 @@ export interface CreateAppUserResponse {
 }
 
 export type PasswordResetResponse = CreateAppUserResponse
+
+// --- Checkin events ---
+
+export type CheckinEventType = 'clock_in' | 'clock_out' | 'transfer_out' | 'transfer_in'
+export type AppUserCheckinStatus = 'off_duty' | 'on_site' | 'in_transit'
+export type EventSource = 'app' | 'admin_force'
+export type EventInitiatorKind = 'app_user' | 'dashboard_user'
+
+export interface GeoPoint {
+  lat: number
+  lng: number
+}
+
+export interface EventLocation {
+  coordinates: GeoPoint
+  accuracy_meters?: number
+  region_name?: string
+  manual_label?: string
+}
+
+export interface CheckinEventDto {
+  id: string
+  app_user_id: string
+  event_type: CheckinEventType
+  occurred_at_client: string
+  occurred_at_server: string
+  source: EventSource
+  initiated_by_kind: EventInitiatorKind
+  initiated_by_id: string
+  location: EventLocation
+  reason?: string
+  has_skew_warning: boolean
+}
+
+export interface BoardAppUserDto {
+  id: string
+  username: string
+  display_name: string
+}
+
+export interface CheckinUserBoardRowDto {
+  user: BoardAppUserDto
+  status: AppUserCheckinStatus
+  current_shift_started_at?: string
+  last_event?: CheckinEventDto
+  has_skew_warning: boolean
+}
+
+export interface ForceCheckoutRequest {
+  reason?: string
+}
+
+export interface UpdateOrgSettingsRequest {
+  transfer_enabled?: boolean
+  timezone?: string
+}
+
+export interface OrgCheckinSettings {
+  transfer_enabled: boolean
+}
+
+export interface OrgSettingsDto {
+  timezone: string
+  checkin: OrgCheckinSettings
+}
 
 export interface ApiErrorBody {
   error: {

@@ -44,6 +44,8 @@ pages/        # 路由頁面
   members.vue              # 成員管理（含 owner transfer 表單）
   cooldowns.vue            # 冷卻管理
   app-users/index.vue      # AppUser CRUD（admin only）
+  checkin/index.vue        # 打卡看板（admin only）
+  checkin/[appUserId].vue  # 單個 AppUser 事件歷史（admin only）
   no-org.vue               # 0 個 membership 時的著陸頁
   orgs/new.vue             # 已登入時建立新組織
   orgs/join.vue            # 已登入時用 org_code 加入新組織
@@ -51,7 +53,7 @@ components/   # 跨頁面共用
   OrgSwitcher.vue          # header dropdown，切換 / 建立 / 加入 Org
   OrgCreateForm.vue        # createOrg 包裝
   OrgJoinForm.vue          # joinOrg 包裝
-composables/  # useApi（$fetch 包裝）、useAuth（multi-org reactive state + 行為）、useOrgSlug、useAppUsers
+composables/  # useApi、useAuth、useOrgSlug、useAppUsers、useCheckin、useOrgSettings、useOrgTime
 middleware/   # auth（要登入；current_org=null 時導去 /no-org，除非路徑屬於 ORG_AGNOSTIC_PATHS）、guest（已登入則導走）
 types/        # 對應 api 的 DTO 型別（手寫 mirror，OpenAPI codegen 在 ROADMAP）
 assets/css/   # Tailwind entry
@@ -83,6 +85,14 @@ assets/css/   # Tailwind entry
 ## 擁有權轉移 UI
 
 `pages/members.vue`：當前使用者是 owner 時，每位非自己的 admin 會多一個「轉移擁有權」按鈕。點下去 inline 展開密碼欄位，密碼正確 + 對方確實是 admin 才會成功。轉移後 `org.owner_id` 變成對方，原 owner 立刻變成可降級 / 可被踢 / 可自離的普通 admin（UI 自動 reflect，因為 `auth.refresh()` 會被呼叫）。錯誤碼：`INVALID_PASSWORD` / `INVALID_TARGET` / `SAME_OWNER` / `FORBIDDEN`。
+
+## 打卡看板與設定
+
+`pages/checkin/index.vue` 是 admin-only 即時看板，依狀態（在班 / 移動中 / 下班）分組列出 AppUser、最後事件、shift duration、skew warning，每 30 秒自動 refresh，可直接觸發強制收班（含選填 reason）。`pages/checkin/[appUserId].vue` 是單人事件歷史，cursor 分頁、`載入更多`、每筆顯示事件類型 / Org TZ 時間 / 地點 / source badge / reason。
+
+`pages/index.vue` 在「打卡設定」段落讓 admin 切換 `transfer_enabled`（有人在班時 server 會回 `STATE_LOCKED`，UI 顯示「目前有 App 使用者在班，需先全部下班才能調整此設定」）與 `timezone`（下拉選單列常見 IANA + 自訂輸入；不合法值回 `INVALID_TIMEZONE`）。
+
+時間 render 用 `useOrgTime.formatInOrgTz(iso, org.timezone)`；missing TZ 時 fallback 到瀏覽器 locale。`shiftDuration(iso)` 算上班至今的時數 / 分鐘給看板用。
 
 ## 已知 / 暫緩
 

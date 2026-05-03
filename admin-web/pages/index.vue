@@ -162,6 +162,91 @@ async function onLogout() {
   await navigateTo('/login')
 }
 
+const orgSettings = useOrgSettings()
+const transferToggleSaving = ref(false)
+const transferToggleError = ref('')
+const stateLockedCount = ref<number | null>(null)
+
+async function toggleTransfer() {
+  if (!auth.currentOrg.value) return
+  transferToggleError.value = ''
+  stateLockedCount.value = null
+  transferToggleSaving.value = true
+  const target = !auth.currentOrg.value.checkin.transfer_enabled
+  try {
+    await orgSettings.update({ transfer_enabled: target })
+    await auth.refresh()
+  }
+  catch (err) {
+    if (err instanceof ApiError && err.code === 'STATE_LOCKED') {
+      // ApiError doesn't carry structured body; pull from message if surfaced.
+      transferToggleError.value = '目前有 App 使用者在班，需先全部下班才能調整此設定'
+    }
+    else if (err instanceof ApiError) {
+      transferToggleError.value = err.code === 'FORBIDDEN' ? '只有管理員可以調整此設定' : err.message
+    }
+    else {
+      transferToggleError.value = err instanceof Error ? err.message : '操作失敗'
+    }
+  }
+  finally {
+    transferToggleSaving.value = false
+  }
+}
+
+const COMMON_TIMEZONES = [
+  'Asia/Taipei',
+  'Asia/Tokyo',
+  'Asia/Hong_Kong',
+  'Asia/Singapore',
+  'Asia/Shanghai',
+  'Asia/Seoul',
+  'America/Los_Angeles',
+  'America/New_York',
+  'Europe/London',
+  'UTC',
+]
+const tzInput = ref('')
+const tzEditing = ref(false)
+const tzSaving = ref(false)
+const tzError = ref('')
+
+function startEditTz() {
+  tzInput.value = auth.currentOrg.value?.timezone ?? ''
+  tzEditing.value = true
+  tzError.value = ''
+}
+
+function cancelEditTz() {
+  tzEditing.value = false
+  tzError.value = ''
+}
+
+async function saveTz() {
+  tzError.value = ''
+  tzSaving.value = true
+  try {
+    await orgSettings.update({ timezone: tzInput.value.trim() })
+    await auth.refresh()
+    tzEditing.value = false
+  }
+  catch (err) {
+    if (err instanceof ApiError) {
+      tzError.value = err.code === 'INVALID_TIMEZONE'
+        ? '不是有效的 IANA 時區名稱（例如 Asia/Taipei、America/Los_Angeles）'
+        : err.code === 'FORBIDDEN'
+          ? '只有管理員可以調整時區'
+          : err.message
+    }
+    else {
+      tzError.value = err instanceof Error ? err.message : '操作失敗'
+    }
+  }
+  finally {
+    tzSaving.value = false
+  }
+}
+
 const showLeaveConfirm = ref(false)
 const leaving = ref(false)
 const leaveError = ref('')
@@ -385,7 +470,7 @@ async function confirmLeave() {
               輪替組織代碼後，舊代碼將無法再加入組織。
             </p>
           </div>
-          <div class="flex shrink-0 gap-2">
+          <div class="flex shrink-0 flex-wrap justify-end gap-2">
             <NuxtLink
               to="/members"
               class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -397,6 +482,12 @@ async function confirmLeave() {
               class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               App 使用者
+            </NuxtLink>
+            <NuxtLink
+              to="/checkin"
+              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              打卡看板
             </NuxtLink>
             <NuxtLink
               to="/cooldowns"
@@ -449,6 +540,122 @@ async function confirmLeave() {
             {{ rotateError }}
           </p>
         </div>
+      </section>
+
+      <section
+        v-if="auth.isAdmin.value && auth.currentOrg.value"
+        class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4"
+      >
+        <div>
+          <h2 class="text-lg font-semibold text-slate-900">
+            打卡設定
+          </h2>
+          <p class="text-sm text-slate-500">
+            轉出 / 轉入功能與顯示用時區。
+          </p>
+        </div>
+
+        <dl class="space-y-4 text-sm">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <dt class="w-24 text-slate-500">
+              轉出 / 轉入
+            </dt>
+            <dd class="flex flex-wrap items-center gap-2">
+              <label class="inline-flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  :checked="auth.currentOrg.value.checkin.transfer_enabled"
+                  :disabled="transferToggleSaving"
+                  class="h-4 w-4 rounded border-slate-300 text-slate-900"
+                  @change="toggleTransfer"
+                >
+                <span class="text-slate-700">
+                  {{ auth.currentOrg.value.checkin.transfer_enabled ? '啟用' : '停用' }}
+                </span>
+              </label>
+              <span class="text-xs text-slate-500">
+                關閉後，App 端只能上下班，無法 transfer_out / transfer_in。
+              </span>
+            </dd>
+          </div>
+          <div
+            v-if="transferToggleError"
+            class="ml-[6.5rem] text-xs text-red-600"
+          >
+            {{ transferToggleError }}
+          </div>
+
+          <div class="flex flex-wrap items-baseline gap-3">
+            <dt class="w-24 text-slate-500">
+              組織時區
+            </dt>
+            <dd class="flex flex-wrap items-center gap-2">
+              <template v-if="!tzEditing">
+                <code class="rounded bg-slate-100 px-2 py-1 font-mono text-slate-900">
+                  {{ auth.currentOrg.value.timezone }}
+                </code>
+                <button
+                  type="button"
+                  class="text-xs text-slate-600 hover:text-slate-900"
+                  @click="startEditTz"
+                >
+                  變更
+                </button>
+              </template>
+              <template v-else>
+                <select
+                  v-model="tzInput"
+                  :disabled="tzSaving"
+                  class="rounded border border-slate-300 px-2 py-1 font-mono text-sm"
+                >
+                  <option
+                    v-for="tz in COMMON_TIMEZONES"
+                    :key="tz"
+                    :value="tz"
+                  >
+                    {{ tz }}
+                  </option>
+                  <option :value="tzInput">
+                    {{ COMMON_TIMEZONES.includes(tzInput) ? '— 自訂 —' : tzInput || '— 自訂 —' }}
+                  </option>
+                </select>
+                <input
+                  v-model="tzInput"
+                  type="text"
+                  class="rounded border border-slate-300 px-2 py-1 font-mono text-sm"
+                  placeholder="或自訂 IANA 名稱"
+                  :disabled="tzSaving"
+                >
+                <button
+                  type="button"
+                  :disabled="tzSaving"
+                  class="rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                  @click="saveTz"
+                >
+                  {{ tzSaving ? '儲存中…' : '儲存' }}
+                </button>
+                <button
+                  type="button"
+                  :disabled="tzSaving"
+                  class="rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  @click="cancelEditTz"
+                >
+                  取消
+                </button>
+              </template>
+            </dd>
+          </div>
+          <div
+            v-if="tzError"
+            class="ml-[6.5rem] text-xs text-red-600"
+          >
+            {{ tzError }}
+          </div>
+
+          <p class="text-xs text-slate-500">
+            時區僅影響 admin-web 顯示，資料庫一律存絕對時間。
+          </p>
+        </dl>
       </section>
 
       <section
