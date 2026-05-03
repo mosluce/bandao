@@ -101,4 +101,4 @@
 
 - [x] 12.1 `cargo test` per-binary serial loop on macOS clean.
 - [x] 12.2 `pnpm typecheck` + `pnpm build` clean.
-- [ ] 12.3 Live curl smoke (no Flutter): create an AppUser via admin-web, log in via `/app/auth/login`, change initial password, then walk the full state-machine via `/app/checkin/events` (clock_in → transfer_out → transfer_in → transfer_out → transfer_in → clock_out). Confirm admin-web live board reflects each transition. Test transfer-disabled toggle (clock everyone out, flip toggle, attempt transfer → 403, attempt clock_in/out → ok). Test force-checkout from admin-web. Test timezone change visible in display.
+- [x] 12.3 Live curl smoke (no Flutter): create an AppUser via admin-web, log in via `/app/auth/login`, change initial password, then walk the full state-machine via `/app/checkin/events` (clock_in → transfer_out → transfer_in → transfer_out → transfer_in → clock_out). Confirm admin-web live board reflects each transition. Test transfer-disabled toggle (clock everyone out, flip toggle, attempt transfer → 403, attempt clock_in/out → ok). Test force-checkout from admin-web. Test timezone change visible in display.
