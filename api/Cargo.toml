@@ -1,0 +1,67 @@
+[package]
+name = "argus-api"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "argus-api"
+path = "src/main.rs"
+
+[dependencies]
+# async runtime + web
+tokio = { version = "1.43", features = ["macros", "rt-multi-thread", "signal", "time", "sync"] }
+axum = { version = "0.8", features = ["macros"] }
+axum-extra = { version = "0.10", features = ["cookie"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+hyper = "1"
+
+# (de)serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# observability + config
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dotenvy = "0.15"
+
+# domain / data layer
+mongodb = "3"
+bson = { version = "2", features = ["chrono-0_4"] }
+argon2 = "0.5"
+nanoid = "0.4"
+time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+rand = "0.8"
+base64 = "0.22"
+
+# utilities
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1.43", features = ["macros", "rt-multi-thread", "test-util"] }
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["mongo"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "rustls-tls"] }
+serde_json = "1"
+
+[profile.dev]
+opt-level = 0
+debug = 1
+
+# Dev builds keep our own code unoptimized for fast iteration, but third-party
+# dependencies (especially argon2 / sha / hmac) are crippling under opt-level=0.
+# Building deps at full optimization is a one-shot cost that makes cargo run
+# behave close to release for hot paths.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

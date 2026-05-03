@@ -1,0 +1,19 @@
+{
+  "name": "argus-admin-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
+  },
+  "devDependencies": {
+    "@nuxtjs/tailwindcss": "^6.12.2",
+    "nuxt": "~3.21.0",
+    "typescript": "^5.6.3",
+    "vue-tsc": "^2.1.10"
+  }
+}

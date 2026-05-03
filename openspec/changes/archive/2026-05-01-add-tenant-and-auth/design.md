@@ -38,7 +38,7 @@ argus 專案目前是空殼 — 只有 OpenSpec / agent 工具設定，沒有任
 
 ### D3. Org code 格式：10 字元 nanoid（去除易混字）
 
-- **格式**：10 字元，字典 `23456789ABCDEFGHJKLMNPQRSTUVWXYZ`（去掉 0/O/1/I/L），約 32^10 ≈ 1.1 × 10^15 組合，夠 MVP 用。
+- **格式**：10 字元，字典 `23456789ABCDEFGHJKLMNPQRSTUVWXYZ`（去掉 0/O/1/I），約 32^10 ≈ 1.1 × 10^15 組合，夠 MVP 用。
 - **生成**：`nanoid` crate；新增時若碰撞（unique index 噴錯）retry 一次。
 - **Rotate**：admin 在 dashboard 觸發 `POST /orgs/:id/code/rotate` → 立刻產新碼、舊碼失效。沒有寬限期。
 - **邀請連結**：`https://<admin-host>/register?code=<orgCode>`，前端把 code 預填到註冊表單，使用者只需填 email + 密碼。連結本身不含 server 簽章，code 即是 auth 憑據。
