@@ -69,14 +69,14 @@
 
 ## 9. API integration tests — new
 
-- [ ] 9.1 `tests/me_orgs_create.rs`: logged-in user creates a new Org, becomes owner, current_org_id updates; works in zero-org state.
-- [ ] 9.2 `tests/me_memberships_join.rs`: join via org_code / active slug / grace slug; ALREADY_MEMBER rejection; cooldown applies; current_org_id updates.
-- [ ] 9.3 `tests/me_current_org_switch.rs`: switch to another membership; NOT_A_MEMBER for non-member orgs; current session only is mutated.
-- [ ] 9.4 `tests/zero_org_state.rs`: org-scoped endpoints return NO_ACTIVE_ORG; org-agnostic ones succeed; user can recover via /me/orgs or /me/memberships.
-- [ ] 9.5 `tests/multi_org_isolation.rs`: user in two orgs sees only `current_org`'s members / cooldowns / etc.; switching org changes the visible scope.
-- [ ] 9.6 `tests/orgs_owner_transfer.rs`: happy path; non-owner forbidden; member forbidden; wrong password; invalid target (not admin / not in org); self-transfer rejected; previous owner can self-leave after transfer; new owner is protected.
-- [ ] 9.7 `tests/membership_force_kick.rs`: leaving / being removed from Org X kills only sessions whose `current_org_id == X`; sessions pointing at other orgs survive.
-- [ ] 9.8 `tests/auth_role_lookup_per_request.rs`: role demotion takes effect on the next authenticated request without re-login; stale-membership session returns UNAUTHORIZED + clears cookie.
+- [x] 9.1 `tests/me_orgs_create.rs`: logged-in user creates a new Org, becomes owner, current_org_id updates; works in zero-org state.
+- [x] 9.2 `tests/me_memberships_join.rs`: join via org_code / active slug / grace slug; ALREADY_MEMBER rejection; cooldown applies; current_org_id updates.
+- [x] 9.3 `tests/me_current_org_switch.rs`: switch to another membership; NOT_A_MEMBER for non-member orgs; current session only is mutated.
+- [x] 9.4 `tests/zero_org_state.rs`: org-scoped endpoints return NO_ACTIVE_ORG; org-agnostic ones succeed; user can recover via /me/orgs or /me/memberships.
+- [x] 9.5 `tests/multi_org_isolation.rs`: user in two orgs sees only `current_org`'s members / cooldowns / etc.; switching org changes the visible scope.
+- [x] 9.6 `tests/orgs_owner_transfer.rs`: happy path; non-owner forbidden; member forbidden; wrong password; invalid target (not admin / not in org); self-transfer rejected; previous owner can self-leave after transfer; new owner is protected.
+- [x] 9.7 `tests/membership_force_kick.rs`: leaving / being removed from Org X kills only sessions whose `current_org_id == X`; sessions pointing at other orgs survive.
+- [x] 9.8 `tests/auth_role_lookup_per_request.rs`: role demotion takes effect on the next authenticated request without re-login; stale-membership session returns UNAUTHORIZED + clears cookie.
 
 ## 10. admin-web: composables and middleware
 
