@@ -8,7 +8,9 @@ plugins {
 android {
     namespace = "tw.ccmos.app.argus"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // flutter_secure_storage and path_provider_android require >= 27.0.12077973;
+    // pin explicitly so plugin upgrades don't surprise local builds.
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
