@@ -58,6 +58,18 @@ pub enum ApiError {
     #[error("new owner must differ from the current owner")]
     SameOwner,
 
+    // --- AppUser surface ---
+    /// `(org_id, username_lower)` collides with an existing AppUser.
+    #[error("username already taken")]
+    UsernameTaken,
+    /// AppUser username failed the `^[a-zA-Z0-9_.-]{2,32}$` shape check.
+    #[error("invalid username format")]
+    InvalidUsernameFormat,
+    /// AppUser is authenticated but `needs_password_change` is set; the
+    /// route is gated until they finish the forced change.
+    #[error("password change required before this action")]
+    NeedsPasswordChange,
+
     #[error("password hashing failed")]
     Password,
     #[error("database error")]
@@ -98,6 +110,13 @@ impl ApiError {
             ApiError::InvalidPassword => (StatusCode::UNAUTHORIZED, "INVALID_PASSWORD"),
             ApiError::InvalidTarget => (StatusCode::BAD_REQUEST, "INVALID_TARGET"),
             ApiError::SameOwner => (StatusCode::BAD_REQUEST, "SAME_OWNER"),
+            ApiError::UsernameTaken => (StatusCode::CONFLICT, "USERNAME_TAKEN"),
+            ApiError::InvalidUsernameFormat => {
+                (StatusCode::BAD_REQUEST, "INVALID_USERNAME_FORMAT")
+            }
+            ApiError::NeedsPasswordChange => {
+                (StatusCode::LOCKED, "NEEDS_PASSWORD_CHANGE")
+            }
             ApiError::Password
             | ApiError::Db(_)
             | ApiError::BsonSer(_)

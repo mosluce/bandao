@@ -92,3 +92,47 @@ pub struct RemovedMembership {
     pub cooldown_until: DateTime,
     pub removal_kind: RemovalKind,
 }
+
+/// AppUser status. Soft-disable preserves history (FK target for future
+/// checkin records, traces, etc.) while gating new logins. Re-enable just
+/// flips back to `active` without touching `password_hash`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AppUserStatus {
+    Active,
+    Disabled,
+}
+
+/// Mobile-end-user identity. 1:1 with Org via immutable `org_id`. Identifiers
+/// are unique per Org (`(org_id, username_lower)` index). Created by an admin;
+/// no self-registration. `username_lower` is denormalized to make case-insensitive
+/// uniqueness a plain unique-index check.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppUser {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub org_id: ObjectId,
+    pub username: String,
+    pub username_lower: String,
+    pub display_name: String,
+    pub password_hash: String,
+    pub status: AppUserStatus,
+    pub needs_password_change: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_login_at: Option<DateTime>,
+    pub created_by_dashboard_user_id: ObjectId,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+}
+
+/// Mobile-side session. Token in `_id`, opaque random base64. TTL on
+/// `expires_at` (Mongo TTL index). Sliding refresh on every authenticated
+/// request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSession {
+    #[serde(rename = "_id")]
+    pub token: String,
+    pub app_user_id: ObjectId,
+    pub expires_at: DateTime,
+    pub created_at: DateTime,
+}

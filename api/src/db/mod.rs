@@ -1,3 +1,5 @@
+pub mod app_sessions;
+pub mod app_users;
 pub mod dashboard_memberships;
 pub mod dashboard_sessions;
 pub mod dashboard_users;
@@ -12,10 +14,13 @@ use mongodb::options::{ClientOptions, IndexOptions};
 use mongodb::{Client, Collection, Database, IndexModel};
 
 use crate::domain::{
-    DashboardSession, DashboardUser, Membership, Org, OrgSlugReservation, RemovedMembership,
+    AppSession, AppUser, DashboardSession, DashboardUser, Membership, Org, OrgSlugReservation,
+    RemovedMembership,
 };
 use crate::error::ApiResult;
 
+pub use app_sessions::AppSessionRepository;
+pub use app_users::{AppUserInsertError, AppUserRepository};
 pub use dashboard_memberships::{MembershipInsertError, MembershipRepository};
 pub use dashboard_sessions::DashboardSessionRepository;
 pub use dashboard_users::DashboardUserRepository;
@@ -32,6 +37,8 @@ pub struct Db {
     pub dashboard_sessions: DashboardSessionRepository,
     pub slug_reservations: OrgSlugReservationRepository,
     pub removed_memberships: RemovedMembershipRepository,
+    pub app_users: AppUserRepository,
+    pub app_sessions: AppSessionRepository,
 }
 
 impl Db {
@@ -63,6 +70,10 @@ impl Db {
             ),
             removed_memberships: RemovedMembershipRepository::new(
                 database.collection::<RemovedMembership>("removed_memberships"),
+            ),
+            app_users: AppUserRepository::new(database.collection::<AppUser>("app_users")),
+            app_sessions: AppSessionRepository::new(
+                database.collection::<AppSession>("app_sessions"),
             ),
             database,
         })
@@ -191,6 +202,60 @@ impl Db {
                         IndexOptions::builder()
                             .expire_after(Duration::from_secs(0))
                             .name("dashboard_sessions_ttl".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        let app_users: Collection<AppUser> = self.database.collection("app_users");
+        app_users
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "org_id": 1, "username_lower": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .unique(true)
+                            .name("app_users_org_username_unique".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        app_users
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "org_id": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("app_users_org_id".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        let app_sessions: Collection<AppSession> = self.database.collection("app_sessions");
+        app_sessions
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "expires_at": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .expire_after(Duration::from_secs(0))
+                            .name("app_sessions_ttl".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        app_sessions
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "app_user_id": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("app_sessions_app_user_id".to_string())
                             .build(),
                     )
                     .build(),
