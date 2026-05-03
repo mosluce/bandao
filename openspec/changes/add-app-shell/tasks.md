@@ -114,5 +114,5 @@
 
 ## 15. Smoke
 
-- [ ] 15.1 `flutter analyze` clean, `flutter test` all green locally.
+- [x] 15.1 `flutter analyze` clean, `flutter test` all green locally.
 - [ ] 15.2 Live smoke: bring up local stack (api on `:9090`, mongo via docker compose). On iOS Simulator, run `flutter run` in `app/`. Walk: see splash → land on `/login` → enter `(org_code, username, initial_password)` → see force-change screen → change password → land on home → see identity → tap logout → return to `/login`. Do the same on Android Emulator (default URL should resolve to `10.0.2.2:9090`). Try the dev menu: tap logo 5x → enter a different URL → save → confirm subsequent login uses it; clear → confirm fallback.
