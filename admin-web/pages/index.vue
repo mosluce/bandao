@@ -20,12 +20,12 @@ const slugError = ref('')
 const slugRetryAfter = ref<string | null>(null)
 const showClearConfirm = ref(false)
 
-const currentSlug = computed(() => auth.me.value?.org.slug ?? null)
+const currentSlug = computed(() => auth.currentOrg.value?.slug ?? null)
 
 const inviteIdentifier = computed(() => {
-  const me = auth.me.value
-  if (!me) return ''
-  return me.org.slug || me.org.code
+  const o = auth.currentOrg.value
+  if (!o) return ''
+  return o.slug || o.code
 })
 
 const inviteUrl = computed(() => {
@@ -58,8 +58,7 @@ function describeSlugError(err: unknown): { message: string, retryAfter: string 
 
 function formatRetryAfter(iso: string): string {
   try {
-    const d = new Date(iso)
-    return d.toLocaleString()
+    return new Date(iso).toLocaleString()
   }
   catch {
     return iso
@@ -118,9 +117,10 @@ async function clearSlug() {
 }
 
 async function copyCode() {
-  if (!auth.me.value) return
+  const o = auth.currentOrg.value
+  if (!o) return
   try {
-    await navigator.clipboard.writeText(auth.me.value.org.code)
+    await navigator.clipboard.writeText(o.code)
     copied.value = true
     setTimeout(() => { copied.value = false }, 1500)
   }
@@ -166,21 +166,16 @@ const showLeaveConfirm = ref(false)
 const leaving = ref(false)
 const leaveError = ref('')
 
-const isOwner = computed(() => {
-  const me = auth.me.value
-  return !!me && me.user.id === me.org.owner_id
-})
-
 async function confirmLeave() {
   leaveError.value = ''
   leaving.value = true
   try {
-    await api('/me/leave', { method: 'POST' })
+    await auth.leaveOrg()
   }
   catch (err) {
     if (err instanceof ApiError) {
       leaveError.value = err.code === 'OWNER_PROTECTED'
-        ? '組織擁有者無法離開組織'
+        ? '組織擁有者無法離開組織，請先轉移擁有權'
         : err.message
     }
     else {
@@ -189,13 +184,8 @@ async function confirmLeave() {
     leaving.value = false
     return
   }
-  // Server cleared the cookie; refresh will hit 401 and reset local auth state.
-  try {
-    await auth.refresh()
-  }
-  catch {
-    // ignore
-  }
+  // Server force-killed this session; the user needs to log in again to reach
+  // their other orgs (or land on /no-org if this was their only one).
   await navigateTo('/login')
 }
 </script>
@@ -203,29 +193,32 @@ async function confirmLeave() {
 <template>
   <main class="min-h-screen px-4 py-10">
     <div class="max-w-3xl mx-auto space-y-6">
-      <header class="flex items-center justify-between">
-        <div>
+      <header class="flex items-center justify-between gap-3">
+        <div class="min-w-0">
           <h1 class="text-2xl font-semibold text-slate-900">
             argus admin
           </h1>
           <p
-            v-if="auth.me.value"
-            class="text-sm text-slate-500"
+            v-if="auth.user.value"
+            class="text-sm text-slate-500 truncate"
           >
-            {{ auth.me.value.user.email }} · {{ auth.me.value.role === 'admin' ? '管理員' : '成員' }}
+            {{ auth.user.value.email }}
           </p>
         </div>
-        <button
-          type="button"
-          class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          @click="onLogout"
-        >
-          登出
-        </button>
+        <div class="flex shrink-0 items-center gap-2">
+          <OrgSwitcher />
+          <button
+            type="button"
+            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            @click="onLogout"
+          >
+            登出
+          </button>
+        </div>
       </header>
 
       <section
-        v-if="auth.me.value"
+        v-if="auth.currentOrg.value"
         class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <h2 class="text-lg font-semibold text-slate-900 mb-4">
@@ -238,7 +231,7 @@ async function confirmLeave() {
               名稱
             </dt>
             <dd class="font-medium text-slate-900">
-              {{ auth.me.value.org.name }}
+              {{ auth.currentOrg.value.name }}
             </dd>
           </div>
 
@@ -247,7 +240,7 @@ async function confirmLeave() {
               組織代碼
             </dt>
             <dd class="flex items-center gap-2">
-              <code class="rounded bg-slate-100 px-2 py-1 font-mono tracking-widest text-slate-900">{{ auth.me.value.org.code }}</code>
+              <code class="rounded bg-slate-100 px-2 py-1 font-mono tracking-widest text-slate-900">{{ auth.currentOrg.value.code }}</code>
               <button
                 type="button"
                 class="text-xs text-slate-600 hover:text-slate-900"
@@ -453,33 +446,33 @@ async function confirmLeave() {
       </section>
 
       <section
-        v-if="auth.me.value"
+        v-if="auth.currentOrg.value"
         class="rounded-xl border border-red-200 bg-white p-6 shadow-sm space-y-4"
       >
         <div>
           <h2 class="text-lg font-semibold text-red-700">
-            危險區
+            離開組織
           </h2>
           <p class="text-sm text-slate-500">
-            離開組織後，將刪除你的帳號並登出。7 天內無法以同一 email 重新加入此組織。
+            離開後，你會從此組織登出（其他組織的登入狀態不受影響，但需在此瀏覽器重新登入）。7 天內無法以同一 email 重新加入此組織。
           </p>
         </div>
 
         <div v-if="!showLeaveConfirm">
           <button
             type="button"
-            :disabled="isOwner"
-            :title="isOwner ? '組織擁有者無法離開組織' : ''"
+            :disabled="auth.isOwner.value"
+            :title="auth.isOwner.value ? '組織擁有者無法離開，請先轉移擁有權' : ''"
             class="rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed"
             @click="showLeaveConfirm = true"
           >
             離開組織
           </button>
           <p
-            v-if="isOwner"
+            v-if="auth.isOwner.value"
             class="mt-2 text-xs text-slate-500"
           >
-            你是組織擁有者，目前無法離開。需要轉移擁有權或刪除組織才能離開。
+            你是組織擁有者，需要先在「成員管理」轉移擁有權給另一位管理員，才能離開。
           </p>
         </div>
 
@@ -488,7 +481,7 @@ async function confirmLeave() {
           class="rounded-md border border-red-200 bg-red-50 p-4 space-y-3"
         >
           <p class="text-sm text-red-900">
-            確定要離開組織？此操作無法復原；7 天內無法以同一 email 重新加入。
+            確定要離開組織？目前 session 將被結束；7 天內無法以同一 email 重新加入此組織。
           </p>
           <div class="flex gap-2">
             <button

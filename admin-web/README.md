@@ -38,12 +38,31 @@ pnpm generate     # 預先 render（SPA 模式下幾乎等同 build）
 ## 結構
 
 ```
-pages/        # 路由頁面（login / register / index / members）
-composables/  # useApi（$fetch 包裝）、useAuth（reactive auth state）、useOrgSlug（vanity slug set/clear）
-middleware/   # auth（要登入）、guest（已登入則導走）
+pages/        # 路由頁面
+  login.vue / register.vue
+  index.vue                # 當前組織總覽 + 離開組織
+  members.vue              # 成員管理（含 owner transfer 表單）
+  cooldowns.vue            # 冷卻管理
+  no-org.vue               # 0 個 membership 時的著陸頁
+  orgs/new.vue             # 已登入時建立新組織
+  orgs/join.vue            # 已登入時用 org_code 加入新組織
+components/   # 跨頁面共用
+  OrgSwitcher.vue          # header dropdown，切換 / 建立 / 加入 Org
+  OrgCreateForm.vue        # createOrg 包裝
+  OrgJoinForm.vue          # joinOrg 包裝
+composables/  # useApi（$fetch 包裝）、useAuth（multi-org reactive state + 行為）、useOrgSlug
+middleware/   # auth（要登入；current_org=null 時導去 /no-org，除非路徑屬於 ORG_AGNOSTIC_PATHS）、guest（已登入則導走）
 types/        # 對應 api 的 DTO 型別（手寫 mirror，OpenAPI codegen 在 ROADMAP）
 assets/css/   # Tailwind entry
 ```
+
+## Multi-org 流程
+
+- `useAuth()` 暴露 `user` / `memberships` / `currentOrg` / `role`，以及 `createOrg` / `joinOrg` / `switchOrg` / `leaveOrg` / `transferOwnership` 行為。
+- localStorage `argus.lastSelectedOrgId` 記住最後選的 Org；下次登入會自動 `switchOrg` 對齊 server。
+- 沒有任何 membership 的使用者會被 middleware 導去 `/no-org`，那邊有併排的「建立新組織」與「加入既有組織」表單。
+- `OrgSwitcher` 在每個 page header 都看得到（`pages/index.vue`、`members.vue`、`cooldowns.vue`），分組顯示「我擁有的」「我加入的」+「+ 建立新組織」「+ 用 org code 加入」入口。
+- 切換 Org 後，依賴 server 資料的 page（members / cooldowns）會 watch `currentOrg.value?.id` 自動重打 API。
 
 ## Vanity slug UI
 
@@ -56,7 +75,11 @@ assets/css/   # Tailwind entry
 
 錯誤訊息對應 `ApiError.code`：`INVALID_SLUG_FORMAT` / `SLUG_RESERVED` / `SLUG_TAKEN` / `SLUG_CHANGE_TOO_SOON`（含 `retry_after` 時間戳）/ `FORBIDDEN`。non-admin 看得見 slug 但沒有 Edit / Clear 按鈕。
 
+## 擁有權轉移 UI
+
+`pages/members.vue`：當前使用者是 owner 時，每位非自己的 admin 會多一個「轉移擁有權」按鈕。點下去 inline 展開密碼欄位，密碼正確 + 對方確實是 admin 才會成功。轉移後 `org.owner_id` 變成對方，原 owner 立刻變成可降級 / 可被踢 / 可自離的普通 admin（UI 自動 reflect，因為 `auth.refresh()` 會被呼叫）。錯誤碼：`INVALID_PASSWORD` / `INVALID_TARGET` / `SAME_OWNER` / `FORBIDDEN`。
+
 ## 已知 / 暫緩
 
-- Nuxt 鎖在 `~3.14.0`，會看到 `'manifest-route-rule' middleware already exists` 警告，3.14.x 已知 bug，cosmetic、不影響功能。升 v4 已記在 `ROADMAP.md`。
 - ESLint 暫未裝，計畫見 `ROADMAP.md`。
+- 升 Nuxt v4 已記在 `ROADMAP.md`，目前 pin 在 `3.21.2`（避開 3.21.3+ ssr:false 的 vite-node IPC regression）。

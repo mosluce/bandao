@@ -5,7 +5,6 @@ export type Role = 'admin' | 'member'
 export interface UserDto {
   id: string
   email: string
-  role: Role
 }
 
 export interface OrgDto {
@@ -17,6 +16,20 @@ export interface OrgDto {
   slug_changed_at?: string
 }
 
+export interface MembershipDto {
+  org: OrgDto
+  role: Role
+}
+
+export interface AuthResponse {
+  user: UserDto
+  memberships: MembershipDto[]
+  /** `null` when the user has no memberships or no current org selected. */
+  current_org: OrgDto | null
+  /** Role within `current_org`. `null` whenever `current_org` is `null`. */
+  role: Role | null
+}
+
 export type RemovalKind = 'kicked' | 'left'
 
 export interface CooldownDto {
@@ -24,12 +37,6 @@ export interface CooldownDto {
   removed_at: string | null
   cooldown_until: string | null
   removal_kind: RemovalKind
-}
-
-export interface AuthResponse {
-  user: UserDto
-  org: OrgDto
-  role: Role
 }
 
 export interface RotateCodeResponse {
@@ -57,6 +64,23 @@ export type RegisterRequest =
 export interface LoginRequest {
   email: string
   password: string
+}
+
+export interface CreateOrgRequest {
+  org_name: string
+}
+
+export interface JoinOrgRequest {
+  org_code: string
+}
+
+export interface SwitchOrgRequest {
+  org_id: string
+}
+
+export interface TransferOwnerRequest {
+  new_owner_user_id: string
+  current_password: string
 }
 
 export interface UpdateRoleRequest {

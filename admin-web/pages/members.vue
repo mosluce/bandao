@@ -16,8 +16,14 @@ const actionError = ref('')
 
 const removeTarget = ref<DashboardUserDto | null>(null)
 
-const ownerId = computed(() => auth.me.value?.org.owner_id ?? null)
-const myId = computed(() => auth.me.value?.user.id ?? null)
+// Owner-transfer state per row.
+const transferTargetId = ref<string | null>(null)
+const transferPassword = ref('')
+const transferring = ref(false)
+const transferError = ref('')
+
+const ownerId = computed(() => auth.currentOrg.value?.owner_id ?? null)
+const myId = computed(() => auth.user.value?.id ?? null)
 
 async function load() {
   loadError.value = ''
@@ -33,6 +39,11 @@ async function load() {
   }
 }
 
+// Refetch when the active org changes (e.g. user switches via OrgSwitcher).
+watch(() => auth.currentOrg.value?.id, (newId, oldId) => {
+  if (newId && newId !== oldId) load()
+})
+
 async function changeRole(user: DashboardUserDto, target: Role) {
   if (user.role === target) return
   actionError.value = ''
@@ -44,7 +55,7 @@ async function changeRole(user: DashboardUserDto, target: Role) {
     })
     const idx = users.value.findIndex(u => u.id === updated.id)
     if (idx >= 0) users.value[idx] = updated
-    if (auth.me.value && updated.id === auth.me.value.user.id) {
+    if (auth.user.value && updated.id === auth.user.value.id) {
       await auth.refresh()
       if (!auth.isAdmin.value) {
         await navigateTo('/')
@@ -87,6 +98,41 @@ async function confirmRemove() {
   }
 }
 
+function startTransfer(user: DashboardUserDto) {
+  transferTargetId.value = user.id
+  transferPassword.value = ''
+  transferError.value = ''
+}
+
+function cancelTransfer() {
+  transferTargetId.value = null
+  transferPassword.value = ''
+  transferError.value = ''
+}
+
+async function confirmTransfer() {
+  const targetId = transferTargetId.value
+  if (!targetId) return
+  transferError.value = ''
+  transferring.value = true
+  try {
+    await auth.transferOwnership(targetId, transferPassword.value)
+    await load()
+    cancelTransfer()
+  }
+  catch (err) {
+    if (err instanceof ApiError) {
+      transferError.value = friendlyTransferError(err)
+    }
+    else {
+      transferError.value = err instanceof Error ? err.message : '轉移失敗'
+    }
+  }
+  finally {
+    transferring.value = false
+  }
+}
+
 function friendlyError(err: ApiError): string {
   switch (err.code) {
     case 'OWNER_PROTECTED':
@@ -95,6 +141,23 @@ function friendlyError(err: ApiError): string {
       return '找不到此成員'
     case 'FORBIDDEN':
       return '只有管理員可以執行此操作'
+    case 'NO_ACTIVE_ORG':
+      return '尚未選擇組織'
+    default:
+      return err.message
+  }
+}
+
+function friendlyTransferError(err: ApiError): string {
+  switch (err.code) {
+    case 'INVALID_PASSWORD':
+      return '密碼不正確'
+    case 'INVALID_TARGET':
+      return '目標必須是同組織的管理員'
+    case 'SAME_OWNER':
+      return '不能轉移給自己'
+    case 'FORBIDDEN':
+      return '只有擁有者可以轉移擁有權'
     default:
       return err.message
   }
@@ -111,16 +174,17 @@ else {
 <template>
   <main class="min-h-screen px-4 py-10">
     <div class="max-w-3xl mx-auto space-y-6">
-      <header class="flex items-center justify-between">
-        <div>
+      <header class="flex items-center justify-between gap-3">
+        <div class="min-w-0">
           <h1 class="text-2xl font-semibold text-slate-900">
             成員管理
           </h1>
-          <p class="text-sm text-slate-500">
-            升降級組織內的 dashboard 帳號
+          <p class="text-sm text-slate-500 truncate">
+            {{ auth.currentOrg.value?.name }} · 升降級組織內的 dashboard 帳號
           </p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex shrink-0 items-center gap-2">
+          <OrgSwitcher />
           <NuxtLink
             to="/cooldowns"
             class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -159,53 +223,105 @@ else {
           <li
             v-for="user in users"
             :key="user.id"
-            class="flex items-center justify-between gap-4 px-6 py-4"
+            class="px-6 py-4"
           >
-            <div class="min-w-0">
-              <p class="truncate font-medium text-slate-900">
-                {{ user.email }}
-              </p>
-              <p class="text-xs text-slate-500">
-                {{ user.role === 'admin' ? '管理員' : '成員' }}
-                <span
-                  v-if="user.id === ownerId"
-                  class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800"
-                >擁有者</span>
-                <span
-                  v-if="user.id === myId"
-                  class="ml-1 text-slate-400"
-                >（你）</span>
-              </p>
+            <div class="flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <p class="truncate font-medium text-slate-900">
+                  {{ user.email }}
+                </p>
+                <p class="text-xs text-slate-500">
+                  {{ user.role === 'admin' ? '管理員' : '成員' }}
+                  <span
+                    v-if="user.id === ownerId"
+                    class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-amber-800"
+                  >擁有者</span>
+                  <span
+                    v-if="user.id === myId"
+                    class="ml-1 text-slate-400"
+                  >（你）</span>
+                </p>
+              </div>
+
+              <div class="flex shrink-0 flex-wrap justify-end gap-2">
+                <button
+                  v-if="user.role === 'member'"
+                  type="button"
+                  :disabled="pendingId === user.id"
+                  class="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                  @click="changeRole(user, 'admin')"
+                >
+                  {{ pendingId === user.id ? '處理中…' : '升為管理員' }}
+                </button>
+                <button
+                  v-else-if="user.id !== ownerId"
+                  type="button"
+                  :disabled="pendingId === user.id"
+                  class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  @click="changeRole(user, 'member')"
+                >
+                  {{ pendingId === user.id ? '處理中…' : '降為成員' }}
+                </button>
+                <button
+                  v-if="auth.isOwner.value && user.role === 'admin' && user.id !== myId && user.id !== ownerId"
+                  type="button"
+                  :disabled="transferring || transferTargetId === user.id"
+                  class="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                  @click="startTransfer(user)"
+                >
+                  轉移擁有權
+                </button>
+                <button
+                  v-if="user.id !== ownerId && user.id !== myId"
+                  type="button"
+                  :disabled="pendingId === user.id"
+                  class="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                  @click="removeTarget = user"
+                >
+                  移除
+                </button>
+              </div>
             </div>
 
-            <div class="flex shrink-0 gap-2">
-              <button
-                v-if="user.role === 'member'"
-                type="button"
-                :disabled="pendingId === user.id"
-                class="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                @click="changeRole(user, 'admin')"
+            <div
+              v-if="transferTargetId === user.id"
+              class="mt-3 rounded-md border border-amber-200 bg-amber-50 p-4 space-y-3"
+            >
+              <p class="text-sm text-amber-900">
+                確認將 <strong>{{ user.email }}</strong> 設為新擁有者。轉移後你會降為一般管理員（仍可降級或被移除）。請輸入你的密碼確認。
+              </p>
+              <input
+                v-model="transferPassword"
+                type="password"
+                autocomplete="current-password"
+                placeholder="目前密碼"
+                :disabled="transferring"
+                class="w-full rounded-md border border-amber-300 px-3 py-2 text-sm focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
               >
-                {{ pendingId === user.id ? '處理中…' : '升為管理員' }}
-              </button>
-              <button
-                v-else-if="user.id !== ownerId"
-                type="button"
-                :disabled="pendingId === user.id"
-                class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                @click="changeRole(user, 'member')"
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  :disabled="transferring || !transferPassword"
+                  class="rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
+                  @click="confirmTransfer"
+                >
+                  {{ transferring ? '轉移中…' : '確認轉移' }}
+                </button>
+                <button
+                  type="button"
+                  :disabled="transferring"
+                  class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  @click="cancelTransfer"
+                >
+                  取消
+                </button>
+              </div>
+              <p
+                v-if="transferError"
+                class="text-sm text-red-600"
               >
-                {{ pendingId === user.id ? '處理中…' : '降為成員' }}
-              </button>
-              <button
-                v-if="user.id !== ownerId && user.id !== myId"
-                type="button"
-                :disabled="pendingId === user.id"
-                class="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
-                @click="removeTarget = user"
-              >
-                移除
-              </button>
+                {{ transferError }}
+              </p>
             </div>
           </li>
         </ul>
@@ -225,7 +341,7 @@ else {
         <p class="text-sm text-red-900">
           確定要將
           <strong>{{ removeTarget.email }}</strong>
-          從組織中移除？該帳號將被刪除，且 7 天內無法以同一 email 重新加入。
+          從此組織移除？此操作只刪除該成員在「{{ auth.currentOrg.value?.name }}」的成員身份；他們的帳號與其他組織的身份不受影響。7 天內無法以同一 email 重新加入此組織。
         </p>
         <div class="flex gap-2">
           <button
