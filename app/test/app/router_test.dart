@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:argus_app/app/router.dart';
 import 'package:argus_app/core/api/models/app_user.dart';
 import 'package:argus_app/core/api/models/org.dart';
+import 'package:argus_app/core/storage/secure_storage.dart';
+import 'package:argus_app/features/auth/presentation/dev_server_config_screen.dart';
+import 'package:argus_app/features/auth/presentation/force_password_change_screen.dart';
+import 'package:argus_app/features/auth/presentation/home_screen.dart';
+import 'package:argus_app/features/auth/presentation/login_screen.dart';
 import 'package:argus_app/features/auth/state/auth_provider.dart';
 import 'package:argus_app/features/auth/state/auth_state.dart';
+import 'package:argus_app/l10n/app_localizations.dart';
 
 import '../helpers/fake_auth_notifier.dart';
+import '../helpers/fake_secure_storage.dart';
 
 void main() {
   group('redirect rules', () {
@@ -18,7 +26,7 @@ void main() {
         const AuthState.unauthenticated(),
         startAt: '/',
       );
-      expect(find.text('Login'), findsOneWidget);
+      expect(find.byType(LoginScreen), findsOneWidget);
     });
 
     testWidgets(
@@ -33,7 +41,7 @@ void main() {
           ),
           startAt: '/',
         );
-        expect(find.text('Change password'), findsOneWidget);
+        expect(find.byType(ForcePasswordChangeScreen), findsOneWidget);
       },
     );
 
@@ -47,7 +55,7 @@ void main() {
         ),
         startAt: '/login',
       );
-      expect(find.text('Home'), findsOneWidget);
+      expect(find.byType(HomeScreen), findsOneWidget);
     });
 
     testWidgets('error -> /login', (tester) async {
@@ -56,7 +64,17 @@ void main() {
         const AuthState.error('boom'),
         startAt: '/',
       );
-      expect(find.text('Login'), findsOneWidget);
+      expect(find.byType(LoginScreen), findsOneWidget);
+    });
+
+    testWidgets('dev menu route reachable while unauthenticated',
+        (tester) async {
+      await _pumpWithAuth(
+        tester,
+        const AuthState.unauthenticated(),
+        startAt: '/dev-server-config',
+      );
+      expect(find.byType(DevServerConfigScreen), findsOneWidget);
     });
   });
 }
@@ -70,6 +88,7 @@ Future<void> _pumpWithAuth(
     overrides: <Override>[
       authProvider
           .overrideWith(() => FakeAuthNotifier(AsyncValue.data(initial))),
+      secureStorageProvider.overrideWithValue(FakeSecureStorage()),
     ],
   );
   addTearDown(container.dispose);
@@ -80,7 +99,17 @@ Future<void> _pumpWithAuth(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(
+        routerConfig: router,
+        locale: const Locale('zh', 'TW'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const <LocalizationsDelegate<Object>>[
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+      ),
     ),
   );
   await tester.pumpAndSettle();

@@ -93,12 +93,12 @@
 
 ## 12. Tests
 
-- [ ] 12.1 `test/core/env/env_test.dart`: assert the dart-define / Android / iOS branches of `Env.compileTimeDefault()`. (Use a mock `Platform` or factor the OS check into an injectable function so it's testable.)
-- [ ] 12.2 `test/core/api/api_error_test.dart`: feed sample dio error responses for each known code into the parser; assert the resulting `ApiException` shape. Include a network-error case (dio `connectionError`).
-- [ ] 12.3 `test/features/auth/state/auth_provider_test.dart`: exercise the `AuthNotifier` state transitions with a fake `AuthRepository` — auto-login success / 401 / network error, login success / `INVALID_CREDENTIALS`, logout (success and network failure both clear state).
-- [ ] 12.4 `test/features/auth/presentation/login_screen_test.dart`: pump the screen with overridden providers; assert disabled submit when fields empty, enabled when all three present, error rendering on `INVALID_CREDENTIALS`, navigation on success.
-- [ ] 12.5 `test/features/auth/presentation/force_password_change_screen_test.dart`: pump screen, assert submit disabled until both fields filled, error renders for `INVALID_PASSWORD`, success path completes.
-- [ ] 12.6 `test/app/router_test.dart`: with overridden auth states, assert that the redirects match the spec (unauthenticated → /login; needsPasswordChange → /force-change-password; etc).
+- [x] 12.1 `test/core/env/env_test.dart`: assert the dart-define / Android / iOS branches of `Env.compileTimeDefault()`. (Use a mock `Platform` or factor the OS check into an injectable function so it's testable.)
+- [x] 12.2 `test/core/api/api_error_test.dart`: feed sample dio error responses for each known code into the parser; assert the resulting `ApiException` shape. Include a network-error case (dio `connectionError`).
+- [x] 12.3 `test/features/auth/state/auth_provider_test.dart`: exercise the `AuthNotifier` state transitions with a fake `AuthRepository` — auto-login success / 401 / network error, login success / `INVALID_CREDENTIALS`, logout (success and network failure both clear state).
+- [x] 12.4 `test/features/auth/presentation/login_screen_test.dart`: pump the screen with overridden providers; assert disabled submit when fields empty, enabled when all three present, error rendering on `INVALID_CREDENTIALS`, navigation on success.
+- [x] 12.5 `test/features/auth/presentation/force_password_change_screen_test.dart`: pump screen, assert submit disabled until both fields filled, error renders for `INVALID_PASSWORD`, success path completes.
+- [x] 12.6 `test/app/router_test.dart`: with overridden auth states, assert that the redirects match the spec (unauthenticated → /login; needsPasswordChange → /force-change-password; etc).
 
 ## 13. CI
 
