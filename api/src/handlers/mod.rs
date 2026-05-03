@@ -1,3 +1,6 @@
+pub mod app_auth;
+pub mod app_dto;
+pub mod app_users;
 pub mod auth;
 pub mod me;
 pub mod orgs;
@@ -9,6 +12,7 @@ use axum::routing::{delete, get, patch, post};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
+use crate::auth::app_extractor::app_require_session;
 use crate::auth::middleware::require_session;
 use crate::state::AppState;
 
@@ -17,7 +21,8 @@ pub fn router(state: AppState) -> Router {
 
     let public = Router::new()
         .route("/auth/register", post(auth::register))
-        .route("/auth/login", post(auth::login));
+        .route("/auth/login", post(auth::login))
+        .route("/app/auth/login", post(app_auth::login));
 
     let protected = Router::new()
         .route("/auth/logout", post(auth::logout))
@@ -43,14 +48,38 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/dashboard-users/{id}", delete(users::remove))
         .route("/dashboard-users/{id}/role", patch(users::update_role))
+        // `/app-users/*` lives in dashboard-tenancy world (cookie auth +
+        // RequireAdmin). The route handlers themselves enforce admin role
+        // and current-Org scoping.
+        .route(
+            "/app-users",
+            get(app_users::list).post(app_users::create),
+        )
+        .route("/app-users/{id}", patch(app_users::update))
+        .route(
+            "/app-users/{id}/password-reset",
+            post(app_users::password_reset),
+        )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             require_session,
         ));
 
+    // `/app/*` (mobile-facing) sits under a separate Bearer-token middleware.
+    // `POST /app/auth/login` is public and lives in `public` above.
+    let app_protected = Router::new()
+        .route("/app/auth/logout", post(app_auth::logout))
+        .route("/app/me", get(app_auth::me))
+        .route("/app/me/password", post(app_auth::change_password))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            app_require_session,
+        ));
+
     Router::new()
         .merge(public)
         .merge(protected)
+        .merge(app_protected)
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state)
