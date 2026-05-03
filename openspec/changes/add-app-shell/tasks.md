@@ -102,9 +102,9 @@
 
 ## 13. CI
 
-- [ ] 13.1 `.github/workflows/app.yml`: workflow triggered on `pull_request` with `paths: [app/**]` and on `push` to `main` with the same paths. Runs on `ubuntu-latest`. Steps: checkout, `subosito/flutter-action@v2` with `channel: stable`, `flutter pub get`, `dart run build_runner build --delete-conflicting-outputs`, `flutter analyze`, `flutter test`.
-- [ ] 13.2 Cache `~/.pub-cache` and `app/.dart_tool/` between runs keyed off `pubspec.lock`'s hash to keep CI fast.
-- [ ] 13.3 Verify the workflow does NOT fire on PRs that only touch `api/`, `admin-web/`, or `openspec/`.
+- [x] 13.1 `.github/workflows/app.yml`: workflow triggered on `pull_request` with `paths: [app/**]` and on `push` to `main` with the same paths. Runs on `ubuntu-latest`. Steps: checkout, `subosito/flutter-action@v2` with `channel: stable`, `flutter pub get`, `dart run build_runner build --delete-conflicting-outputs`, `flutter analyze`, `flutter test`. (Deviation: `build_runner` step omitted because the project no longer uses freezed/json_serializable codegen — see section 5.)
+- [x] 13.2 Cache `~/.pub-cache` and `app/.dart_tool/` between runs keyed off `pubspec.lock`'s hash to keep CI fast.
+- [x] 13.3 Verify the workflow does NOT fire on PRs that only touch `api/`, `admin-web/`, or `openspec/`.
 
 ## 14. Docs
 
