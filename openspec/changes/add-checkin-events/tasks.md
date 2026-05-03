@@ -80,25 +80,25 @@
 
 ## 10. admin-web
 
-- [ ] 10.1 Add types to `admin-web/types/api.ts`: `CheckinEventType`, `AppUserCheckinStatus`, `EventSource`, `EventInitiatorKind`, `EventLocation`, `CheckinEventDto`, `CheckinUserStatusDto`, `SubmitCheckinEventRequest`, `ForceCheckoutRequest`, `UpdateOrgSettingsRequest`, `OrgSettingsDto`.
-- [ ] 10.2 Add `composables/useCheckin.ts`: `listUsers()`, `listUserEvents(id, cursor?)`, `forceCheckout(id, reason?)`.
-- [ ] 10.3 Add `composables/useOrgSettings.ts`: `update({ transfer_enabled?, timezone? })`. (Or fold into existing `useOrgSlug` / a new umbrella; pick the simplest.)
-- [ ] 10.4 New page `pages/checkin/index.vue` (admin-only): live status board listing AppUsers grouped by status (on_site / in_transit / off_duty). Each row shows display_name, status badge, current_shift_started_at (rendered in Org timezone), last event location summary, and a skew-warning icon when applicable. Force-checkout button per non-`off_duty` row → confirm dialog with optional reason field. Polling every 30s. Watch `auth.currentOrg.value?.id` to refetch.
-- [ ] 10.5 New page `pages/checkin/[appUserId].vue` (admin-only): single AppUser's event history with cursor pagination, each event showing event_type, time (Org TZ), location (region_name + manual_label + lat/lng tooltip), source badge (`app` / `管理員強制收班`), reason (when present), skew-warning icon when applicable.
-- [ ] 10.6 Update `pages/index.vue` organisation-info section: add `transfer_enabled` toggle (state-locked semantics surfaced — when `STATE_LOCKED`, show "目前在班 N 人，需先全部下班才能調整"). Add `timezone` selector populated from a small curated list (or text input with validation). Both reuse `useOrgSettings.update`.
-- [ ] 10.7 Add `pages/checkin/index.vue` to admin nav row in `pages/index.vue` (alongside 成員管理 / App 使用者 / 冷卻管理).
-- [ ] 10.8 Friendly error messages for `INVALID_TRANSITION`, `TRANSFER_DISABLED`, `OUT_OF_ORDER`, `STATE_LOCKED` (with `on_duty_count`), `NOT_ON_DUTY`, `INVALID_TIMEZONE`.
-- [ ] 10.9 All Org-TZ rendering uses a shared helper (e.g. `formatInOrgTz(iso, org.timezone)`); fall back to browser TZ if Org TZ is missing.
-- [ ] 10.10 OrgSwitcher present on `pages/checkin/*` headers (consistent with members / cooldowns / app-users).
+- [x] 10.1 Add types to `admin-web/types/api.ts`: `CheckinEventType`, `AppUserCheckinStatus`, `EventSource`, `EventInitiatorKind`, `EventLocation`, `CheckinEventDto`, `CheckinUserStatusDto`, `SubmitCheckinEventRequest`, `ForceCheckoutRequest`, `UpdateOrgSettingsRequest`, `OrgSettingsDto`.
+- [x] 10.2 Add `composables/useCheckin.ts`: `listUsers()`, `listUserEvents(id, cursor?)`, `forceCheckout(id, reason?)`.
+- [x] 10.3 Add `composables/useOrgSettings.ts`: `update({ transfer_enabled?, timezone? })`. (Or fold into existing `useOrgSlug` / a new umbrella; pick the simplest.)
+- [x] 10.4 New page `pages/checkin/index.vue` (admin-only): live status board listing AppUsers grouped by status (on_site / in_transit / off_duty). Each row shows display_name, status badge, current_shift_started_at (rendered in Org timezone), last event location summary, and a skew-warning icon when applicable. Force-checkout button per non-`off_duty` row → confirm dialog with optional reason field. Polling every 30s. Watch `auth.currentOrg.value?.id` to refetch.
+- [x] 10.5 New page `pages/checkin/[appUserId].vue` (admin-only): single AppUser's event history with cursor pagination, each event showing event_type, time (Org TZ), location (region_name + manual_label + lat/lng tooltip), source badge (`app` / `管理員強制收班`), reason (when present), skew-warning icon when applicable.
+- [x] 10.6 Update `pages/index.vue` organisation-info section: add `transfer_enabled` toggle (state-locked semantics surfaced — when `STATE_LOCKED`, show "目前在班 N 人，需先全部下班才能調整"). Add `timezone` selector populated from a small curated list (or text input with validation). Both reuse `useOrgSettings.update`.
+- [x] 10.7 Add `pages/checkin/index.vue` to admin nav row in `pages/index.vue` (alongside 成員管理 / App 使用者 / 冷卻管理).
+- [x] 10.8 Friendly error messages for `INVALID_TRANSITION`, `TRANSFER_DISABLED`, `OUT_OF_ORDER`, `STATE_LOCKED` (with `on_duty_count`), `NOT_ON_DUTY`, `INVALID_TIMEZONE`.
+- [x] 10.9 All Org-TZ rendering uses a shared helper (e.g. `formatInOrgTz(iso, org.timezone)`); fall back to browser TZ if Org TZ is missing.
+- [x] 10.10 OrgSwitcher present on `pages/checkin/*` headers (consistent with members / cooldowns / app-users).
 
 ## 11. Docs
 
-- [ ] 11.1 Update `api/README.md` with a "打卡 / Checkin" section: state-machine table, endpoint list (mobile + admin), error codes (`INVALID_TRANSITION`, `TRANSFER_DISABLED`, `OUT_OF_ORDER`, `STATE_LOCKED`, `NOT_ON_DUTY`, `INVALID_TIMEZONE`), reverse-geocoder swap path (Nominatim → others), Nominatim Usage Policy notes (User-Agent, 1 req/s avg), and the dual-timestamp + offline-queue contract for `add-app-shell`.
-- [ ] 11.2 Update `admin-web/README.md` structure section to include `pages/checkin/`, `composables/useCheckin`, `composables/useOrgSettings`, and a paragraph on the live board + skew warning UX.
-- [ ] 11.3 Cross-reference `add-app-shell` in `api/README.md` as the upcoming change that consumes `/app/checkin/*` and implements the persistent queue.
+- [x] 11.1 Update `api/README.md` with a "打卡 / Checkin" section: state-machine table, endpoint list (mobile + admin), error codes (`INVALID_TRANSITION`, `TRANSFER_DISABLED`, `OUT_OF_ORDER`, `STATE_LOCKED`, `NOT_ON_DUTY`, `INVALID_TIMEZONE`), reverse-geocoder swap path (Nominatim → others), Nominatim Usage Policy notes (User-Agent, 1 req/s avg), and the dual-timestamp + offline-queue contract for `add-app-shell`.
+- [x] 11.2 Update `admin-web/README.md` structure section to include `pages/checkin/`, `composables/useCheckin`, `composables/useOrgSettings`, and a paragraph on the live board + skew warning UX.
+- [x] 11.3 Cross-reference `add-app-shell` in `api/README.md` as the upcoming change that consumes `/app/checkin/*` and implements the persistent queue.
 
 ## 12. Smoke
 
-- [ ] 12.1 `cargo test` per-binary serial loop on macOS clean.
-- [ ] 12.2 `pnpm typecheck` + `pnpm build` clean.
+- [x] 12.1 `cargo test` per-binary serial loop on macOS clean.
+- [x] 12.2 `pnpm typecheck` + `pnpm build` clean.
 - [ ] 12.3 Live curl smoke (no Flutter): create an AppUser via admin-web, log in via `/app/auth/login`, change initial password, then walk the full state-machine via `/app/checkin/events` (clock_in → transfer_out → transfer_in → transfer_out → transfer_in → clock_out). Confirm admin-web live board reflects each transition. Test transfer-disabled toggle (clock everyone out, flip toggle, attempt transfer → 403, attempt clock_in/out → ok). Test force-checkout from admin-web. Test timezone change visible in display.

@@ -156,3 +156,82 @@ login 失敗（org_code 不存在、username 不存在、wrong password、status
 | `USERNAME_TAKEN` | 409 | 同 Org 內 username 已存在（case-insensitive） |
 | `INVALID_USERNAME_FORMAT` | 400 | username 不符 `^[a-zA-Z0-9_.-]{2,32}$` |
 | `NEEDS_PASSWORD_CHANGE` | 423 | AppUser 尚未變更初始密碼，先改才能呼叫其他 `/app/*` |
+
+## 打卡 / Checkin
+
+四個事件 + 三狀態的狀態機。AppUser 透過 `/app/checkin/*` 提交事件，admin 透過 `/checkin/*` 看即時看板與強制收班。下一個 ROADMAP item `add-app-shell` 會 bootstrap Flutter app 消化這個 surface。
+
+### 狀態機
+
+```
+status: off_duty | on_site | in_transit
+
+  off_duty   ─clock_in─────▶ on_site         上班（在某現場開始）
+  on_site    ─transfer_out─▶ in_transit      離開現場、在路上
+  in_transit ─transfer_in──▶ on_site         抵達下一現場
+  on_site    ─clock_out────▶ off_duty        在現場下班
+  in_transit ─clock_out────▶ off_duty        忘了 transfer_in 直接下班
+```
+
+`transfer_in` 表示「到了下一個現場」，**不是**「回到原本的 primary」。多現場 shift（A → B → C）是合法且預期的工作流。
+
+### Mobile-facing endpoints `/app/checkin/*`（Bearer auth）
+
+| Endpoint | 說明 |
+| --- | --- |
+| `POST /app/checkin/events` | body `{ event_type, lat, lng, accuracy?, manual_label?, occurred_at_client }`；返 `{ event, status }` |
+| `GET /app/checkin/status` | 自己當前的 status + last_event |
+| `GET /app/checkin/events` | 自己的事件歷史，cursor 分頁（`?before=<RFC3339>&limit=N`） |
+
+### Admin-facing endpoints（dashboard cookie + admin）
+
+| Endpoint | 說明 |
+| --- | --- |
+| `GET /checkin/users` | 即時看板：`current_org` 內所有 AppUser 的當前狀態 + has_skew_warning |
+| `GET /checkin/users/:id/events` | 單個 AppUser 的事件歷史，cursor 分頁 |
+| `POST /checkin/users/:id/force-checkout` | 強制收班，body `{ reason?: String (≤240) }`；事件 source=admin_force、location 沿用最後一筆、manual_label 標註「管理員強制收班」 |
+| `PATCH /orgs/me/settings` | body `{ transfer_enabled?, timezone? }`；`transfer_enabled` 受 state-lock；`timezone` 隨時可改 |
+
+### 雙時間戳與離線同步
+
+每筆事件都有兩個時間戳：
+
+- `occurred_at_client`：app 端裝置記錄的時間，由 request body 帶來。**顯示與排序皆以此為準**。任意 skew 都接受（包括未來 / 過去數天）。
+- `occurred_at_server`：server 收到當下。僅供 audit 與 admin-web `has_skew_warning` 判定（`|client - server| > 1h` 時為 true）。
+
+每個 AppUser 的事件嚴格按 `occurred_at_client` 升序：新事件 `client` 時間若 ≤ 該 AppUser 上一筆，回 `409 OUT_OF_ORDER`。
+
+**App 端 queue 契約（`add-app-shell` 將實作）**：
+- 事件先寫進 device-local 持久 queue（SQLite / Hive / shared_preferences），重啟後仍在。
+- 嚴格序列化送出：每筆等到 `2xx` 才送下一筆。
+- 失敗則同一筆以同 `occurred_at_client` 重試（不要重新 timestamp）。
+
+只要 app 遵守這個契約，正常運作下不會觸發 `OUT_OF_ORDER`。
+
+### Reverse geocoding
+
+每筆事件成功收下後，server 同步呼叫 `ReverseGeocoder::lookup(lat, lng)` 補上 `region_name`。預設實作 `NominatimGeocoder` 串接 [Nominatim](https://nominatim.openstreetmap.org/)：
+
+- User-Agent: `argus-api/<version>`，符合 [Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/) 要求
+- 2 秒 timeout
+- 任何失敗（timeout / non-2xx / parse error）→ `region_name = null`，事件照常記錄（fail-soft）
+- accept-language 預設 `"zh-TW,en"`
+
+**換 provider**：`ReverseGeocoder` 是 trait，要切 Mapbox / Google / 自架時新增一個 impl 注入 `AppState` 即可，handler 不變。Nominatim 的 free-tier 適合 dev / pilot，production 通常要換家。
+
+### Org timezone
+
+`Org.timezone` 是 IANA 名稱（例：`Asia/Taipei`、`UTC`），新 Org 預設 `Asia/Taipei`。**純顯示用**：DB 一律存絕對 UTC 時間，server 不依此做 date-range 計算或保留期決定。admin-web 與未來 Flutter app 用此值 render 時間。
+
+驗證：用內建 IANA primary-name 列表（[`api/src/services/timezone.rs`](src/services/timezone.rs)）。日後若想換 `chrono-tz` crate，只要改 `validate_timezone` 一處。
+
+### Error codes（這個 change 新增）
+
+| Code | HTTP | 說明 |
+| --- | --- | --- |
+| `INVALID_TRANSITION` | 422 | 狀態機不允許此 transition；body 含 `from` / `attempted` |
+| `TRANSFER_DISABLED` | 403 | Org 關閉 transfer，不接受 transfer_out / transfer_in |
+| `OUT_OF_ORDER` | 409 | 新事件的 `occurred_at_client` ≤ 該 AppUser 上一筆 |
+| `STATE_LOCKED` | 409 | 有人非 off_duty 時無法調整 `transfer_enabled`；body 含 `on_duty_count` |
+| `NOT_ON_DUTY` | 409 | 強制收班的目標目前已下班 |
+| `INVALID_TIMEZONE` | 400 | timezone 不在 IANA primary-name 列表中 |
