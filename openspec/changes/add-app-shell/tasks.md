@@ -53,14 +53,14 @@
 
 ## 7. go_router + redirect logic
 
-- [ ] 7.1 `lib/app/router.dart`: define the `GoRouter` with routes `/login`, `/force-change-password`, `/`, `/dev-server-config` (debug only). Provide it as a Riverpod provider that `argus_app.dart` consumes.
-- [ ] 7.2 Implement `redirect` against the auth provider's state:
+- [x] 7.1 `lib/app/router.dart`: define the `GoRouter` with routes `/login`, `/force-change-password`, `/`, `/dev-server-config` (debug only). Provide it as a Riverpod provider that `argus_app.dart` consumes.
+- [x] 7.2 Implement `redirect` against the auth provider's state:
   - `loading` → no redirect (let the splash render at whatever path)
   - `unauthenticated` → redirect any non-`/login`, non-`/dev-server-config` path to `/login`
   - `authenticated && needsPasswordChange` → redirect any non-`/force-change-password` path to `/force-change-password`
   - `authenticated && !needsPasswordChange` → redirect `/login` and `/force-change-password` to `/`
   - `error` → redirect to `/login` (the screen will surface a banner)
-- [ ] 7.3 Verify via a small widget test that the redirects fire: with overridden auth state, `goNamed('/')` while unauthenticated lands on `/login`.
+- [x] 7.3 Verify via a small widget test that the redirects fire: with overridden auth state, `goNamed('/')` while unauthenticated lands on `/login`.
 
 ## 8. Login screen
 
