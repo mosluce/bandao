@@ -36,11 +36,15 @@ async fn newly_created_app_user_has_off_duty_status_row() {
     );
     assert!(row.last_event_id.is_none());
     assert!(row.current_shift_started_at.is_none());
-    assert_eq!(row.org_id.to_hex(), create_body["user"]["id"].as_str().map(|_| {
-        // sanity-check: we want the row in the right org. Re-derive via
-        // app_users collection rather than encode the org id round-trip.
-        ()
-    }).map(|_| row.org_id.to_hex()).unwrap());
+    // Sanity check: org_id on the status row matches the AppUser's org.
+    let app_user = app
+        .db()
+        .app_users
+        .find_by_id(app_user_id)
+        .await
+        .unwrap()
+        .expect("app user row");
+    assert_eq!(row.org_id, app_user.org_id);
 }
 
 #[tokio::test]
