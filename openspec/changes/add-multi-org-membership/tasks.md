@@ -106,5 +106,5 @@
 
 ## 13. Smoke
 
-- [ ] 13.1 Bring up local stack (mongo + api + admin-web), wipe DB, register two identities, each creating their own Org; have one join the other's; verify switching, leaving, owner transfer, zero-org recovery end-to-end in the browser.
+- [x] 13.1 Bring up local stack (mongo + api + admin-web), wipe DB, register two identities, each creating their own Org; have one join the other's; verify switching, leaving, owner transfer, zero-org recovery end-to-end in the browser.
 - [x] 13.2 Run `cargo test` and `pnpm typecheck` + `pnpm build` clean.
