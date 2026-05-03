@@ -26,25 +26,25 @@
 
 ## 4. Mobile-facing handlers (`/app/*`)
 
-- [ ] 4.1 `POST /app/auth/login` in `api/src/handlers/app_auth.rs`: validate body shape, resolve `org_code`, look up `app_users(org_id, username_lower)`, verify password, verify status, issue session, update `last_login_at`, return `{ token, expires_at, user, org, needs_password_change }`. All failure modes collapse to `INVALID_CREDENTIALS`.
-- [ ] 4.2 `POST /app/auth/logout`: delete session row by token; reachable even when `needs_password_change == true`.
-- [ ] 4.3 `GET /app/me`: return `{ user, org, needs_password_change }`; reachable even when `needs_password_change == true`.
-- [ ] 4.4 `POST /app/me/password`: verify `current_password`, validate `new_password >= 8`, update hash, set `needs_password_change = false`, leave sessions intact; reachable even when `needs_password_change == true`.
-- [ ] 4.5 Wire `/app/*` routes into `api/src/lib.rs` (or wherever the router is composed). Ensure they sit under a sub-router that runs the `RequireAppUser` middleware (or equivalent) — except `/app/auth/login`, which is public.
+- [x] 4.1 `POST /app/auth/login` in `api/src/handlers/app_auth.rs`: validate body shape, resolve `org_code`, look up `app_users(org_id, username_lower)`, verify password, verify status, issue session, update `last_login_at`, return `{ token, expires_at, user, org, needs_password_change }`. All failure modes collapse to `INVALID_CREDENTIALS`.
+- [x] 4.2 `POST /app/auth/logout`: delete session row by token; reachable even when `needs_password_change == true`.
+- [x] 4.3 `GET /app/me`: return `{ user, org, needs_password_change }`; reachable even when `needs_password_change == true`.
+- [x] 4.4 `POST /app/me/password`: verify `current_password`, validate `new_password >= 8`, update hash, set `needs_password_change = false`, leave sessions intact; reachable even when `needs_password_change == true`.
+- [x] 4.5 Wire `/app/*` routes into `api/src/lib.rs` (or wherever the router is composed). Ensure they sit under a sub-router that runs the `RequireAppUser` middleware (or equivalent) — except `/app/auth/login`, which is public.
 
 ## 5. Admin-facing handlers (`/app-users`)
 
-- [ ] 5.1 `GET /app-users`: admin-only, scoped to `current_org`. Return list of `AppUserDto`. Excludes `password_hash` and any session info.
-- [ ] 5.2 `POST /app-users`: admin-only. Validate `username` against `^[a-zA-Z0-9_.-]{2,32}$` and `display_name` length 1–60. Generate initial password, create row with `needs_password_change = true`, return `{ user, initial_password }`. Map duplicate-key to `USERNAME_TAKEN`.
-- [ ] 5.3 `PATCH /app-users/:id`: admin-only, scoped to `current_org`. Accept partial update of `display_name?`, `status?`. Reject any other fields. When `status` transitions to `disabled`, delete all `app_sessions` for that AppUser. Cross-Org id → `NOT_FOUND`.
-- [ ] 5.4 `POST /app-users/:id/password-reset`: admin-only, scoped to `current_org`. Generate new initial password, update hash, set `needs_password_change = true`, delete all `app_sessions` for that AppUser, return `{ user, initial_password }`.
-- [ ] 5.5 Wire `/app-users/*` routes under existing dashboard auth + tenancy (cookie + `RequireAdmin`). Make sure NO_ACTIVE_ORG comes through naturally for sessions without `current_org_id`.
+- [x] 5.1 `GET /app-users`: admin-only, scoped to `current_org`. Return list of `AppUserDto`. Excludes `password_hash` and any session info.
+- [x] 5.2 `POST /app-users`: admin-only. Validate `username` against `^[a-zA-Z0-9_.-]{2,32}$` and `display_name` length 1–60. Generate initial password, create row with `needs_password_change = true`, return `{ user, initial_password }`. Map duplicate-key to `USERNAME_TAKEN`.
+- [x] 5.3 `PATCH /app-users/:id`: admin-only, scoped to `current_org`. Accept partial update of `display_name?`, `status?`. Reject any other fields. When `status` transitions to `disabled`, delete all `app_sessions` for that AppUser. Cross-Org id → `NOT_FOUND`.
+- [x] 5.4 `POST /app-users/:id/password-reset`: admin-only, scoped to `current_org`. Generate new initial password, update hash, set `needs_password_change = true`, delete all `app_sessions` for that AppUser, return `{ user, initial_password }`.
+- [x] 5.5 Wire `/app-users/*` routes under existing dashboard auth + tenancy (cookie + `RequireAdmin`). Make sure NO_ACTIVE_ORG comes through naturally for sessions without `current_org_id`.
 
 ## 6. DTO shapes
 
-- [ ] 6.1 Define `AppUserDto { id, username, display_name, status, needs_password_change, last_login_at, created_at }` once and reuse from both `app_auth` and `app_users` handler modules.
-- [ ] 6.2 Define `AppLoginRequest { org_code, username, password }`, `AppLoginResponse { token, expires_at, user, org, needs_password_change }`, `AppMeResponse { user, org, needs_password_change }`, `AppPasswordChangeRequest { current_password, new_password }`.
-- [ ] 6.3 Define `CreateAppUserRequest { username, display_name }`, `UpdateAppUserRequest { display_name?, status? }`, `CreateAppUserResponse { user, initial_password }`.
+- [x] 6.1 Define `AppUserDto { id, username, display_name, status, needs_password_change, last_login_at, created_at }` once and reuse from both `app_auth` and `app_users` handler modules.
+- [x] 6.2 Define `AppLoginRequest { org_code, username, password }`, `AppLoginResponse { token, expires_at, user, org, needs_password_change }`, `AppMeResponse { user, org, needs_password_change }`, `AppPasswordChangeRequest { current_password, new_password }`.
+- [x] 6.3 Define `CreateAppUserRequest { username, display_name }`, `UpdateAppUserRequest { display_name?, status? }`, `CreateAppUserResponse { user, initial_password }`.
 
 ## 7. API integration tests
 

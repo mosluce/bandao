@@ -255,13 +255,15 @@ mod tests {
     ///   /me
     ///   /orgs/me/code/rotate
     ///   /dashboard-users/{id}/role, /dashboard-users
+    ///   /app/auth/login, /app/auth/logout, /app/me, /app/me/password
+    ///   /app-users, /app-users/{id}, /app-users/{id}/password-reset
     ///
-    /// First-level segments: auth, me, orgs, dashboard-users.
-    /// `dashboard-users` cannot match the slug regex (contains `-`), so it never collides;
-    /// the others must be in the list.
+    /// First-level segments: auth, me, orgs, dashboard-users, app, app-users.
+    /// `dashboard-users` and `app-users` cannot match the slug regex (contain `-`),
+    /// so they never collide; the slug-shaped ones must be in the list.
     #[test]
     fn router_first_level_paths_are_reserved() {
-        let segments = ["auth", "me", "orgs"];
+        let segments = ["auth", "me", "orgs", "app"];
         for seg in segments {
             assert!(
                 RESERVED_SLUGS.contains(&seg),

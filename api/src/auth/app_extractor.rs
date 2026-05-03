@@ -72,10 +72,15 @@ enum AppAuthFail {
 /// can extract `AppAuthContext` directly.
 pub async fn app_require_session(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     mut req: Request,
     next: Next,
 ) -> Response {
-    match authenticate(&state, &req).await {
+    let token = match extract_bearer(&headers) {
+        Some(t) => t,
+        None => return ApiError::Unauthorized.into_response(),
+    };
+    match authenticate(&state, token).await {
         Ok(ctx) => {
             // Sliding refresh — best-effort, don't fail the request on update miss.
             if let Err(err) = state
@@ -93,11 +98,7 @@ pub async fn app_require_session(
     }
 }
 
-async fn authenticate(state: &AppState, req: &Request) -> Result<AppAuthContext, AppAuthFail> {
-    let token = match extract_bearer(req) {
-        Some(t) => t,
-        None => return Err(AppAuthFail::Unauthorized),
-    };
+async fn authenticate(state: &AppState, token: String) -> Result<AppAuthContext, AppAuthFail> {
 
     let session = match state.db.app_sessions.find_by_token(&token).await {
         Ok(Some(s)) => s,
@@ -145,8 +146,8 @@ async fn authenticate(state: &AppState, req: &Request) -> Result<AppAuthContext,
 
 /// Pull `Authorization: Bearer <token>` out of the request headers.
 /// Case-insensitive match on the scheme; rejects anything else.
-fn extract_bearer(req: &Request) -> Option<String> {
-    let value = req.headers().get(AUTHORIZATION)?.to_str().ok()?;
+fn extract_bearer(headers: &axum::http::HeaderMap) -> Option<String> {
+    let value = headers.get(AUTHORIZATION)?.to_str().ok()?;
     let mut parts = value.splitn(2, ' ');
     let scheme = parts.next()?;
     let token = parts.next()?.trim();
@@ -159,48 +160,43 @@ fn extract_bearer(req: &Request) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::Body;
-    use axum::http::Request as HttpRequest;
+    use axum::http::HeaderMap;
+    use axum::http::HeaderValue;
 
-    fn req_with_auth(value: &str) -> Request {
-        HttpRequest::builder()
-            .uri("/")
-            .header(AUTHORIZATION, value)
-            .body(Body::empty())
-            .unwrap()
+    fn headers_with_auth(value: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert(AUTHORIZATION, HeaderValue::from_str(value).unwrap());
+        h
     }
 
     #[test]
     fn extract_bearer_strips_scheme() {
-        let req = req_with_auth("Bearer abc.def");
-        assert_eq!(extract_bearer(&req), Some("abc.def".to_string()));
+        let h = headers_with_auth("Bearer abc.def");
+        assert_eq!(extract_bearer(&h), Some("abc.def".to_string()));
     }
 
     #[test]
     fn extract_bearer_is_case_insensitive_on_scheme() {
-        let req = req_with_auth("bearer xyz");
-        assert_eq!(extract_bearer(&req), Some("xyz".to_string()));
+        let h = headers_with_auth("bearer xyz");
+        assert_eq!(extract_bearer(&h), Some("xyz".to_string()));
     }
 
     #[test]
     fn extract_bearer_rejects_other_schemes() {
-        let req = req_with_auth("Basic dXNlcjpwYXNz");
-        assert_eq!(extract_bearer(&req), None);
+        let h = headers_with_auth("Basic dXNlcjpwYXNz");
+        assert_eq!(extract_bearer(&h), None);
     }
 
     #[test]
     fn extract_bearer_rejects_missing_token() {
-        let req = req_with_auth("Bearer ");
-        assert_eq!(extract_bearer(&req), None);
+        let h = headers_with_auth("Bearer ");
+        assert_eq!(extract_bearer(&h), None);
     }
 
     #[test]
     fn extract_bearer_rejects_no_header() {
-        let req = HttpRequest::builder()
-            .uri("/")
-            .body(Body::empty())
-            .unwrap();
-        assert_eq!(extract_bearer(&req), None);
+        let h = HeaderMap::new();
+        assert_eq!(extract_bearer(&h), None);
     }
 
     /// Unit-test the 423 gate logic without spinning up a server. The
