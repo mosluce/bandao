@@ -172,7 +172,7 @@ The system SHALL allow any authenticated dashboard user to leave `current_org` v
 - **AND** no records are modified
 - **AND** the response message indicates that the owner must transfer ownership before leaving
 
-### Requirement: Cooldown blocks rejoin during membership creation
+### Requirement: Cooldown blocks rejoin during `register mode=join`
 
 The system SHALL, when creating any new membership for an existing-or-newly-created identity, look up `removed_memberships` by `(target_org.id, lowercase(input_email))` after resolving the Org but before inserting the membership. If a non-expired marker exists, the request SHALL be rejected with `EMAIL_IN_COOLDOWN`. The cooldown SHALL apply identically regardless of `removal_kind`. The cooldown SHALL be scoped to one Org: a cooldown for Org A SHALL NOT block joining Org B with the same email. The check SHALL apply to both `register mode=join` (creating identity + membership in one step) and `POST /me/memberships` (existing identity adding a new membership). The check SHALL NOT apply to `register mode=create` or `POST /me/orgs` (creating a brand-new Org cannot collide with a cooldown for that Org).
 
