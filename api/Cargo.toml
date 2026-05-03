@@ -42,6 +42,7 @@ base64 = "0.22"
 
 # utilities
 async-trait = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["macros", "rt-multi-thread", "test-util"] }

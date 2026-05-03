@@ -193,6 +193,14 @@ impl AppUserRepository {
             .await?;
         Ok(())
     }
+
+    /// Hard delete by id. Used by the `POST /app-users` rollback path when
+    /// the post-insert hook (`checkin_user_status` init) fails. Returns the
+    /// number of removed rows.
+    pub async fn delete_by_id(&self, id: ObjectId) -> ApiResult<u64> {
+        let result = self.coll.delete_one(doc! { "_id": id }).await?;
+        Ok(result.deleted_count)
+    }
 }
 
 fn is_duplicate_key(err: &mongodb::error::Error) -> bool {

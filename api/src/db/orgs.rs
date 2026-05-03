@@ -2,7 +2,7 @@ use bson::oid::ObjectId;
 use bson::{DateTime, doc};
 use mongodb::Collection;
 
-use crate::domain::Org;
+use crate::domain::{DEFAULT_ORG_TIMEZONE, Org};
 use crate::error::{ApiError, ApiResult};
 
 #[derive(Clone)]
@@ -17,6 +17,13 @@ impl OrgRepository {
 
     pub async fn create(&self, name: &str, code: &str, owner_id: ObjectId) -> ApiResult<Org> {
         let now = DateTime::now();
+        // New Orgs default to transfer_enabled=true (the more permissive
+        // option) and Asia/Taipei. Both can be flipped via PATCH /orgs/me/settings.
+        let mut settings = bson::Document::new();
+        settings.insert(
+            "checkin",
+            doc! { "transfer_enabled": true },
+        );
         let org = Org {
             id: ObjectId::new(),
             name: name.to_string(),
@@ -24,12 +31,39 @@ impl OrgRepository {
             owner_id,
             slug: None,
             slug_changed_at: None,
-            settings: bson::Document::new(),
+            timezone: DEFAULT_ORG_TIMEZONE.to_string(),
+            settings,
             created_at: now,
             updated_at: now,
         };
         self.coll.insert_one(&org).await?;
         Ok(org)
+    }
+
+    /// Apply a partial settings patch — `transfer_enabled` lands under
+    /// `settings.checkin.transfer_enabled`; `timezone` is a top-level field.
+    /// State-lock and timezone validation are handler-side concerns; this
+    /// method just runs the writes. Returns the updated Org.
+    pub async fn update_settings(
+        &self,
+        id: ObjectId,
+        transfer_enabled: Option<bool>,
+        timezone: Option<&str>,
+    ) -> ApiResult<Org> {
+        let now = DateTime::now();
+        let mut set = doc! { "updated_at": now };
+        if let Some(tz) = timezone {
+            set.insert("timezone", tz);
+        }
+        if let Some(flag) = transfer_enabled {
+            set.insert("settings.checkin.transfer_enabled", flag);
+        }
+        let result = self
+            .coll
+            .find_one_and_update(doc! { "_id": id }, doc! { "$set": set })
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await?;
+        result.ok_or(ApiError::NotFound)
     }
 
     pub async fn find_by_id(&self, id: ObjectId) -> ApiResult<Option<Org>> {

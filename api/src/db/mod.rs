@@ -1,5 +1,7 @@
 pub mod app_sessions;
 pub mod app_users;
+pub mod checkin_events;
+pub mod checkin_user_status;
 pub mod dashboard_memberships;
 pub mod dashboard_sessions;
 pub mod dashboard_users;
@@ -14,13 +16,15 @@ use mongodb::options::{ClientOptions, IndexOptions};
 use mongodb::{Client, Collection, Database, IndexModel};
 
 use crate::domain::{
-    AppSession, AppUser, DashboardSession, DashboardUser, Membership, Org, OrgSlugReservation,
-    RemovedMembership,
+    AppSession, AppUser, CheckinEvent, CheckinUserStatus, DashboardSession, DashboardUser,
+    Membership, Org, OrgSlugReservation, RemovedMembership,
 };
 use crate::error::ApiResult;
 
 pub use app_sessions::AppSessionRepository;
 pub use app_users::{AppUserInsertError, AppUserRepository};
+pub use checkin_events::CheckinEventRepository;
+pub use checkin_user_status::{CheckinStatusInsertError, CheckinUserStatusRepository};
 pub use dashboard_memberships::{MembershipInsertError, MembershipRepository};
 pub use dashboard_sessions::DashboardSessionRepository;
 pub use dashboard_users::DashboardUserRepository;
@@ -39,6 +43,8 @@ pub struct Db {
     pub removed_memberships: RemovedMembershipRepository,
     pub app_users: AppUserRepository,
     pub app_sessions: AppSessionRepository,
+    pub checkin_events: CheckinEventRepository,
+    pub checkin_user_status: CheckinUserStatusRepository,
 }
 
 impl Db {
@@ -74,6 +80,12 @@ impl Db {
             app_users: AppUserRepository::new(database.collection::<AppUser>("app_users")),
             app_sessions: AppSessionRepository::new(
                 database.collection::<AppSession>("app_sessions"),
+            ),
+            checkin_events: CheckinEventRepository::new(
+                database.collection::<CheckinEvent>("checkin_events"),
+            ),
+            checkin_user_status: CheckinUserStatusRepository::new(
+                database.collection::<CheckinUserStatus>("checkin_user_status"),
             ),
             database,
         })
@@ -285,6 +297,53 @@ impl Db {
                         IndexOptions::builder()
                             .expire_after(Duration::from_secs(0))
                             .name("removed_memberships_ttl".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        // checkin_events: paginate per-AppUser by client time (mobile + admin
+        // history) and per-Org by client time (future cross-Org reports).
+        let checkin_events: Collection<CheckinEvent> =
+            self.database.collection("checkin_events");
+        checkin_events
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "app_user_id": 1, "occurred_at_client": -1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("checkin_events_user_client_time".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        checkin_events
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "org_id": 1, "occurred_at_client": -1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("checkin_events_org_client_time".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        // checkin_user_status: `_id` is the AppUser id, so uniqueness is
+        // intrinsic. The secondary index is `(org_id, status)` for the live
+        // board and the state-lock count.
+        let checkin_status: Collection<CheckinUserStatus> =
+            self.database.collection("checkin_user_status");
+        checkin_status
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "org_id": 1, "status": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("checkin_user_status_org_status".to_string())
                             .build(),
                     )
                     .build(),

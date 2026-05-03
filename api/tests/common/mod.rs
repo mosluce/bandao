@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use argus_api::services::reverse_geocoder::ReverseGeocoder;
 use argus_api::{AppState, Config, Db, handlers};
 use bson::oid::ObjectId;
 use reqwest::redirect::Policy;
@@ -31,7 +32,35 @@ impl TestApp {
         .await
     }
 
+    /// Spawn with a custom geocoder. Use the `StaticReverseGeocoder` from
+    /// `argus_api::services::reverse_geocoder` to control whether events
+    /// record `region_name` or store `null`.
+    pub async fn spawn_with_geocoder<G>(geocoder: G) -> Self
+    where
+        G: ReverseGeocoder + 'static,
+    {
+        Self::spawn_inner(
+            |cfg| {
+                cfg.session_ttl = Duration::from_secs(60 * 60);
+            },
+            Some(Box::new(|db, config| {
+                AppState::with_geocoder(db, config, geocoder)
+            })),
+        )
+        .await
+    }
+
     pub async fn spawn_with<F>(mut tweak: F) -> Self
+    where
+        F: FnMut(&mut Config),
+    {
+        Self::spawn_inner(|cfg| tweak(cfg), None).await
+    }
+
+    async fn spawn_inner<F>(
+        mut tweak: F,
+        state_builder: Option<Box<dyn FnOnce(Db, Config) -> AppState + Send>>,
+    ) -> Self
     where
         F: FnMut(&mut Config),
     {
@@ -63,7 +92,10 @@ impl TestApp {
             .expect("connect mongo");
         db.ensure_indexes().await.expect("ensure indexes");
 
-        let state = AppState::new(db, config);
+        let state = match state_builder {
+            Some(build) => build(db, config),
+            None => AppState::new(db, config),
+        };
         let app = handlers::router(state.clone());
 
         let listener = TcpListener::bind("127.0.0.1:0")
@@ -255,6 +287,92 @@ impl TestApp {
             .post(self.url(path))
             .header("Authorization", format!("Bearer {token}"))
     }
+
+    /// Submit a checkin event via `POST /app/checkin/events`. Returns the
+    /// raw response so the caller can assert on status + body shape.
+    pub async fn submit_checkin_event(
+        &self,
+        client: &reqwest::Client,
+        token: &str,
+        event_type: &str,
+        lat: f64,
+        lng: f64,
+        occurred_at_client: &str,
+    ) -> reqwest::Response {
+        self.submit_checkin_event_with(
+            client,
+            token,
+            json!({
+                "event_type": event_type,
+                "lat": lat,
+                "lng": lng,
+                "occurred_at_client": occurred_at_client,
+            }),
+        )
+        .await
+    }
+
+    /// Lower-level variant: pass an arbitrary JSON body so tests can
+    /// exercise `manual_label`, `accuracy`, etc.
+    pub async fn submit_checkin_event_with(
+        &self,
+        client: &reqwest::Client,
+        token: &str,
+        body: Value,
+    ) -> reqwest::Response {
+        self.app_post(client, token, "/app/checkin/events")
+            .json(&body)
+            .send()
+            .await
+            .expect("submit_checkin_event")
+    }
+
+    /// Bootstrap an AppUser ready to submit checkin events: register
+    /// dashboard admin, create the AppUser, log them in via `/app/auth/login`,
+    /// clear the forced-password gate. Returns `(admin_client, org_code,
+    /// app_user_id_hex, app_client, app_token, current_password)`.
+    pub async fn seed_app_user_ready_to_checkin(
+        &self,
+        admin_email: &str,
+        org_name: &str,
+        username: &str,
+        display_name: &str,
+    ) -> (
+        reqwest::Client,
+        String,
+        String,
+        reqwest::Client,
+        String,
+        String,
+    ) {
+        let (admin, body) = self.register_admin(admin_email, org_name).await;
+        let org_code = body["current_org"]["code"].as_str().unwrap().to_string();
+        let create_body = self.create_app_user(&admin, username, display_name).await;
+        let app_user_id = create_body["user"]["id"].as_str().unwrap().to_string();
+        let initial_password = create_body["initial_password"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let (app_client, login_body) = self.app_login(&org_code, username, &initial_password).await;
+        let token = login_body["token"].as_str().unwrap().to_string();
+        // Clear `needs_password_change` so /app/checkin/* doesn't 423.
+        let new_password = "newpass!secure".to_string();
+        let resp = self
+            .app_post(&app_client, &token, "/app/me/password")
+            .json(&json!({
+                "current_password": initial_password,
+                "new_password": new_password,
+            }))
+            .send()
+            .await
+            .expect("change password");
+        assert_eq!(
+            resp.status(),
+            reqwest::StatusCode::NO_CONTENT,
+            "change_password failed"
+        );
+        (admin, org_code, app_user_id, app_client, token, new_password)
+    }
 }
 
 impl Drop for TestApp {
@@ -291,4 +409,15 @@ pub fn user_id(body: &Value) -> String {
         .as_str()
         .unwrap_or_else(|| panic!("expected user.id in {body}"))
         .to_string()
+}
+
+/// Build an RFC3339 timestamp `now + minute` minutes (negative = past).
+/// Anchored on `now()` so events stay within the 1h skew threshold regardless
+/// of when the test runs — a fixed unix base would silently flip
+/// `has_skew_warning` once enough wall time elapses.
+pub fn ts(minute: i64) -> String {
+    let now = ::time::OffsetDateTime::now_utc().unix_timestamp();
+    let dt = ::time::OffsetDateTime::from_unix_timestamp(now + minute * 60).unwrap();
+    dt.format(&::time::format_description::well_known::Rfc3339)
+        .unwrap()
 }
