@@ -64,32 +64,32 @@
 
 ## 8. Login screen
 
-- [ ] 8.1 `lib/features/auth/presentation/login_screen.dart`: form with three required `TextFormField`s. The `org_code` field initial value is loaded from `secureStorage.readLastOrgCode()` once on first build.
-- [ ] 8.2 Submit button is disabled until all three fields have non-empty trimmed values. On submit, call `authNotifier.login(...)`. Loading state disables the form.
-- [ ] 8.3 Map `ApiException` to friendly strings via `ApiException.friendlyZh()`. `INVALID_CREDENTIALS` → "帳號、密碼或組織代碼錯誤". `NETWORK_ERROR` → "連線失敗，請確認網路". Other codes → use the API message.
-- [ ] 8.4 The Argus logo / title widget at the top of the screen tracks rapid taps; on the 5th tap within a rolling 3-second window it navigates to `/dev-server-config` (only when `kDebugMode` is true).
-- [ ] 8.5 In debug builds only, show a small "API: <effective URL>" line at the bottom of the login screen.
+- [x] 8.1 `lib/features/auth/presentation/login_screen.dart`: form with three required `TextFormField`s. The `org_code` field initial value is loaded from `secureStorage.readLastOrgCode()` once on first build.
+- [x] 8.2 Submit button is disabled until all three fields have non-empty trimmed values. On submit, call `authNotifier.login(...)`. Loading state disables the form.
+- [x] 8.3 Map `ApiException` to friendly strings via `ApiException.friendlyZh()`. `INVALID_CREDENTIALS` → "帳號、密碼或組織代碼錯誤". `NETWORK_ERROR` → "連線失敗，請確認網路". Other codes → use the API message.
+- [x] 8.4 The Argus logo / title widget at the top of the screen tracks rapid taps; on the 5th tap within a rolling 3-second window it navigates to `/dev-server-config` (only when `kDebugMode` is true).
+- [x] 8.5 In debug builds only, show a small "API: <effective URL>" line at the bottom of the login screen.
 
 ## 9. Force-change-password screen
 
-- [ ] 9.1 `lib/features/auth/presentation/force_password_change_screen.dart`: two `TextFormField`s (`current_password`, `new_password`). `new_password` requires length ≥ 8 (client-side hint, server enforces).
-- [ ] 9.2 Submit calls `authNotifier.changePassword(...)`. On success, the notifier refreshes via `/app/me`, which clears the flag and `go_router` navigates to `/`.
-- [ ] 9.3 `INVALID_PASSWORD` → "目前密碼不正確". Validation errors → use API message. Other codes → friendly fallback.
-- [ ] 9.4 Disable any "back" affordance (no AppBar back button); the redirect logic also catches programmatic exits.
+- [x] 9.1 `lib/features/auth/presentation/force_password_change_screen.dart`: two `TextFormField`s (`current_password`, `new_password`). `new_password` requires length ≥ 8 (client-side hint, server enforces).
+- [x] 9.2 Submit calls `authNotifier.changePassword(...)`. On success, the notifier refreshes via `/app/me`, which clears the flag and `go_router` navigates to `/`.
+- [x] 9.3 `INVALID_PASSWORD` → "目前密碼不正確". Validation errors → use API message. Other codes → friendly fallback.
+- [x] 9.4 Disable any "back" affordance (no AppBar back button); the redirect logic also catches programmatic exits.
 
 ## 10. Home screen (placeholder for add-app-checkin)
 
-- [ ] 10.1 `lib/features/auth/presentation/home_screen.dart`: an authenticated route showing `display_name` prominently, `username` (mono font) and `org.name` underneath.
-- [ ] 10.2 A status-pill placeholder rendering "尚未實作" with explanatory subtitle. Wire it as a separate widget so `add-app-checkin` can replace it cleanly.
-- [ ] 10.3 An overflow menu (or single button) with "登出". On tap, call `authNotifier.logout()` (which navigates to `/login`).
-- [ ] 10.4 A small "了解更多" footer text linking to `app/README.md` style instructions, OR omit if it adds noise.
+- [x] 10.1 `lib/features/auth/presentation/home_screen.dart`: an authenticated route showing `display_name` prominently, `username` (mono font) and `org.name` underneath.
+- [x] 10.2 A status-pill placeholder rendering "尚未實作" with explanatory subtitle. Wire it as a separate widget so `add-app-checkin` can replace it cleanly.
+- [x] 10.3 An overflow menu (or single button) with "登出". On tap, call `authNotifier.logout()` (which navigates to `/login`).
+- [x] 10.4 A small "了解更多" footer text linking to `app/README.md` style instructions, OR omit if it adds noise. (Omitted — see task; org name shows in AppBar instead, no footer noise.)
 
 ## 11. Dev server config screen
 
-- [ ] 11.1 `lib/features/auth/presentation/dev_server_config_screen.dart` (only built in debug mode — guarded by conditional import or `kDebugMode` check at route registration time).
-- [ ] 11.2 Display: current effective base URL (read live), a `TextFormField` for the new value (pre-filled with the override if set, else with `Env.compileTimeDefault()`), buttons "儲存" and "清除".
-- [ ] 11.3 "儲存": validate as a parseable URL, then call `devOverrides.write(value)`. On success, pop and force-rebuild the dio provider (so subsequent requests pick up the new URL).
-- [ ] 11.4 "清除": call `devOverrides.clear()`, pop, force-rebuild dio.
+- [x] 11.1 `lib/features/auth/presentation/dev_server_config_screen.dart` (only built in debug mode — guarded by conditional import or `kDebugMode` check at route registration time).
+- [x] 11.2 Display: current effective base URL (read live), a `TextFormField` for the new value (pre-filled with the override if set, else with `Env.compileTimeDefault()`), buttons "儲存" and "清除".
+- [x] 11.3 "儲存": validate as a parseable URL, then call `devOverrides.write(value)`. On success, pop and force-rebuild the dio provider (so subsequent requests pick up the new URL).
+- [x] 11.4 "清除": call `devOverrides.clear()`, pop, force-rebuild dio.
 
 ## 12. Tests
 
