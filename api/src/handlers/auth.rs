@@ -52,10 +52,17 @@ pub struct OrgDto {
     pub name: String,
     pub code: String,
     pub owner_id: String,
+    pub timezone: String,
+    pub checkin: OrgCheckinDto,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug_changed_at: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrgCheckinDto {
+    pub transfer_enabled: bool,
 }
 
 impl OrgDto {
@@ -65,6 +72,10 @@ impl OrgDto {
             name: org.name.clone(),
             code: org.code.clone(),
             owner_id: org.owner_id.to_hex(),
+            timezone: org.timezone.clone(),
+            checkin: OrgCheckinDto {
+                transfer_enabled: org.checkin_transfer_enabled(),
+            },
             slug: org.slug.clone(),
             slug_changed_at: org
                 .slug_changed_at
