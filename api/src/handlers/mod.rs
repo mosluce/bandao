@@ -22,12 +22,16 @@ pub fn router(state: AppState) -> Router {
     let protected = Router::new()
         .route("/auth/logout", post(auth::logout))
         .route("/me", get(me::me))
+        .route("/me/orgs", post(me::create_org))
+        .route("/me/memberships", post(me::join_membership))
+        .route("/me/current-org", post(me::switch_current_org))
         .route("/me/leave", post(me::leave))
         .route("/orgs/me/code/rotate", post(orgs::rotate_code))
         .route(
             "/orgs/me/slug",
             post(orgs::set_slug).delete(orgs::clear_slug),
         )
+        .route("/orgs/me/owner", post(orgs::transfer_owner))
         .route("/dashboard-users", get(users::list_in_org))
         .route(
             "/dashboard-users/cooldowns",

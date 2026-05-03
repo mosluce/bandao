@@ -1,56 +1,56 @@
 ## 1. Data model & schema
 
-- [ ] 1.1 Add `Membership` struct to `api/src/domain.rs` with fields `id, user_id, org_id, role, joined_at, updated_at`; serde uses `_id` for `id`
-- [ ] 1.2 Strip `org_id` and `role` fields from `DashboardUser` in `api/src/domain.rs` (identity only)
-- [ ] 1.3 Rename `DashboardSession.org_id` → `current_org_id` in `api/src/domain.rs` and make it `Option<ObjectId>`
-- [ ] 1.4 Create `api/src/db/dashboard_memberships.rs` with `MembershipRepository`: `create`, `find`, `find_by_user_and_org`, `list_by_user`, `list_by_org`, `update_role`, `delete`, `delete_by_org`, `count_by_user`
-- [ ] 1.5 In Mongo init code (`api/src/db/mod.rs`), create `dashboard_memberships` collection with unique index on `(user_id, org_id)` and secondary index on `org_id`
-- [ ] 1.6 In Mongo init code, drop the old `dashboard_users.org_id` index if present
+- [x] 1.1 Add `Membership` struct to `api/src/domain.rs` with fields `id, user_id, org_id, role, joined_at, updated_at`; serde uses `_id` for `id`
+- [x] 1.2 Strip `org_id` and `role` fields from `DashboardUser` in `api/src/domain.rs` (identity only)
+- [x] 1.3 Rename `DashboardSession.org_id` → `current_org_id` in `api/src/domain.rs` and make it `Option<ObjectId>`
+- [x] 1.4 Create `api/src/db/dashboard_memberships.rs` with `MembershipRepository`: `create`, `find`, `find_by_user_and_org`, `list_by_user`, `list_by_org`, `update_role`, `delete`, `delete_by_org`, `count_by_user`
+- [x] 1.5 In Mongo init code (`api/src/db/mod.rs`), create `dashboard_memberships` collection with unique index on `(user_id, org_id)` and secondary index on `org_id`
+- [x] 1.6 In Mongo init code, drop the old `dashboard_users.org_id` index if present
 
 ## 2. Repos: rewire existing collections
 
-- [ ] 2.1 Update `api/src/db/dashboard_users.rs`: remove `org_id` and `role` from `create` parameters and the struct; remove `list_in_org` (moved to memberships); remove `update_role` (moved to memberships)
-- [ ] 2.2 Update `api/src/db/dashboard_sessions.rs`: rename `org_id` → `current_org_id`, make it `Option<ObjectId>`; add `update_current_org(token, new_current_org_id)`; add `delete_by_user_and_org(user_id, org_id)` for force-kick scope
-- [ ] 2.3 Audit `dashboard_sessions.delete_by_user(user_id)` callers — only logout-style flows should use it now; per-org leave/remove uses the new scoped delete
+- [x] 2.1 Update `api/src/db/dashboard_users.rs`: remove `org_id` and `role` from `create` parameters and the struct; remove `list_in_org` (moved to memberships); remove `update_role` (moved to memberships)
+- [x] 2.2 Update `api/src/db/dashboard_sessions.rs`: rename `org_id` → `current_org_id`, make it `Option<ObjectId>`; add `update_current_org(token, new_current_org_id)`; add `delete_by_user_and_org(user_id, org_id)` for force-kick scope
+- [x] 2.3 Audit `dashboard_sessions.delete_by_user(user_id)` callers — only logout-style flows should use it now; per-org leave/remove uses the new scoped delete
 
 ## 3. Auth middleware & extractor
 
-- [ ] 3.1 Update `api/src/auth/extractor.rs::AuthContext` to carry `Option<ObjectId> current_org_id` and `Option<Role> role` (both nullable for zero-Org state)
-- [ ] 3.2 Update `api/src/auth/middleware.rs`: after resolving session, if `current_org_id` is set, look up `dashboard_memberships(user_id, current_org_id)` to fill `role`; if lookup fails treat as `UNAUTHORIZED` and clear cookie
-- [ ] 3.3 Add `RequireActiveOrg` extractor that requires `current_org_id.is_some()`, returning `NO_ACTIVE_ORG` (403) otherwise; use it at every org-scoped handler entry point
-- [ ] 3.4 Update `RequireAdmin` extractor to use `RequireActiveOrg` first, then check `role == admin`
-- [ ] 3.5 Add `ApiError::NoActiveOrg` and `ApiError::NotAMember` and `ApiError::AlreadyMember` and `ApiError::InvalidPassword` and `ApiError::InvalidTarget` and `ApiError::SameOwner` variants in `api/src/error.rs`, with appropriate HTTP statuses
+- [x] 3.1 Update `api/src/auth/extractor.rs::AuthContext` to carry `Option<ObjectId> current_org_id` and `Option<Role> role` (both nullable for zero-Org state)
+- [x] 3.2 Update `api/src/auth/middleware.rs`: after resolving session, if `current_org_id` is set, look up `dashboard_memberships(user_id, current_org_id)` to fill `role`; if lookup fails treat as `UNAUTHORIZED` and clear cookie
+- [x] 3.3 Add `RequireActiveOrg` extractor that requires `current_org_id.is_some()`, returning `NO_ACTIVE_ORG` (403) otherwise; use it at every org-scoped handler entry point
+- [x] 3.4 Update `RequireAdmin` extractor to use `RequireActiveOrg` first, then check `role == admin`
+- [x] 3.5 Add `ApiError::NoActiveOrg` and `ApiError::NotAMember` and `ApiError::AlreadyMember` and `ApiError::InvalidPassword` and `ApiError::InvalidTarget` and `ApiError::SameOwner` variants in `api/src/error.rs`, with appropriate HTTP statuses
 
 ## 4. Auth handlers (register, login, logout)
 
-- [ ] 4.1 In `api/src/handlers/auth.rs::register`, `mode=create`: insert `dashboard_user` (identity only), insert `dashboard_membership(role=admin)`, insert session with `current_org_id = new_org.id`; rollback membership and Org if anything fails
-- [ ] 4.2 In `register`, `mode=join`: identity-not-exists check (existing email → `EMAIL_TAKEN`); cooldown check before insert; insert identity + `dashboard_membership(role=member)` + session
-- [ ] 4.3 In `api/src/handlers/auth.rs::login`, after credential verification: load all of user's memberships; pick default `current_org_id` per spec rule (oldest owned > oldest membership > null); insert session with that `current_org_id`; return `{ user, memberships, current_org }`
-- [ ] 4.4 Update `AuthResponse` DTO in `auth.rs` to include `memberships: Vec<MembershipDto>` and `current_org: Option<OrgDto>` and `role: Option<Role>`; remove the top-level `org` and `role` fields' previous strict shape
-- [ ] 4.5 Logout handler (`POST /auth/logout`) is unchanged in semantics; verify it still passes integration tests after middleware changes
+- [x] 4.1 In `api/src/handlers/auth.rs::register`, `mode=create`: insert `dashboard_user` (identity only), insert `dashboard_membership(role=admin)`, insert session with `current_org_id = new_org.id`; rollback membership and Org if anything fails
+- [x] 4.2 In `register`, `mode=join`: identity-not-exists check (existing email → `EMAIL_TAKEN`); cooldown check before insert; insert identity + `dashboard_membership(role=member)` + session
+- [x] 4.3 In `api/src/handlers/auth.rs::login`, after credential verification: load all of user's memberships; pick default `current_org_id` per spec rule (oldest owned > oldest membership > null); insert session with that `current_org_id`; return `{ user, memberships, current_org }`
+- [x] 4.4 Update `AuthResponse` DTO in `auth.rs` to include `memberships: Vec<MembershipDto>` and `current_org: Option<OrgDto>` and `role: Option<Role>`; remove the top-level `org` and `role` fields' previous strict shape
+- [x] 4.5 Logout handler (`POST /auth/logout`) is unchanged in semantics; verify it still passes integration tests after middleware changes
 
 ## 5. /me handlers
 
-- [ ] 5.1 `GET /me`: return `{ user, memberships: [{org, role}], current_org: Org | null, role: Role | null }`; works with `current_org_id == null`
-- [ ] 5.2 `POST /me/orgs` (org-agnostic): create new Org with caller as owner, insert membership(role=admin), update current session `current_org_id` to new Org; return updated `/me`-shaped payload
-- [ ] 5.3 `POST /me/memberships` (org-agnostic): resolve target Org via the existing `resolve_org_for_join` (org_code / active slug / grace slug); reject `ALREADY_MEMBER` if `(user, org)` membership exists; cooldown check; insert membership(role=member); update current session `current_org_id` to joined Org
-- [ ] 5.4 `POST /me/current-org` (org-agnostic): verify caller has membership in target org; update current session's `current_org_id`; return updated `/me`-shaped payload
-- [ ] 5.5 Rewrite `POST /me/leave`: now scoped to `current_org`. Delete only the membership for `(ctx.user_id, current_org_id)`. Delete only sessions where `(user_id == ctx.user_id AND current_org_id == current_org_id)`. Insert cooldown marker. Reject if caller is `current_org.owner_id` with `OWNER_PROTECTED`.
+- [x] 5.1 `GET /me`: return `{ user, memberships: [{org, role}], current_org: Org | null, role: Role | null }`; works with `current_org_id == null`
+- [x] 5.2 `POST /me/orgs` (org-agnostic): create new Org with caller as owner, insert membership(role=admin), update current session `current_org_id` to new Org; return updated `/me`-shaped payload
+- [x] 5.3 `POST /me/memberships` (org-agnostic): resolve target Org via the existing `resolve_org_for_join` (org_code / active slug / grace slug); reject `ALREADY_MEMBER` if `(user, org)` membership exists; cooldown check; insert membership(role=member); update current session `current_org_id` to joined Org
+- [x] 5.4 `POST /me/current-org` (org-agnostic): verify caller has membership in target org; update current session's `current_org_id`; return updated `/me`-shaped payload
+- [x] 5.5 Rewrite `POST /me/leave`: now scoped to `current_org`. Delete only the membership for `(ctx.user_id, current_org_id)`. Delete only sessions where `(user_id == ctx.user_id AND current_org_id == current_org_id)`. Insert cooldown marker. Reject if caller is `current_org.owner_id` with `OWNER_PROTECTED`.
 
 ## 6. /dashboard-users handlers (membership-scoped)
 
-- [ ] 6.1 `PATCH /dashboard-users/:id/role`: operate on `dashboard_memberships(target_id, current_org_id)`. Cross-Org membership lookups return `NOT_FOUND`. Owner protection: reject demoting `current_org.owner_id`.
-- [ ] 6.2 `DELETE /dashboard-users/:id`: delete membership row only; delete only sessions where `(user_id == target.id AND current_org_id == current_org_id)`; insert cooldown marker. Owner / self / cross-org protections preserved.
-- [ ] 6.3 `GET /dashboard-users` (list members of current_org): use `MembershipRepository::list_by_org(current_org_id)` joined with user identities to return the same payload shape callers expect.
-- [ ] 6.4 `GET /dashboard-users/cooldowns` and `DELETE /dashboard-users/cooldowns/:email`: behavior unchanged at the handler level beyond using `current_org_id`; verify tests after the middleware refactor.
+- [x] 6.1 `PATCH /dashboard-users/:id/role`: operate on `dashboard_memberships(target_id, current_org_id)`. Cross-Org membership lookups return `NOT_FOUND`. Owner protection: reject demoting `current_org.owner_id`.
+- [x] 6.2 `DELETE /dashboard-users/:id`: delete membership row only; delete only sessions where `(user_id == target.id AND current_org_id == current_org_id)`; insert cooldown marker. Owner / self / cross-org protections preserved.
+- [x] 6.3 `GET /dashboard-users` (list members of current_org): use `MembershipRepository::list_by_org(current_org_id)` joined with user identities to return the same payload shape callers expect.
+- [x] 6.4 `GET /dashboard-users/cooldowns` and `DELETE /dashboard-users/cooldowns/:email`: behavior unchanged at the handler level beyond using `current_org_id`; verify tests after the middleware refactor.
 
 ## 7. Owner transfer
 
-- [ ] 7.1 Add `POST /orgs/me/owner` handler in `api/src/handlers/orgs.rs`. Body: `{ new_owner_user_id, current_password }`. Caller must be `current_org.owner_id`.
-- [ ] 7.2 Verify `current_password` against caller's stored hash via `auth::password::verify`; return `INVALID_PASSWORD` on mismatch.
-- [ ] 7.3 Verify target has `dashboard_memberships(new_owner_user_id, current_org_id)` with `role=admin`; return `INVALID_TARGET` otherwise.
-- [ ] 7.4 Reject `new_owner_user_id == ctx.user_id` with `SAME_OWNER`.
-- [ ] 7.5 Update `org.owner_id = new_owner_user_id` and `org.updated_at = now`. Do not touch sessions, memberships, or any other Org field.
+- [x] 7.1 Add `POST /orgs/me/owner` handler in `api/src/handlers/orgs.rs`. Body: `{ new_owner_user_id, current_password }`. Caller must be `current_org.owner_id`.
+- [x] 7.2 Verify `current_password` against caller's stored hash via `auth::password::verify`; return `INVALID_PASSWORD` on mismatch.
+- [x] 7.3 Verify target has `dashboard_memberships(new_owner_user_id, current_org_id)` with `role=admin`; return `INVALID_TARGET` otherwise.
+- [x] 7.4 Reject `new_owner_user_id == ctx.user_id` with `SAME_OWNER`.
+- [x] 7.5 Update `org.owner_id = new_owner_user_id` and `org.updated_at = now`. Do not touch sessions, memberships, or any other Org field.
 
 ## 8. API integration tests — rewrite existing 16 to multi-org model
 

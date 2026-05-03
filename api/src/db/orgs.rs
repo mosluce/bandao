@@ -89,4 +89,20 @@ impl OrgRepository {
             .await?;
         result.ok_or(ApiError::NotFound)
     }
+
+    /// Transfer ownership: set `owner_id` to `new_owner_id` and bump
+    /// `updated_at`. Caller is expected to have already validated that
+    /// `new_owner_id` is currently an admin of this Org.
+    pub async fn transfer_owner(&self, id: ObjectId, new_owner_id: ObjectId) -> ApiResult<Org> {
+        let now = DateTime::now();
+        let result = self
+            .coll
+            .find_one_and_update(
+                doc! { "_id": id },
+                doc! { "$set": { "owner_id": new_owner_id, "updated_at": now } },
+            )
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await?;
+        result.ok_or(ApiError::NotFound)
+    }
 }

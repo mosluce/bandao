@@ -37,15 +37,27 @@ pub struct OrgSlugReservation {
     pub created_at: DateTime,
 }
 
+/// Pure identity record. The user's Org affiliations live in
+/// `dashboard_memberships`, not on this row.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardUser {
     #[serde(rename = "_id")]
     pub id: ObjectId,
-    pub org_id: ObjectId,
     pub email: String,
     pub password_hash: String,
-    pub role: Role,
     pub created_at: DateTime,
+    pub updated_at: DateTime,
+}
+
+/// One row per (user, org) pair. Carries the user's role in that org.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Membership {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub user_id: ObjectId,
+    pub org_id: ObjectId,
+    pub role: Role,
+    pub joined_at: DateTime,
     pub updated_at: DateTime,
 }
 
@@ -54,7 +66,11 @@ pub struct DashboardSession {
     #[serde(rename = "_id")]
     pub token: String,
     pub user_id: ObjectId,
-    pub org_id: ObjectId,
+    /// The Org this session is currently scoped to. Mutable across the session
+    /// lifetime via `POST /me/current-org`. May be `None` for users with zero
+    /// memberships, or whose memberships were all removed mid-session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_org_id: Option<ObjectId>,
     pub expires_at: DateTime,
     pub created_at: DateTime,
 }

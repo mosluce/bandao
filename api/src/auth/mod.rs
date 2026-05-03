@@ -5,4 +5,4 @@ pub mod password;
 pub mod session_token;
 pub mod slug;
 
-pub use extractor::{AuthContext, RequireAdmin};
+pub use extractor::{AuthContext, RequireActiveOrg, RequireAdmin};

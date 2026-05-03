@@ -36,6 +36,28 @@ pub enum ApiError {
     #[error("slug change too soon")]
     SlugChangeTooSoon { retry_after: DateTime },
 
+    /// Caller hit an org-scoped endpoint with no `current_org_id` selected.
+    #[error("no active org selected")]
+    NoActiveOrg,
+    /// Target user has no membership in the relevant Org. Surfaced when the
+    /// caller tries to switch into / transfer ownership to an Org they
+    /// (or the target) don't belong to.
+    #[error("not a member of this org")]
+    NotAMember,
+    /// New membership would collide with an existing `(user_id, org_id)` row.
+    #[error("user is already a member of this org")]
+    AlreadyMember,
+    /// Re-auth password didn't match the caller's stored hash.
+    #[error("invalid password")]
+    InvalidPassword,
+    /// Owner-transfer target is not currently an admin of the Org, or has no
+    /// membership at all.
+    #[error("invalid target user")]
+    InvalidTarget,
+    /// Owner tried to transfer the Org to themselves.
+    #[error("new owner must differ from the current owner")]
+    SameOwner,
+
     #[error("password hashing failed")]
     Password,
     #[error("database error")]
@@ -66,6 +88,16 @@ impl ApiError {
             ApiError::SlugChangeTooSoon { .. } => {
                 (StatusCode::TOO_MANY_REQUESTS, "SLUG_CHANGE_TOO_SOON")
             }
+            ApiError::NoActiveOrg => (StatusCode::FORBIDDEN, "NO_ACTIVE_ORG"),
+            // `NOT_A_MEMBER` is surfaced by `POST /me/current-org`, which is the
+            // one place a caller has a legitimate reason to learn that an Org
+            // they tried to switch into isn't in their membership set. Other
+            // cross-Org probes still flatten to `NOT_FOUND`.
+            ApiError::NotAMember => (StatusCode::NOT_FOUND, "NOT_A_MEMBER"),
+            ApiError::AlreadyMember => (StatusCode::CONFLICT, "ALREADY_MEMBER"),
+            ApiError::InvalidPassword => (StatusCode::UNAUTHORIZED, "INVALID_PASSWORD"),
+            ApiError::InvalidTarget => (StatusCode::BAD_REQUEST, "INVALID_TARGET"),
+            ApiError::SameOwner => (StatusCode::BAD_REQUEST, "SAME_OWNER"),
             ApiError::Password
             | ApiError::Db(_)
             | ApiError::BsonSer(_)

@@ -1,3 +1,4 @@
+pub mod dashboard_memberships;
 pub mod dashboard_sessions;
 pub mod dashboard_users;
 pub mod orgs;
@@ -10,9 +11,12 @@ use bson::doc;
 use mongodb::options::{ClientOptions, IndexOptions};
 use mongodb::{Client, Collection, Database, IndexModel};
 
-use crate::domain::{DashboardSession, DashboardUser, Org, OrgSlugReservation, RemovedMembership};
+use crate::domain::{
+    DashboardSession, DashboardUser, Membership, Org, OrgSlugReservation, RemovedMembership,
+};
 use crate::error::ApiResult;
 
+pub use dashboard_memberships::{MembershipInsertError, MembershipRepository};
 pub use dashboard_sessions::DashboardSessionRepository;
 pub use dashboard_users::DashboardUserRepository;
 pub use orgs::OrgRepository;
@@ -24,6 +28,7 @@ pub struct Db {
     pub database: Database,
     pub orgs: OrgRepository,
     pub dashboard_users: DashboardUserRepository,
+    pub dashboard_memberships: MembershipRepository,
     pub dashboard_sessions: DashboardSessionRepository,
     pub slug_reservations: OrgSlugReservationRepository,
     pub removed_memberships: RemovedMembershipRepository,
@@ -46,6 +51,9 @@ impl Db {
             orgs: OrgRepository::new(database.collection::<Org>("orgs")),
             dashboard_users: DashboardUserRepository::new(
                 database.collection::<DashboardUser>("dashboard_users"),
+            ),
+            dashboard_memberships: MembershipRepository::new(
+                database.collection::<Membership>("dashboard_memberships"),
             ),
             dashboard_sessions: DashboardSessionRepository::new(
                 database.collection::<DashboardSession>("dashboard_sessions"),
@@ -138,13 +146,36 @@ impl Db {
                     .build(),
             )
             .await?;
-        users
+        // Drop the legacy `dashboard_users.org_id` index from the 1:1 era. The
+        // field has been removed from the document; the index becomes stale on
+        // upgrade and would only sit there indexing nothing.
+        if let Err(err) = users.drop_index("dashboard_users_org_id").await {
+            // `IndexNotFound` is the common case on fresh databases; log and continue.
+            tracing::debug!(?err, "dashboard_users_org_id drop_index ignored");
+        }
+
+        let memberships: Collection<Membership> =
+            self.database.collection("dashboard_memberships");
+        memberships
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "user_id": 1, "org_id": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .unique(true)
+                            .name("dashboard_memberships_user_org_unique".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        memberships
             .create_index(
                 IndexModel::builder()
                     .keys(doc! { "org_id": 1 })
                     .options(
                         IndexOptions::builder()
-                            .name("dashboard_users_org_id".to_string())
+                            .name("dashboard_memberships_org_id".to_string())
                             .build(),
                     )
                     .build(),

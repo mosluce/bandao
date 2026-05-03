@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
-use crate::auth::extractor::{AuthContext, RequireAdmin};
+use crate::auth::extractor::{RequireActiveOrg, RequireAdmin};
 use crate::domain::{RemovalKind, Role};
 use crate::error::{ApiError, ApiResult};
 use crate::state::AppState;
@@ -31,117 +31,138 @@ pub struct CooldownDto {
 
 pub async fn list_in_org(
     State(state): State<AppState>,
-    ctx: AuthContext,
+    active: RequireActiveOrg,
 ) -> ApiResult<Json<Vec<DashboardUserDto>>> {
-    let users = state.db.dashboard_users.list_in_org(ctx.org_id).await?;
-    let out = users
-        .into_iter()
-        .map(|u| DashboardUserDto {
-            id: u.id.to_hex(),
-            email: u.email,
-            role: u.role,
-        })
-        .collect();
+    let org_id = active.org_id;
+    let memberships = state.db.dashboard_memberships.list_by_org(org_id).await?;
+    let mut out = Vec::with_capacity(memberships.len());
+    for m in memberships {
+        // Best-effort: skip rows whose user identity has gone missing.
+        if let Some(user) = state.db.dashboard_users.find_by_id(m.user_id).await? {
+            out.push(DashboardUserDto {
+                id: user.id.to_hex(),
+                email: user.email,
+                role: m.role,
+            });
+        }
+    }
     Ok(Json(out))
 }
 
 pub async fn update_role(
     State(state): State<AppState>,
-    RequireAdmin(ctx): RequireAdmin,
+    RequireAdmin(active): RequireAdmin,
     Path(id): Path<String>,
     Json(req): Json<UpdateRoleRequest>,
 ) -> ApiResult<Json<DashboardUserDto>> {
-    let user_id = ObjectId::parse_str(&id).map_err(|_| ApiError::NotFound)?;
+    let org_id = active.org_id;
+    let target_id = ObjectId::parse_str(&id).map_err(|_| ApiError::NotFound)?;
 
-    // Cross-org targets must look like NotFound; loading first lets us guard owner
-    // protection before mutating.
-    let target = state
+    // Cross-org targets must look like NotFound; loading the membership first
+    // gives us both the existence check and the current role for owner-promote
+    // no-op handling.
+    let membership = state
         .db
-        .dashboard_users
-        .find_by_id(user_id)
+        .dashboard_memberships
+        .find_by_user_and_org(target_id, org_id)
         .await?
         .ok_or(ApiError::NotFound)?;
-    if target.org_id != ctx.org_id {
-        return Err(ApiError::NotFound);
-    }
+
+    let target_user = state
+        .db
+        .dashboard_users
+        .find_by_id(target_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
 
     let org = state
         .db
         .orgs
-        .find_by_id(ctx.org_id)
+        .find_by_id(org_id)
         .await?
         .ok_or(ApiError::NotFound)?;
 
-    // Owner is permanently admin: any attempt to demote them is rejected.
-    if target.id == org.owner_id && matches!(req.role, Role::Member) {
+    // Owner is permanently admin in this Org: any attempt to demote them is
+    // rejected. Promotion to admin (if anyone tries) is a no-op.
+    if target_user.id == org.owner_id && matches!(req.role, Role::Member) {
         return Err(ApiError::OwnerProtected);
     }
 
-    if target.role == req.role {
+    if membership.role == req.role {
         return Ok(Json(DashboardUserDto {
-            id: target.id.to_hex(),
-            email: target.email,
-            role: target.role,
+            id: target_user.id.to_hex(),
+            email: target_user.email,
+            role: membership.role,
         }));
     }
 
     let updated = state
         .db
-        .dashboard_users
-        .update_role(user_id, ctx.org_id, req.role)
+        .dashboard_memberships
+        .update_role(target_id, org_id, req.role)
         .await?;
 
     Ok(Json(DashboardUserDto {
-        id: updated.id.to_hex(),
-        email: updated.email,
+        id: target_user.id.to_hex(),
+        email: target_user.email,
         role: updated.role,
     }))
 }
 
 pub async fn remove(
     State(state): State<AppState>,
-    RequireAdmin(ctx): RequireAdmin,
+    RequireAdmin(active): RequireAdmin,
     Path(id): Path<String>,
 ) -> ApiResult<StatusCode> {
+    let org_id = active.org_id;
     let target_id = ObjectId::parse_str(&id).map_err(|_| ApiError::NotFound)?;
 
     // Self-removal must go through /me/leave so removal_kind is unambiguous.
-    if target_id == ctx.user_id {
+    if target_id == active.ctx.user_id {
         return Err(ApiError::Forbidden);
     }
 
-    let target = state
+    // Membership must exist in caller's current Org. Cross-org or strangers
+    // collapse to NotFound.
+    if state
+        .db
+        .dashboard_memberships
+        .find_by_user_and_org(target_id, org_id)
+        .await?
+        .is_none()
+    {
+        return Err(ApiError::NotFound);
+    }
+
+    let target_user = state
         .db
         .dashboard_users
         .find_by_id(target_id)
         .await?
         .ok_or(ApiError::NotFound)?;
-    if target.org_id != ctx.org_id {
-        return Err(ApiError::NotFound);
-    }
 
     let org = state
         .db
         .orgs
-        .find_by_id(ctx.org_id)
+        .find_by_id(org_id)
         .await?
         .ok_or(ApiError::NotFound)?;
-    if target.id == org.owner_id {
+    if target_user.id == org.owner_id {
         return Err(ApiError::OwnerProtected);
     }
 
-    cascade_delete_user(&state, &target).await?;
+    cascade_remove_membership(&state, &target_user, org_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn list_cooldowns(
     State(state): State<AppState>,
-    RequireAdmin(ctx): RequireAdmin,
+    RequireAdmin(active): RequireAdmin,
 ) -> ApiResult<Json<Vec<CooldownDto>>> {
     let markers = state
         .db
         .removed_memberships
-        .list_for_org(ctx.org_id)
+        .list_for_org(active.org_id)
         .await?;
     let out = markers
         .into_iter()
@@ -157,65 +178,41 @@ pub async fn list_cooldowns(
 
 pub async fn clear_cooldown(
     State(state): State<AppState>,
-    RequireAdmin(ctx): RequireAdmin,
+    RequireAdmin(active): RequireAdmin,
     Path(email): Path<String>,
 ) -> ApiResult<StatusCode> {
     let key = email.trim().to_ascii_lowercase();
     state
         .db
         .removed_memberships
-        .delete(ctx.org_id, &key)
+        .delete(active.org_id, &key)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Cascade: sessions → user → marker. The order matters per design: if the
-/// process crashes mid-cascade, leaving a still-valid user with no sessions
-/// is less harmful than leaving a deleted user with a stale "active" session.
-pub(crate) async fn cascade_delete_user(
+/// Cascade an admin-initiated removal from a single Org: drop membership row,
+/// drop sessions scoped to this Org, write the kicked-marker. Identity, other
+/// memberships, and other-Org sessions are preserved.
+pub(crate) async fn cascade_remove_membership(
     state: &AppState,
     target: &crate::domain::DashboardUser,
+    org_id: ObjectId,
 ) -> ApiResult<()> {
     state
         .db
-        .dashboard_sessions
-        .delete_all_by_user_id(target.id)
+        .dashboard_memberships
+        .delete(target.id, org_id)
         .await?;
-    state.db.dashboard_users.delete_by_id(target.id).await?;
-    let email_key = target.email.trim().to_ascii_lowercase();
-    if let Err(err) = state
-        .db
-        .removed_memberships
-        .insert(target.org_id, &email_key, RemovalKind::Kicked)
-        .await
-    {
-        tracing::error!(?err, "failed to write removed_memberships marker after cascade delete");
-        return Err(err);
-    }
-    Ok(())
-}
-
-/// Same cascade as `cascade_delete_user`, but stamps the marker with
-/// `RemovalKind::Left` so the audit trail distinguishes self-leave from kick.
-pub(crate) async fn cascade_self_leave(
-    state: &AppState,
-    target: &crate::domain::DashboardUser,
-) -> ApiResult<()> {
     state
         .db
         .dashboard_sessions
-        .delete_all_by_user_id(target.id)
+        .delete_by_user_and_org(target.id, org_id)
         .await?;
-    state.db.dashboard_users.delete_by_id(target.id).await?;
     let email_key = target.email.trim().to_ascii_lowercase();
-    if let Err(err) = state
+    state
         .db
         .removed_memberships
-        .insert(target.org_id, &email_key, RemovalKind::Left)
-        .await
-    {
-        tracing::error!(?err, "failed to write removed_memberships marker after self-leave");
-        return Err(err);
-    }
+        .insert(org_id, &email_key, RemovalKind::Kicked)
+        .await?;
     Ok(())
 }

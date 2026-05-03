@@ -3,7 +3,7 @@ use bson::{DateTime, doc};
 use mongodb::Collection;
 use mongodb::error::{ErrorKind, WriteFailure};
 
-use crate::domain::{DashboardUser, Role};
+use crate::domain::DashboardUser;
 use crate::error::{ApiError, ApiResult};
 
 const MONGO_DUPLICATE_KEY: i32 = 11000;
@@ -18,21 +18,19 @@ impl DashboardUserRepository {
         Self { coll }
     }
 
+    /// Insert a new identity. Org affiliation lives on `dashboard_memberships`,
+    /// so the user row only carries email + password_hash + timestamps.
     pub async fn create(
         &self,
         id: ObjectId,
-        org_id: ObjectId,
         email: &str,
         password_hash: &str,
-        role: Role,
     ) -> ApiResult<DashboardUser> {
         let now = DateTime::now();
         let user = DashboardUser {
             id,
-            org_id,
             email: email.to_string(),
             password_hash: password_hash.to_string(),
-            role,
             created_at: now,
             updated_at: now,
         };
@@ -56,39 +54,9 @@ impl DashboardUserRepository {
         Ok(self.coll.find_one(doc! { "_id": id }).await?)
     }
 
-    pub async fn list_in_org(&self, org_id: ObjectId) -> ApiResult<Vec<DashboardUser>> {
-        let mut cursor = self.coll.find(doc! { "org_id": org_id }).await?;
-        let mut out = Vec::new();
-        while cursor.advance().await? {
-            out.push(cursor.deserialize_current()?);
-        }
-        Ok(out)
-    }
-
     pub async fn delete_by_id(&self, id: ObjectId) -> ApiResult<()> {
         self.coll.delete_one(doc! { "_id": id }).await?;
         Ok(())
-    }
-
-    /// Updates a user's role within the same org. The caller must enforce
-    /// the "at least one admin" invariant before invoking this method.
-    pub async fn update_role(
-        &self,
-        user_id: ObjectId,
-        org_id: ObjectId,
-        new_role: Role,
-    ) -> ApiResult<DashboardUser> {
-        let now = DateTime::now();
-        let role_bson = bson::to_bson(&new_role)?;
-        let result = self
-            .coll
-            .find_one_and_update(
-                doc! { "_id": user_id, "org_id": org_id },
-                doc! { "$set": { "role": role_bson, "updated_at": now } },
-            )
-            .return_document(mongodb::options::ReturnDocument::After)
-            .await?;
-        result.ok_or(ApiError::NotFound)
     }
 }
 
