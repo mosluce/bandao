@@ -80,4 +80,4 @@
 
 - [x] 10.1 Run cargo build / cargo test (per-binary serial loop on macOS to dodge TIME_WAIT noise documented in `api/README.md`).
 - [x] 10.2 Run admin-web `pnpm typecheck` + `pnpm build`.
-- [ ] 10.3 Live smoke: bring up local stack, log into admin-web, create an AppUser, confirm one-time password modal, disable + re-enable, reset password. Use `curl` to hit `/app/auth/login` with `(org_code, username, initial_password)` and confirm 200 + `needs_password_change=true`; hit `/app/me/password` with the change; confirm flag clears. (No Flutter required — the live smoke is API-level.)
+- [x] 10.3 Live smoke: bring up local stack, log into admin-web, create an AppUser, confirm one-time password modal, disable + re-enable, reset password. Use `curl` to hit `/app/auth/login` with `(org_code, username, initial_password)` and confirm 200 + `needs_password_change=true`; hit `/app/me/password` with the change; confirm flag clears. (No Flutter required — the live smoke is API-level.)
