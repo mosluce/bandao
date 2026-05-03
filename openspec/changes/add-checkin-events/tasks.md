@@ -1,28 +1,28 @@
 ## 1. Domain & DB schema
 
-- [ ] 1.1 Add `CheckinEventType` enum (`clock_in | clock_out | transfer_out | transfer_in`) and `AppUserCheckinStatus` enum (`off_duty | on_site | in_transit`) to `api/src/domain.rs` with snake_case serde.
-- [ ] 1.2 Add `EventSource` enum (`app | admin_force`) and `EventInitiatorKind` enum (`app_user | dashboard_user`) to `api/src/domain.rs`.
-- [ ] 1.3 Add `EventLocation` struct: `coordinates: GeoPoint { lat: f64, lng: f64 }`, `accuracy_meters: Option<f64>`, `region_name: Option<String>`, `manual_label: Option<String>`.
-- [ ] 1.4 Add `CheckinEvent` struct: `id, org_id, app_user_id, event_type, occurred_at_client, occurred_at_server, source, initiated_by_kind, initiated_by_id, location, reason: Option<String>` (reason only set on admin_force).
-- [ ] 1.5 Add `CheckinUserStatus` struct: `app_user_id (PK), org_id, status, current_shift_started_at: Option<DateTime>, last_event_id: Option<ObjectId>, updated_at`.
-- [ ] 1.6 Extend `Org` in `api/src/domain.rs`: add `timezone: String` (default `"Asia/Taipei"`) and `OrgCheckinSettings { transfer_enabled: bool }` reachable as `Org.settings.checkin` via `bson::Document` access (or migrate to a typed struct on `Org`). Pick the simpler.
-- [ ] 1.7 Create `api/src/db/checkin_events.rs` with `CheckinEventRepository`: `create`, `find_by_id`, `latest_for_app_user`, `list_by_app_user_paginated(cursor, limit)`, `list_by_org_paginated`, `list_by_app_user_after(after_client_time)`.
-- [ ] 1.8 Create `api/src/db/checkin_user_status.rs` with `CheckinUserStatusRepository`: `init_off_duty(app_user_id, org_id)`, `find(app_user_id)`, `list_by_org(org_id)`, `update_to(app_user_id, expected_prior_status, new_status, current_shift_started_at, last_event_id)` — `update_to` uses conditional `find_one_and_update` matching the prior status; returns `None` (race) on mismatch.
-- [ ] 1.9 In `api/src/db/mod.rs` create the two collections and indexes:
+- [x] 1.1 Add `CheckinEventType` enum (`clock_in | clock_out | transfer_out | transfer_in`) and `AppUserCheckinStatus` enum (`off_duty | on_site | in_transit`) to `api/src/domain.rs` with snake_case serde.
+- [x] 1.2 Add `EventSource` enum (`app | admin_force`) and `EventInitiatorKind` enum (`app_user | dashboard_user`) to `api/src/domain.rs`.
+- [x] 1.3 Add `EventLocation` struct: `coordinates: GeoPoint { lat: f64, lng: f64 }`, `accuracy_meters: Option<f64>`, `region_name: Option<String>`, `manual_label: Option<String>`.
+- [x] 1.4 Add `CheckinEvent` struct: `id, org_id, app_user_id, event_type, occurred_at_client, occurred_at_server, source, initiated_by_kind, initiated_by_id, location, reason: Option<String>` (reason only set on admin_force).
+- [x] 1.5 Add `CheckinUserStatus` struct: `app_user_id (PK), org_id, status, current_shift_started_at: Option<DateTime>, last_event_id: Option<ObjectId>, updated_at`.
+- [x] 1.6 Extend `Org` in `api/src/domain.rs`: add `timezone: String` (default `"Asia/Taipei"`) and `OrgCheckinSettings { transfer_enabled: bool }` reachable as `Org.settings.checkin` via `bson::Document` access (or migrate to a typed struct on `Org`). Pick the simpler.
+- [x] 1.7 Create `api/src/db/checkin_events.rs` with `CheckinEventRepository`: `create`, `find_by_id`, `latest_for_app_user`, `list_by_app_user_paginated(cursor, limit)`, `list_by_org_paginated`, `list_by_app_user_after(after_client_time)`.
+- [x] 1.8 Create `api/src/db/checkin_user_status.rs` with `CheckinUserStatusRepository`: `init_off_duty(app_user_id, org_id)`, `find(app_user_id)`, `list_by_org(org_id)`, `update_to(app_user_id, expected_prior_status, new_status, current_shift_started_at, last_event_id)` — `update_to` uses conditional `find_one_and_update` matching the prior status; returns `None` (race) on mismatch.
+- [x] 1.9 In `api/src/db/mod.rs` create the two collections and indexes:
   - `checkin_events`: `(app_user_id, occurred_at_client desc)`, `(org_id, occurred_at_client desc)`
   - `checkin_user_status`: unique on `app_user_id`, secondary on `(org_id, status)`
-- [ ] 1.10 In `api/src/db/orgs.rs` add `update_settings(org_id, settings_patch: { transfer_enabled?, timezone? })` returning the updated Org. Handle absent `Org.settings.checkin` by treating it as defaults at read time.
+- [x] 1.10 In `api/src/db/orgs.rs` add `update_settings(org_id, settings_patch: { transfer_enabled?, timezone? })` returning the updated Org. Handle absent `Org.settings.checkin` by treating it as defaults at read time.
 
 ## 2. Reverse geocoder
 
-- [ ] 2.1 Create `api/src/services/mod.rs` and `api/src/services/reverse_geocoder.rs` defining `#[async_trait] pub trait ReverseGeocoder { async fn lookup(&self, lat: f64, lng: f64) -> Option<String>; }`.
-- [ ] 2.2 Create `api/src/services/reverse_geocoder/nominatim.rs` (or `nominatim_geocoder.rs`) implementing the trait against `https://nominatim.openstreetmap.org/reverse`. Use `reqwest::Client` with a User-Agent string `"argus-api/<version> (<contact>)"`, 2-second timeout, accept-language preference (configurable, default `"zh-TW,en"`). All errors collapse to `None`.
-- [ ] 2.3 Wire a default `ReverseGeocoder` instance into `AppState` (probably as `Arc<dyn ReverseGeocoder>`). Keep the type erased so tests can substitute a stub.
-- [ ] 2.4 Add a stub `StaticReverseGeocoder { fixed: Option<String> }` for tests.
+- [x] 2.1 Create `api/src/services/mod.rs` and `api/src/services/reverse_geocoder.rs` defining `#[async_trait] pub trait ReverseGeocoder { async fn lookup(&self, lat: f64, lng: f64) -> Option<String>; }`.
+- [x] 2.2 Create `api/src/services/reverse_geocoder/nominatim.rs` (or `nominatim_geocoder.rs`) implementing the trait against `https://nominatim.openstreetmap.org/reverse`. Use `reqwest::Client` with a User-Agent string `"argus-api/<version> (<contact>)"`, 2-second timeout, accept-language preference (configurable, default `"zh-TW,en"`). All errors collapse to `None`.
+- [x] 2.3 Wire a default `ReverseGeocoder` instance into `AppState` (probably as `Arc<dyn ReverseGeocoder>`). Keep the type erased so tests can substitute a stub.
+- [x] 2.4 Add a stub `StaticReverseGeocoder { fixed: Option<String> }` for tests.
 
 ## 3. AppUser-facing handlers (`/app/checkin/*`)
 
-- [ ] 3.1 `POST /app/checkin/events` in `api/src/handlers/app_checkin.rs`:
+- [x] 3.1 `POST /app/checkin/events` in `api/src/handlers/app_checkin.rs`:
   - Validate request body: `event_type`, `lat`, `lng`, `accuracy?`, `manual_label?` (length 1–120 if present), `occurred_at_client` (RFC3339).
   - Look up caller's `CheckinUserStatus` (init off_duty if missing).
   - Run state-machine validation; reject with `INVALID_TRANSITION` on illegal pair.
@@ -31,37 +31,37 @@
   - Call `ReverseGeocoder::lookup`; on `None`, store `region_name = null`.
   - Insert event row; then call `update_to(app_user_id, prior_status, new_status, ...)`. If race (returns `None`), best-effort delete the event row and respond `INVALID_TRANSITION`.
   - Return `201 Created` with `{ event, status }`.
-- [ ] 3.2 `GET /app/checkin/status` returns `{ status, current_shift_started_at, last_event }`.
-- [ ] 3.3 `GET /app/checkin/events` returns cursor-paginated own events (newest first by `occurred_at_client`, default 50, accepts `cursor` query param as event id of the last item from previous page).
-- [ ] 3.4 Wire `/app/checkin/*` routes; AppUser middleware (`RequireAppUser`) covers them, applying the `needs_password_change` 423 gate transparently.
+- [x] 3.2 `GET /app/checkin/status` returns `{ status, current_shift_started_at, last_event }`.
+- [x] 3.3 `GET /app/checkin/events` returns cursor-paginated own events (newest first by `occurred_at_client`, default 50, accepts `cursor` query param as event id of the last item from previous page).
+- [x] 3.4 Wire `/app/checkin/*` routes; AppUser middleware (`RequireAppUser`) covers them, applying the `needs_password_change` 423 gate transparently.
 
 ## 4. Admin-facing handlers (`/checkin/*` and `/orgs/me/settings`)
 
-- [ ] 4.1 `GET /checkin/users` in `api/src/handlers/checkin.rs`: admin-only, scoped to `current_org`. Returns array of `{ user, status, current_shift_started_at, last_event, has_skew_warning }`. Compute `has_skew_warning = |last_event.occurred_at_client - last_event.occurred_at_server| > 1 hour` per row when `last_event` exists.
-- [ ] 4.2 `GET /checkin/users/:id/events`: admin-only, scoped to `current_org`. Cross-Org id → `NOT_FOUND`. Cursor pagination by `occurred_at_client` desc.
-- [ ] 4.3 `POST /checkin/users/:id/force-checkout`: admin-only, scoped to `current_org`. Body `{ reason?: String (≤240 chars) }`. Reject if target's status is `off_duty` with `NOT_ON_DUTY`. Insert `clock_out` event with `source=admin_force`, `initiated_by_kind=dashboard_user`, `initiated_by_id=ctx.user_id`, `occurred_at_client=now`, `occurred_at_server=now`, `location` copied from target's last event, `manual_label="管理員強制收班"`, `reason` from body. Update status atomically.
-- [ ] 4.4 `PATCH /orgs/me/settings`: admin-only, scoped to `current_org`. Accepts `{ transfer_enabled?: bool, timezone?: String }`. If `transfer_enabled` is present, run state-lock check (count `checkin_user_status` where `org_id = current_org_id AND status != off_duty`); reject with `STATE_LOCKED { on_duty_count }` if count > 0. Validate `timezone` against IANA db; reject with `INVALID_TIMEZONE` on bad value. Apply the patch and return updated `OrgSettingsDto`.
+- [x] 4.1 `GET /checkin/users` in `api/src/handlers/checkin.rs`: admin-only, scoped to `current_org`. Returns array of `{ user, status, current_shift_started_at, last_event, has_skew_warning }`. Compute `has_skew_warning = |last_event.occurred_at_client - last_event.occurred_at_server| > 1 hour` per row when `last_event` exists.
+- [x] 4.2 `GET /checkin/users/:id/events`: admin-only, scoped to `current_org`. Cross-Org id → `NOT_FOUND`. Cursor pagination by `occurred_at_client` desc.
+- [x] 4.3 `POST /checkin/users/:id/force-checkout`: admin-only, scoped to `current_org`. Body `{ reason?: String (≤240 chars) }`. Reject if target's status is `off_duty` with `NOT_ON_DUTY`. Insert `clock_out` event with `source=admin_force`, `initiated_by_kind=dashboard_user`, `initiated_by_id=ctx.user_id`, `occurred_at_client=now`, `occurred_at_server=now`, `location` copied from target's last event, `manual_label="管理員強制收班"`, `reason` from body. Update status atomically.
+- [x] 4.4 `PATCH /orgs/me/settings`: admin-only, scoped to `current_org`. Accepts `{ transfer_enabled?: bool, timezone?: String }`. If `transfer_enabled` is present, run state-lock check (count `checkin_user_status` where `org_id = current_org_id AND status != off_duty`); reject with `STATE_LOCKED { on_duty_count }` if count > 0. Validate `timezone` against IANA db; reject with `INVALID_TIMEZONE` on bad value. Apply the patch and return updated `OrgSettingsDto`.
 
 ## 5. New error variants
 
-- [ ] 5.1 In `api/src/error.rs` add: `InvalidTransition { from, attempted } (422, INVALID_TRANSITION)`, `TransferDisabled (403, TRANSFER_DISABLED)`, `OutOfOrder (409, OUT_OF_ORDER)`, `StateLocked { on_duty_count: u32 } (409, STATE_LOCKED)`, `NotOnDuty (409, NOT_ON_DUTY)`, `InvalidTimezone (400, INVALID_TIMEZONE)`. Update `IntoResponse` to render the structured fields.
+- [x] 5.1 In `api/src/error.rs` add: `InvalidTransition { from, attempted } (422, INVALID_TRANSITION)`, `TransferDisabled (403, TRANSFER_DISABLED)`, `OutOfOrder (409, OUT_OF_ORDER)`, `StateLocked { on_duty_count: u32 } (409, STATE_LOCKED)`, `NotOnDuty (409, NOT_ON_DUTY)`, `InvalidTimezone (400, INVALID_TIMEZONE)`. Update `IntoResponse` to render the structured fields.
 
 ## 6. DTO shapes
 
-- [ ] 6.1 `CheckinEventDto { id, app_user_id, event_type, occurred_at_client, occurred_at_server, source, initiated_by_kind, initiated_by_id, location, reason?, has_skew_warning }`.
-- [ ] 6.2 `CheckinUserStatusDto { app_user_id, status, current_shift_started_at, last_event?, has_skew_warning }`.
-- [ ] 6.3 `SubmitCheckinEventRequest { event_type, lat, lng, accuracy?, manual_label?, occurred_at_client }`.
-- [ ] 6.4 `ForceCheckoutRequest { reason?: String }`.
-- [ ] 6.5 `UpdateOrgSettingsRequest { transfer_enabled?, timezone? }` and `OrgSettingsDto { timezone, checkin: { transfer_enabled } }`.
+- [x] 6.1 `CheckinEventDto { id, app_user_id, event_type, occurred_at_client, occurred_at_server, source, initiated_by_kind, initiated_by_id, location, reason?, has_skew_warning }`.
+- [x] 6.2 `CheckinUserStatusDto { app_user_id, status, current_shift_started_at, last_event?, has_skew_warning }`.
+- [x] 6.3 `SubmitCheckinEventRequest { event_type, lat, lng, accuracy?, manual_label?, occurred_at_client }`.
+- [x] 6.4 `ForceCheckoutRequest { reason?: String }`.
+- [x] 6.5 `UpdateOrgSettingsRequest { transfer_enabled?, timezone? }` and `OrgSettingsDto { timezone, checkin: { transfer_enabled } }`.
 
 ## 7. AppUser status init when an AppUser is created
 
-- [ ] 7.1 Update `POST /app-users` (in `api/src/handlers/app_users.rs`) to also insert a `checkin_user_status` row with `status = off_duty` immediately after the AppUser row succeeds. If the status insert fails, roll back the AppUser create (best effort).
-- [ ] 7.2 Update tests `tests/app_users_create.rs` to assert the matching `checkin_user_status` row exists.
+- [x] 7.1 Update `POST /app-users` (in `api/src/handlers/app_users.rs`) to also insert a `checkin_user_status` row with `status = off_duty` immediately after the AppUser row succeeds. If the status insert fails, roll back the AppUser create (best effort).
+- [x] 7.2 Update tests `tests/app_users_create.rs` to assert the matching `checkin_user_status` row exists.
 
 ## 8. Startup repair (status drift safety net)
 
-- [ ] 8.1 Add a small startup task (or admin-only `POST /admin/checkin/repair-status`) that scans `checkin_user_status` against the latest event per AppUser and fixes any drift (e.g. status row says off_duty but latest event was clock_in, or vice versa). Document why this exists in `api/README.md`. MVP: only the startup form, run once per process start; admin endpoint is optional follow-up.
+- [x] 8.1 Add a small startup task (or admin-only `POST /admin/checkin/repair-status`) that scans `checkin_user_status` against the latest event per AppUser and fixes any drift (e.g. status row says off_duty but latest event was clock_in, or vice versa). Document why this exists in `api/README.md`. MVP: only the startup form, run once per process start; admin endpoint is optional follow-up.
 
 ## 9. API integration tests
 

@@ -1,6 +1,6 @@
 use std::process::ExitCode;
 
-use argus_api::{AppState, Config, Db, handlers};
+use argus_api::{AppState, Config, Db, handlers, startup};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -28,6 +28,10 @@ async fn main() -> ExitCode {
         tracing::error!(?err, "failed to ensure indexes");
         return ExitCode::from(1);
     }
+
+    // One-shot drift repair on the checkin status projection. See
+    // `startup::repair_checkin_status_drift` for the why.
+    startup::repair_checkin_status_drift(&db).await;
 
     let listen_addr = config.listen_addr;
     let state = AppState::new(db, config);

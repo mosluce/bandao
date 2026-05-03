@@ -4,6 +4,8 @@ use axum::response::{IntoResponse, Response};
 use bson::DateTime;
 use serde_json::json;
 
+use crate::domain::{AppUserCheckinStatus, CheckinEventType};
+
 pub type ApiResult<T> = Result<T, ApiError>;
 
 #[derive(Debug, thiserror::Error)]
@@ -70,6 +72,33 @@ pub enum ApiError {
     #[error("password change required before this action")]
     NeedsPasswordChange,
 
+    // --- Checkin-events surface ---
+    /// `(prior_status, attempted_event)` is not in the legal-transition table.
+    /// Body includes both fields so clients can render a useful message.
+    #[error("invalid checkin transition")]
+    InvalidTransition {
+        from: AppUserCheckinStatus,
+        attempted: CheckinEventType,
+    },
+    /// Org-level toggle is off; transfer events are blocked. clock_in /
+    /// clock_out are unaffected.
+    #[error("transfer events are disabled for this org")]
+    TransferDisabled,
+    /// New event's `occurred_at_client` is `<=` the AppUser's most recent
+    /// stored event. Strict less-than-or-equal: same client time also fails.
+    #[error("event is out of order with respect to the latest stored event")]
+    OutOfOrder,
+    /// Cannot flip `transfer_enabled` while AppUsers are on shift. Body
+    /// carries the count so admin-web can render "目前在班 N 人，需先全部下班".
+    #[error("cannot change setting while AppUsers are on shift")]
+    StateLocked { on_duty_count: u32 },
+    /// Force-checkout target is already off-duty.
+    #[error("AppUser is not currently on shift")]
+    NotOnDuty,
+    /// `Org.timezone` write failed IANA validation.
+    #[error("invalid timezone identifier")]
+    InvalidTimezone,
+
     #[error("password hashing failed")]
     Password,
     #[error("database error")]
@@ -117,6 +146,14 @@ impl ApiError {
             ApiError::NeedsPasswordChange => {
                 (StatusCode::LOCKED, "NEEDS_PASSWORD_CHANGE")
             }
+            ApiError::InvalidTransition { .. } => {
+                (StatusCode::UNPROCESSABLE_ENTITY, "INVALID_TRANSITION")
+            }
+            ApiError::TransferDisabled => (StatusCode::FORBIDDEN, "TRANSFER_DISABLED"),
+            ApiError::OutOfOrder => (StatusCode::CONFLICT, "OUT_OF_ORDER"),
+            ApiError::StateLocked { .. } => (StatusCode::CONFLICT, "STATE_LOCKED"),
+            ApiError::NotOnDuty => (StatusCode::CONFLICT, "NOT_ON_DUTY"),
+            ApiError::InvalidTimezone => (StatusCode::BAD_REQUEST, "INVALID_TIMEZONE"),
             ApiError::Password
             | ApiError::Db(_)
             | ApiError::BsonSer(_)
@@ -142,6 +179,21 @@ impl IntoResponse for ApiError {
                     "code": code,
                     "message": message,
                     "retry_after": retry_after.try_to_rfc3339_string().ok(),
+                }
+            })),
+            ApiError::InvalidTransition { from, attempted } => Json(json!({
+                "error": {
+                    "code": code,
+                    "message": message,
+                    "from": from,
+                    "attempted": attempted,
+                }
+            })),
+            ApiError::StateLocked { on_duty_count } => Json(json!({
+                "error": {
+                    "code": code,
+                    "message": message,
+                    "on_duty_count": on_duty_count,
                 }
             })),
             _ => Json(json!({ "error": { "code": code, "message": message } })),

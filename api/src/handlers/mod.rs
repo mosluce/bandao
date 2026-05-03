@@ -1,7 +1,10 @@
 pub mod app_auth;
+pub mod app_checkin;
 pub mod app_dto;
 pub mod app_users;
 pub mod auth;
+pub mod checkin;
+pub mod checkin_dto;
 pub mod me;
 pub mod orgs;
 pub mod users;
@@ -37,6 +40,7 @@ pub fn router(state: AppState) -> Router {
             post(orgs::set_slug).delete(orgs::clear_slug),
         )
         .route("/orgs/me/owner", post(orgs::transfer_owner))
+        .route("/orgs/me/settings", patch(checkin::update_settings))
         .route("/dashboard-users", get(users::list_in_org))
         .route(
             "/dashboard-users/cooldowns",
@@ -60,6 +64,18 @@ pub fn router(state: AppState) -> Router {
             "/app-users/{id}/password-reset",
             post(app_users::password_reset),
         )
+        // Admin-side checkin board / per-user history / force-checkout. All
+        // three guard on RequireAdmin and scope to current_org inside the
+        // handler.
+        .route("/checkin/users", get(checkin::list_users))
+        .route(
+            "/checkin/users/{id}/events",
+            get(checkin::list_user_events),
+        )
+        .route(
+            "/checkin/users/{id}/force-checkout",
+            post(checkin::force_checkout),
+        )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             require_session,
@@ -71,6 +87,8 @@ pub fn router(state: AppState) -> Router {
         .route("/app/auth/logout", post(app_auth::logout))
         .route("/app/me", get(app_auth::me))
         .route("/app/me/password", post(app_auth::change_password))
+        .route("/app/checkin/events", post(app_checkin::submit_event).get(app_checkin::list_events))
+        .route("/app/checkin/status", get(app_checkin::status))
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             app_require_session,

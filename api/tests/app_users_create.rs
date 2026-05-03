@@ -42,6 +42,23 @@ async fn admin_creates_app_user_returns_initial_password_once() {
     assert_eq!(user["status"], "active");
     assert_eq!(user["needs_password_change"], true);
     assert!(user["last_login_at"].is_null() || !user.as_object().unwrap().contains_key("last_login_at"));
+
+    // The matching `checkin_user_status` row must exist with status=off_duty,
+    // ready for the AppUser's first clock-in.
+    let app_user_id = bson::oid::ObjectId::parse_str(user["id"].as_str().unwrap()).unwrap();
+    let status_row = app
+        .db()
+        .checkin_user_status
+        .find(app_user_id)
+        .await
+        .unwrap()
+        .expect("checkin_user_status row should exist after AppUser create");
+    assert_eq!(
+        bson::to_bson(&status_row.status).unwrap().as_str(),
+        Some("off_duty"),
+    );
+    assert!(status_row.last_event_id.is_none());
+    assert!(status_row.current_shift_started_at.is_none());
 }
 
 #[tokio::test]

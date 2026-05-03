@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::auth::extractor::RequireAdmin;
 use crate::auth::{app_password, password};
-use crate::db::AppUserInsertError;
+use crate::db::{AppUserInsertError, CheckinStatusInsertError};
 use crate::domain::AppUserStatus;
 use crate::error::{ApiError, ApiResult};
 use crate::handlers::app_dto::{
@@ -80,6 +80,30 @@ pub async fn create(
         Err(AppUserInsertError::Duplicate) => return Err(ApiError::UsernameTaken),
         Err(AppUserInsertError::Db(err)) => return Err(ApiError::Db(err)),
     };
+
+    // Initialise the AppUser's checkin status row. Required so the live
+    // board, force-checkout, and the AppUser's own state queries all have
+    // a row to read. Best-effort rollback if the insert fails — we'd
+    // rather lose the AppUser than ship one without a status row, since
+    // the checkin handlers self-heal but admin queries may not.
+    if let Err(err) = state
+        .db
+        .checkin_user_status
+        .init_off_duty(user.id, active.org_id)
+        .await
+    {
+        match err {
+            CheckinStatusInsertError::Duplicate => {
+                // Pre-existing row — fine, treat as success.
+            }
+            CheckinStatusInsertError::Db(db_err) => {
+                if let Err(rollback) = state.db.app_users.delete_by_id(user.id).await {
+                    tracing::error!(?rollback, app_user_id = %user.id, "failed to roll back app user after status init failure");
+                }
+                return Err(ApiError::Db(db_err));
+            }
+        }
+    }
 
     Ok((
         StatusCode::CREATED,
