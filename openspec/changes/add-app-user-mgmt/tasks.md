@@ -61,23 +61,23 @@
 
 ## 8. admin-web
 
-- [ ] 8.1 Add types to `admin-web/types/api.ts`: `AppUserDto`, `AppUserStatus`, `CreateAppUserRequest`, `UpdateAppUserRequest`, `CreateAppUserResponse`.
-- [ ] 8.2 Add `composables/useAppUsers.ts` exposing `list`, `create`, `update`, `disable`, `enable`, `resetPassword`, all of which 401-resilient via existing `useApi`.
-- [ ] 8.3 Add `pages/app-users/index.vue`: list with `username`, `display_name`, `status`, `last_login_at`, `created_at`. Watch `auth.currentOrg.value?.id` and refetch on switch. Admin-only — non-admin lands on `/`.
-- [ ] 8.4 Add "新增 App 使用者" button → modal with `username` + `display_name`. On success, show a one-time password modal with copy-to-clipboard + "知道了" dismiss. After dismiss, the cleartext is gone client-side.
-- [ ] 8.5 Add inline disable/enable toggle per row (with confirm for disable). Disabled rows render with reduced opacity + "已停用" badge.
-- [ ] 8.6 Add "重設密碼" action per row → confirmation → on success, reuse the one-time password modal.
-- [ ] 8.7 Add a header link from `pages/index.vue` (admin section) to `/app-users`. Add OrgSwitcher to `pages/app-users/index.vue` like other org-scoped pages.
-- [ ] 8.8 Friendly error messages for `USERNAME_TAKEN`, `INVALID_USERNAME_FORMAT`, `NO_ACTIVE_ORG`, `FORBIDDEN`.
+- [x] 8.1 Add types to `admin-web/types/api.ts`: `AppUserDto`, `AppUserStatus`, `CreateAppUserRequest`, `UpdateAppUserRequest`, `CreateAppUserResponse`.
+- [x] 8.2 Add `composables/useAppUsers.ts` exposing `list`, `create`, `update`, `disable`, `enable`, `resetPassword`, all of which 401-resilient via existing `useApi`.
+- [x] 8.3 Add `pages/app-users/index.vue`: list with `username`, `display_name`, `status`, `last_login_at`, `created_at`. Watch `auth.currentOrg.value?.id` and refetch on switch. Admin-only — non-admin lands on `/`.
+- [x] 8.4 Add "新增 App 使用者" button → modal with `username` + `display_name`. On success, show a one-time password modal with copy-to-clipboard + "知道了" dismiss. After dismiss, the cleartext is gone client-side.
+- [x] 8.5 Add inline disable/enable toggle per row (with confirm for disable). Disabled rows render with reduced opacity + "已停用" badge.
+- [x] 8.6 Add "重設密碼" action per row → confirmation → on success, reuse the one-time password modal.
+- [x] 8.7 Add a header link from `pages/index.vue` (admin section) to `/app-users`. Add OrgSwitcher to `pages/app-users/index.vue` like other org-scoped pages.
+- [x] 8.8 Friendly error messages for `USERNAME_TAKEN`, `INVALID_USERNAME_FORMAT`, `NO_ACTIVE_ORG`, `FORBIDDEN`.
 
 ## 9. Docs
 
-- [ ] 9.1 Update `api/README.md` with a new section describing the AppUser surface (`/app/auth/*`, `/app/me`, `/app-users/*`), including the new error codes (`USERNAME_TAKEN`, `INVALID_USERNAME_FORMAT`, `NEEDS_PASSWORD_CHANGE`).
-- [ ] 9.2 Update `admin-web/README.md` structure section to include `pages/app-users/`, `composables/useAppUsers`, and a brief note on the one-time-password modal pattern.
-- [ ] 9.3 Note in proposal-adjacent docs (or a short paragraph in `api/README.md`) that `add-app-shell` is the next ROADMAP item that consumes this surface.
+- [x] 9.1 Update `api/README.md` with a new section describing the AppUser surface (`/app/auth/*`, `/app/me`, `/app-users/*`), including the new error codes (`USERNAME_TAKEN`, `INVALID_USERNAME_FORMAT`, `NEEDS_PASSWORD_CHANGE`).
+- [x] 9.2 Update `admin-web/README.md` structure section to include `pages/app-users/`, `composables/useAppUsers`, and a brief note on the one-time-password modal pattern.
+- [x] 9.3 Note in proposal-adjacent docs (or a short paragraph in `api/README.md`) that `add-app-shell` is the next ROADMAP item that consumes this surface.
 
 ## 10. Smoke
 
-- [ ] 10.1 Run cargo build / cargo test (per-binary serial loop on macOS to dodge TIME_WAIT noise documented in `api/README.md`).
-- [ ] 10.2 Run admin-web `pnpm typecheck` + `pnpm build`.
+- [x] 10.1 Run cargo build / cargo test (per-binary serial loop on macOS to dodge TIME_WAIT noise documented in `api/README.md`).
+- [x] 10.2 Run admin-web `pnpm typecheck` + `pnpm build`.
 - [ ] 10.3 Live smoke: bring up local stack, log into admin-web, create an AppUser, confirm one-time password modal, disable + re-enable, reset password. Use `curl` to hit `/app/auth/login` with `(org_code, username, initial_password)` and confirm 200 + `needs_password_change=true`; hit `/app/me/password` with the change; confirm flag clears. (No Flutter required — the live smoke is API-level.)

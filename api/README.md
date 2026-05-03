@@ -124,3 +124,35 @@ Endpoints：
 | `INVALID_PASSWORD` | 401 | owner transfer 的 `current_password` 驗證失敗 |
 | `INVALID_TARGET` | 400 | owner transfer 的 `new_owner_user_id` 不是同 Org 的 admin |
 | `SAME_OWNER` | 400 | owner transfer 的目標就是呼叫者 |
+
+## AppUser（手機 app 端使用者）
+
+跟 dashboard 完全分開的軸：`app_users` 是 1:1 with Org（同一個人不會跨 Org 當 AppUser），由 admin 建立，無自助註冊。Auth 走 `Authorization: Bearer <token>` header（而不是 cookie），token 存在 `app_sessions` collection（與 dashboard session 同樣是 server-side opaque random + sliding refresh）。下一個 ROADMAP item `add-app-shell` 會 bootstrap Flutter app 消化這個 surface。
+
+### Mobile-facing endpoints `/app/*`
+
+| Endpoint | 說明 |
+| --- | --- |
+| `POST /app/auth/login` | body `{ org_code, username, password }`；`org_code` 接受 random code / active slug / grace-period slug（同 register mode=join 的 resolver） |
+| `POST /app/auth/logout` | 刪除目前 token；其他 device 的 session 不受影響 |
+| `GET /app/me` | 回 `{ user, org, needs_password_change }` |
+| `POST /app/me/password` | body `{ current_password, new_password }`；改完密碼後 `needs_password_change` 清除，token 仍有效 |
+
+login 失敗（org_code 不存在、username 不存在、wrong password、status=disabled）一律回 `INVALID_CREDENTIALS`，不洩漏失敗原因。
+
+`needs_password_change=true` 時除了 `GET /app/me`、`POST /app/me/password`、`POST /app/auth/logout` 之外的 `/app/*` endpoint 都回 `423 LOCKED` + `NEEDS_PASSWORD_CHANGE`，強制 app 端先帶使用者改密碼。
+
+### Admin-facing endpoints `/app-users/*`（dashboard cookie + admin role）
+
+| Endpoint | 說明 |
+| --- | --- |
+| `GET /app-users` | 列出 `current_org` 內的 AppUser |
+| `POST /app-users` | body `{ username, display_name }`；server 產 12 字一次性初始密碼（字符集同 `org_code`），response 含 `initial_password` 一次顯示 |
+| `PATCH /app-users/:id` | body `{ display_name?, status? }`；`status=disabled` 會同步刪該 AppUser 全部 sessions |
+| `POST /app-users/:id/password-reset` | 重新產一次性密碼、強制 `needs_password_change=true`、刪所有 sessions |
+
+| Code | HTTP | 說明 |
+| --- | --- | --- |
+| `USERNAME_TAKEN` | 409 | 同 Org 內 username 已存在（case-insensitive） |
+| `INVALID_USERNAME_FORMAT` | 400 | username 不符 `^[a-zA-Z0-9_.-]{2,32}$` |
+| `NEEDS_PASSWORD_CHANGE` | 423 | AppUser 尚未變更初始密碼，先改才能呼叫其他 `/app/*` |
