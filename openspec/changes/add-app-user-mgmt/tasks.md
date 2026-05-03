@@ -48,16 +48,16 @@
 
 ## 7. API integration tests
 
-- [ ] 7.1 `tests/common/mod.rs` helper: `create_app_user(org_id, username, display_name, admin_session)` and `app_login(org_code, username, password)` builders. Reuse the existing TestApp infra and `testcontainers`.
-- [ ] 7.2 `tests/app_auth_login.rs`: happy path; unknown org_code → INVALID_CREDENTIALS; unknown username → INVALID_CREDENTIALS; wrong password → INVALID_CREDENTIALS; disabled → INVALID_CREDENTIALS; case-insensitive username match; slug + grace slug both work; `last_login_at` updated.
-- [ ] 7.3 `tests/app_auth_logout.rs`: logout deletes only the current token; sibling sessions on other devices survive; works with `needs_password_change=true`.
-- [ ] 7.4 `tests/app_me.rs`: returns `{ user, org, needs_password_change }`; works with `needs_password_change=true`; unknown token → 401.
-- [ ] 7.5 `tests/app_me_password.rs`: forced flow (initial password → change → flag cleared, token still valid); voluntary flow (already-active user changes password); wrong current_password → INVALID_PASSWORD; too-short new password → VALIDATION; works while `needs_password_change=true`.
-- [ ] 7.6 `tests/app_needs_password_change_gate.rs`: hit a gated `/app/*` endpoint with `needs_password_change=true` → 423 NEEDS_PASSWORD_CHANGE; hit GET /app/me / POST /app/me/password / POST /app/auth/logout → succeeds; after change, gated endpoints stop blocking. Use a placeholder gated route (or document that there's no second `/app/*` endpoint yet — assert via the extractor's behavior).
-- [ ] 7.7 `tests/app_users_list.rs`: admin lists current_org's AppUsers; member → FORBIDDEN; no current_org → NO_ACTIVE_ORG; cross-org rows excluded.
-- [ ] 7.8 `tests/app_users_create.rs`: happy path returns `initial_password` once; format `^[2-9A-HJ-NP-Z]{12}$`; member → FORBIDDEN; INVALID_USERNAME_FORMAT for bad shapes; USERNAME_TAKEN for case-insensitive duplicate; same username allowed in another Org.
-- [ ] 7.9 `tests/app_users_update.rs`: update display_name only; disable kills sessions; re-enable preserves password and needs_password_change; member → FORBIDDEN; cross-org → NOT_FOUND.
-- [ ] 7.10 `tests/app_users_password_reset.rs`: reset returns new `initial_password`, sets `needs_password_change=true`, kills all sessions, hash differs from prior; member → FORBIDDEN; cross-org → NOT_FOUND.
+- [x] 7.1 `tests/common/mod.rs` helper: `create_app_user(org_id, username, display_name, admin_session)` and `app_login(org_code, username, password)` builders. Reuse the existing TestApp infra and `testcontainers`.
+- [x] 7.2 `tests/app_auth_login.rs`: happy path; unknown org_code → INVALID_CREDENTIALS; unknown username → INVALID_CREDENTIALS; wrong password → INVALID_CREDENTIALS; disabled → INVALID_CREDENTIALS; case-insensitive username match; slug + grace slug both work; `last_login_at` updated.
+- [x] 7.3 `tests/app_auth_logout.rs`: logout deletes only the current token; sibling sessions on other devices survive; works with `needs_password_change=true`.
+- [x] 7.4 `tests/app_me.rs`: returns `{ user, org, needs_password_change }`; works with `needs_password_change=true`; unknown token → 401.
+- [x] 7.5 `tests/app_me_password.rs`: forced flow (initial password → change → flag cleared, token still valid); voluntary flow (already-active user changes password); wrong current_password → INVALID_PASSWORD; too-short new password → VALIDATION; works while `needs_password_change=true`.
+- [x] 7.6 `tests/app_needs_password_change_gate.rs`: hit a gated `/app/*` endpoint with `needs_password_change=true` → 423 NEEDS_PASSWORD_CHANGE; hit GET /app/me / POST /app/me/password / POST /app/auth/logout → succeeds; after change, gated endpoints stop blocking. Use a placeholder gated route (or document that there's no second `/app/*` endpoint yet — assert via the extractor's behavior).
+- [x] 7.7 `tests/app_users_list.rs`: admin lists current_org's AppUsers; member → FORBIDDEN; no current_org → NO_ACTIVE_ORG; cross-org rows excluded.
+- [x] 7.8 `tests/app_users_create.rs`: happy path returns `initial_password` once; format `^[2-9A-HJ-NP-Z]{12}$`; member → FORBIDDEN; INVALID_USERNAME_FORMAT for bad shapes; USERNAME_TAKEN for case-insensitive duplicate; same username allowed in another Org.
+- [x] 7.9 `tests/app_users_update.rs`: update display_name only; disable kills sessions; re-enable preserves password and needs_password_change; member → FORBIDDEN; cross-org → NOT_FOUND.
+- [x] 7.10 `tests/app_users_password_reset.rs`: reset returns new `initial_password`, sets `needs_password_change=true`, kills all sessions, hash differs from prior; member → FORBIDDEN; cross-org → NOT_FOUND.
 
 ## 8. admin-web
 

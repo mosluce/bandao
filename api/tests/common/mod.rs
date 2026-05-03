@@ -185,6 +185,76 @@ impl TestApp {
             .await
             .expect("membership count")
     }
+
+    /// Admin builder: create an AppUser via `POST /app-users` against
+    /// `admin_client`'s current Org. Returns the parsed `CreateAppUserResponse`
+    /// body (`{ user, initial_password }`).
+    pub async fn create_app_user(
+        &self,
+        admin_client: &reqwest::Client,
+        username: &str,
+        display_name: &str,
+    ) -> Value {
+        let resp = admin_client
+            .post(self.url("/app-users"))
+            .json(&json!({ "username": username, "display_name": display_name }))
+            .send()
+            .await
+            .expect("send create app user");
+        assert_eq!(
+            resp.status(),
+            reqwest::StatusCode::CREATED,
+            "create_app_user failed: status={}",
+            resp.status()
+        );
+        resp.json().await.expect("create_app_user body")
+    }
+
+    /// Mobile-side builder: hit `POST /app/auth/login` with a fresh client
+    /// (no shared cookie jar — bearer auth doesn't need one). Returns
+    /// `(reqwest::Client, body)` for the caller to make subsequent
+    /// `Authorization: Bearer <token>` requests via `app_get` / `app_post`.
+    pub async fn app_login(
+        &self,
+        org_code: &str,
+        username: &str,
+        password: &str,
+    ) -> (reqwest::Client, Value) {
+        let client = self.fresh_client();
+        let resp = client
+            .post(self.url("/app/auth/login"))
+            .json(&json!({
+                "org_code": org_code,
+                "username": username,
+                "password": password,
+            }))
+            .send()
+            .await
+            .expect("send app login");
+        assert_eq!(
+            resp.status(),
+            reqwest::StatusCode::OK,
+            "app_login failed: status={}",
+            resp.status()
+        );
+        let body: Value = resp.json().await.expect("app_login body");
+        (client, body)
+    }
+
+    /// Convenience: send an authenticated `GET /app/...` request, attaching
+    /// `Authorization: Bearer <token>` from a previous `app_login` body.
+    pub fn app_get(&self, client: &reqwest::Client, token: &str, path: &str) -> reqwest::RequestBuilder {
+        client
+            .get(self.url(path))
+            .header("Authorization", format!("Bearer {token}"))
+    }
+
+    /// Convenience: send an authenticated `POST /app/...` request.
+    pub fn app_post(&self, client: &reqwest::Client, token: &str, path: &str) -> reqwest::RequestBuilder {
+        client
+            .post(self.url(path))
+            .header("Authorization", format!("Bearer {token}"))
+    }
 }
 
 impl Drop for TestApp {
