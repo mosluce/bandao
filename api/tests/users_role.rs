@@ -4,54 +4,12 @@ use common::TestApp;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-async fn register_admin(app: &TestApp, email: &str, org_name: &str) -> (reqwest::Client, Value) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "create",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_name": org_name,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    (client, body)
-}
-
-async fn register_member(app: &TestApp, email: &str, org_code: &str) -> (reqwest::Client, Value) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "join",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_code": org_code,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    (client, body)
-}
-
 #[tokio::test]
 async fn admin_promotes_member_to_admin() {
     let app = TestApp::spawn().await;
-    let (admin, admin_body) = register_admin(&app, "founder@example.com", "Acme").await;
-    let code = admin_body["org"]["code"].as_str().unwrap().to_string();
-    let (_member, member_body) = register_member(&app, "member@example.com", &code).await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let (_member, member_body) = app.register_member("member@example.com", &code).await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
     let resp = admin
@@ -69,9 +27,9 @@ async fn admin_promotes_member_to_admin() {
 #[tokio::test]
 async fn member_cannot_change_roles() {
     let app = TestApp::spawn().await;
-    let (_admin, admin_body) = register_admin(&app, "founder@example.com", "Acme").await;
-    let code = admin_body["org"]["code"].as_str().unwrap().to_string();
-    let (member, member_body) = register_member(&app, "member@example.com", &code).await;
+    let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let (member, member_body) = app.register_member("member@example.com", &code).await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
     let resp = member
@@ -86,8 +44,9 @@ async fn member_cannot_change_roles() {
 #[tokio::test]
 async fn cross_org_target_returns_not_found() {
     let app = TestApp::spawn().await;
-    let (admin_a, _) = register_admin(&app, "alpha@example.com", "OrgA").await;
-    let (_admin_b, body_b) = register_admin(&app, "beta@example.com", "OrgB").await;
+    let (admin_a, _) = app.register_admin("alpha@example.com", "OrgA").await;
+    let (_admin_b, body_b) = app.register_admin("beta@example.com", "OrgB").await;
+    // Identity B has no membership in OrgA → cross-Org probe collapses to NOT_FOUND.
     let outsider_id = body_b["user"]["id"].as_str().unwrap().to_string();
 
     let resp = admin_a
@@ -104,7 +63,7 @@ async fn cross_org_target_returns_not_found() {
 #[tokio::test]
 async fn demoting_owner_is_rejected() {
     let app = TestApp::spawn().await;
-    let (admin, body) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, body) = app.register_admin("founder@example.com", "Acme").await;
     let owner_id = body["user"]["id"].as_str().unwrap().to_string();
 
     let resp = admin
@@ -121,9 +80,9 @@ async fn demoting_owner_is_rejected() {
 #[tokio::test]
 async fn demoting_non_owner_admin_succeeds() {
     let app = TestApp::spawn().await;
-    let (admin, admin_body) = register_admin(&app, "founder@example.com", "Acme").await;
-    let code = admin_body["org"]["code"].as_str().unwrap().to_string();
-    let (_member, member_body) = register_member(&app, "member@example.com", &code).await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let (_member, member_body) = app.register_member("member@example.com", &code).await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
     // Promote first.
@@ -135,7 +94,7 @@ async fn demoting_non_owner_admin_succeeds() {
         .unwrap();
     assert_eq!(promote.status(), StatusCode::OK);
 
-    // Demote the non-owner admin: must succeed (no LAST_ADMIN check; owner remains admin).
+    // Demote the non-owner admin: must succeed (owner remains admin).
     let demote = admin
         .patch(app.url(&format!("/dashboard-users/{member_id}/role")))
         .json(&json!({ "role": "member" }))
@@ -145,4 +104,21 @@ async fn demoting_non_owner_admin_succeeds() {
     assert_eq!(demote.status(), StatusCode::OK);
     let body: Value = demote.json().await.unwrap();
     assert_eq!(body["role"], "member");
+}
+
+#[tokio::test]
+async fn promoting_owner_is_a_noop() {
+    let app = TestApp::spawn().await;
+    let (admin, body) = app.register_admin("founder@example.com", "Acme").await;
+    let owner_id = body["user"]["id"].as_str().unwrap().to_string();
+
+    let resp = admin
+        .patch(app.url(&format!("/dashboard-users/{owner_id}/role")))
+        .json(&json!({ "role": "admin" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["role"], "admin");
 }

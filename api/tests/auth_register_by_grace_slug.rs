@@ -6,28 +6,6 @@ use common::TestApp;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-async fn register_admin(app: &TestApp, email: &str, org_name: &str) -> (reqwest::Client, String) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "create",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_name": org_name,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    let org_id = body["org"]["id"].as_str().unwrap().to_string();
-    (client, org_id)
-}
-
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
 /// Backdate the org's `slug_changed_at` so the rate-limit window has elapsed.
@@ -64,7 +42,8 @@ async fn expire_reservation(app: &TestApp, slug: &str) {
 #[tokio::test]
 async fn join_works_during_grace_then_fails_after_expiry() {
     let app = TestApp::spawn().await;
-    let (admin, org_id) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let org_id = admin_body["current_org"]["id"].as_str().unwrap().to_string();
 
     // First SET (no rate limit).
     let r = admin
@@ -87,34 +66,15 @@ async fn join_works_during_grace_then_fails_after_expiry() {
         .unwrap();
     assert_eq!(r.status(), StatusCode::OK);
 
-    // Old slug "acme" still resolves via grace.
-    let joiner = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let r = joiner
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "join",
-            "email": "graceuser@example.com",
-            "password": "hunter2hunter2",
-            "org_code": "acme",
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(r.status(), StatusCode::OK);
-    let body: Value = r.json().await.unwrap();
-    assert_eq!(body["org"]["id"], org_id);
+    // Old slug "acme" still resolves via grace; new identity registers + joins.
+    let (_grace_user, grace_body) = app.register_member("graceuser@example.com", "acme").await;
+    assert_eq!(grace_body["current_org"]["id"], org_id);
 
     // Force-expire the grace reservation.
     expire_reservation(&app, "acme").await;
 
     // Old slug should now be rejected.
-    let stranger = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
+    let stranger = app.fresh_client();
     let r = stranger
         .post(app.url("/auth/register"))
         .json(&json!({

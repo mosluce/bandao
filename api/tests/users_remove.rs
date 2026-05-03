@@ -5,56 +5,14 @@ use common::TestApp;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-async fn register_admin(app: &TestApp, email: &str, org_name: &str) -> (reqwest::Client, Value) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "create",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_name": org_name,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    (client, body)
-}
-
-async fn register_member(app: &TestApp, email: &str, org_code: &str) -> (reqwest::Client, Value) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "join",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_code": org_code,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    (client, body)
-}
-
 #[tokio::test]
-async fn admin_removes_member_succeeds() {
+async fn admin_removes_member_succeeds_membership_only() {
     let app = TestApp::spawn().await;
-    let (admin, admin_body) = register_admin(&app, "founder@example.com", "Acme").await;
-    let code = admin_body["org"]["code"].as_str().unwrap().to_string();
-    let org_id = ObjectId::parse_str(admin_body["org"]["id"].as_str().unwrap()).unwrap();
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let org_id = ObjectId::parse_str(admin_body["current_org"]["id"].as_str().unwrap()).unwrap();
 
-    let (member, member_body) = register_member(&app, "member@example.com", &code).await;
+    let (member, member_body) = app.register_member("member@example.com", &code).await;
     let member_id_hex = member_body["user"]["id"].as_str().unwrap().to_string();
     let member_id = ObjectId::parse_str(&member_id_hex).unwrap();
 
@@ -69,9 +27,17 @@ async fn admin_removes_member_succeeds() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 
-    // User is gone.
-    let users = app.db().dashboard_users.find_by_id(member_id).await.unwrap();
-    assert!(users.is_none());
+    // Identity SURVIVES — only the membership is gone.
+    let user = app.db().dashboard_users.find_by_id(member_id).await.unwrap();
+    assert!(user.is_some(), "identity should survive admin remove");
+
+    let m = app
+        .db()
+        .dashboard_memberships
+        .find_by_user_and_org(member_id, org_id)
+        .await
+        .unwrap();
+    assert!(m.is_none(), "membership for current_org should be gone");
 
     // Marker is present.
     let marker = app
@@ -91,9 +57,9 @@ async fn admin_removes_member_succeeds() {
 #[tokio::test]
 async fn admin_removes_non_owner_admin_succeeds() {
     let app = TestApp::spawn().await;
-    let (admin, admin_body) = register_admin(&app, "founder@example.com", "Acme").await;
-    let code = admin_body["org"]["code"].as_str().unwrap().to_string();
-    let (_member, member_body) = register_member(&app, "second@example.com", &code).await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let (_member, member_body) = app.register_member("second@example.com", &code).await;
     let other_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
     // Promote the second user to admin.
@@ -117,12 +83,12 @@ async fn admin_removes_non_owner_admin_succeeds() {
 #[tokio::test]
 async fn admin_cannot_remove_owner() {
     let app = TestApp::spawn().await;
-    let (founder, founder_body) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (founder, founder_body) = app.register_admin("founder@example.com", "Acme").await;
     let owner_id = founder_body["user"]["id"].as_str().unwrap().to_string();
-    let code = founder_body["org"]["code"].as_str().unwrap().to_string();
+    let code = founder_body["current_org"]["code"].as_str().unwrap().to_string();
 
     // A second admin (non-owner) tries to remove the owner.
-    let (_second, second_body) = register_member(&app, "second@example.com", &code).await;
+    let (_second, second_body) = app.register_member("second@example.com", &code).await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
     let promote = founder
         .patch(app.url(&format!("/dashboard-users/{second_id}/role")))
@@ -133,17 +99,7 @@ async fn admin_cannot_remove_owner() {
     assert_eq!(promote.status(), StatusCode::OK);
 
     // Re-login as the new admin.
-    let new_admin = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let login = new_admin
-        .post(app.url("/auth/login"))
-        .json(&json!({ "email": "second@example.com", "password": "hunter2hunter2" }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(login.status(), StatusCode::OK);
+    let (new_admin, _) = app.login("second@example.com", "hunter2hunter2").await;
 
     let resp = new_admin
         .delete(app.url(&format!("/dashboard-users/{owner_id}")))
@@ -158,7 +114,7 @@ async fn admin_cannot_remove_owner() {
 #[tokio::test]
 async fn admin_cannot_remove_self_via_id_endpoint() {
     let app = TestApp::spawn().await;
-    let (admin, body) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, body) = app.register_admin("founder@example.com", "Acme").await;
     let admin_id = body["user"]["id"].as_str().unwrap().to_string();
 
     let resp = admin
@@ -174,12 +130,12 @@ async fn admin_cannot_remove_self_via_id_endpoint() {
 #[tokio::test]
 async fn member_cannot_remove_anyone() {
     let app = TestApp::spawn().await;
-    let (admin, admin_body) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
     let admin_id = admin_body["user"]["id"].as_str().unwrap().to_string();
-    let code = admin_body["org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
 
-    let (member, _member_body) = register_member(&app, "member@example.com", &code).await;
-    let _ = admin; // suppress unused
+    let (member, _member_body) = app.register_member("member@example.com", &code).await;
+    let _ = admin;
 
     let resp = member
         .delete(app.url(&format!("/dashboard-users/{admin_id}")))
@@ -192,8 +148,8 @@ async fn member_cannot_remove_anyone() {
 #[tokio::test]
 async fn admin_remove_cross_org_returns_not_found() {
     let app = TestApp::spawn().await;
-    let (admin_a, _) = register_admin(&app, "alpha@example.com", "OrgA").await;
-    let (_admin_b, body_b) = register_admin(&app, "beta@example.com", "OrgB").await;
+    let (admin_a, _) = app.register_admin("alpha@example.com", "OrgA").await;
+    let (_admin_b, body_b) = app.register_admin("beta@example.com", "OrgB").await;
     let outsider_id = body_b["user"]["id"].as_str().unwrap().to_string();
 
     let resp = admin_a

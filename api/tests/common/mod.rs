@@ -7,6 +7,7 @@ use std::time::Duration;
 use argus_api::{AppState, Config, Db, handlers};
 use bson::oid::ObjectId;
 use reqwest::redirect::Policy;
+use serde_json::{Value, json};
 use testcontainers::ContainerAsync;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::mongo::Mongo;
@@ -104,6 +105,86 @@ impl TestApp {
     pub fn db(&self) -> Arc<argus_api::Db> {
         self.state.db.clone()
     }
+
+    /// Spawn a fresh reqwest client with its own cookie jar — convenient when
+    /// a test needs to act as a different identity / session than `self.client`.
+    pub fn fresh_client(&self) -> reqwest::Client {
+        reqwest::Client::builder()
+            .cookie_store(true)
+            .redirect(Policy::none())
+            .build()
+            .expect("fresh reqwest client")
+    }
+
+    /// Register the first identity in an Org via `mode=create`. Returns the
+    /// authenticated client and the parsed `AuthResponse`-shaped body.
+    pub async fn register_admin(
+        &self,
+        email: &str,
+        org_name: &str,
+    ) -> (reqwest::Client, Value) {
+        let client = self.fresh_client();
+        let resp = client
+            .post(self.url("/auth/register"))
+            .json(&json!({
+                "mode": "create",
+                "email": email,
+                "password": "hunter2hunter2",
+                "org_name": org_name,
+            }))
+            .send()
+            .await
+            .expect("send register create");
+        assert_eq!(resp.status(), reqwest::StatusCode::OK, "register create failed");
+        let body: Value = resp.json().await.expect("register body json");
+        (client, body)
+    }
+
+    /// Register a new identity that joins an existing Org via `mode=join`.
+    pub async fn register_member(
+        &self,
+        email: &str,
+        org_code: &str,
+    ) -> (reqwest::Client, Value) {
+        let client = self.fresh_client();
+        let resp = client
+            .post(self.url("/auth/register"))
+            .json(&json!({
+                "mode": "join",
+                "email": email,
+                "password": "hunter2hunter2",
+                "org_code": org_code,
+            }))
+            .send()
+            .await
+            .expect("send register join");
+        assert_eq!(resp.status(), reqwest::StatusCode::OK, "register join failed");
+        let body: Value = resp.json().await.expect("register join body");
+        (client, body)
+    }
+
+    /// Log in an existing identity. Returns the cookie-bearing client + body.
+    pub async fn login(&self, email: &str, password: &str) -> (reqwest::Client, Value) {
+        let client = self.fresh_client();
+        let resp = client
+            .post(self.url("/auth/login"))
+            .json(&json!({ "email": email, "password": password }))
+            .send()
+            .await
+            .expect("send login");
+        assert_eq!(resp.status(), reqwest::StatusCode::OK, "login failed");
+        let body: Value = resp.json().await.expect("login body");
+        (client, body)
+    }
+
+    /// Count how many membership rows the given user has.
+    pub async fn membership_count(&self, user_id: ObjectId) -> u64 {
+        self.db()
+            .dashboard_memberships
+            .count_by_user(user_id)
+            .await
+            .expect("membership count")
+    }
 }
 
 impl Drop for TestApp {
@@ -115,4 +196,29 @@ impl Drop for TestApp {
             handle.abort();
         }
     }
+}
+
+/// Pull `body["current_org"]["code"]` as an owned `String`. Tests use it
+/// pervasively to feed new join requests.
+pub fn current_org_code(body: &Value) -> String {
+    body["current_org"]["code"]
+        .as_str()
+        .unwrap_or_else(|| panic!("expected current_org.code in {body}"))
+        .to_string()
+}
+
+/// Pull `body["current_org"]["id"]` as an owned `String`.
+pub fn current_org_id(body: &Value) -> String {
+    body["current_org"]["id"]
+        .as_str()
+        .unwrap_or_else(|| panic!("expected current_org.id in {body}"))
+        .to_string()
+}
+
+/// Pull `body["user"]["id"]` as an owned `String`.
+pub fn user_id(body: &Value) -> String {
+    body["user"]["id"]
+        .as_str()
+        .unwrap_or_else(|| panic!("expected user.id in {body}"))
+        .to_string()
 }

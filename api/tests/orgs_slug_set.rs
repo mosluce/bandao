@@ -8,48 +8,6 @@ use serde_json::{Value, json};
 
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
-async fn register_admin(app: &TestApp, email: &str, org_name: &str) -> (reqwest::Client, String) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "create",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_name": org_name,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    let org_id = body["org"]["id"].as_str().unwrap().to_string();
-    (client, org_id)
-}
-
-async fn register_member(app: &TestApp, email: &str, org_code: &str) -> reqwest::Client {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "join",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_code": org_code,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    client
-}
-
 async fn backdate_slug_change(app: &TestApp, org_id_hex: &str, days_ago: i64) {
     let oid = ObjectId::parse_str(org_id_hex).unwrap();
     let backdated = DateTime::from_millis(DateTime::now().timestamp_millis() - days_ago * DAY_MS);
@@ -68,7 +26,7 @@ async fn backdate_slug_change(app: &TestApp, org_id_hex: &str, days_ago: i64) {
 #[tokio::test]
 async fn set_slug_happy_path() {
     let app = TestApp::spawn().await;
-    let (admin, _) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, _) = app.register_admin("founder@example.com", "Acme").await;
 
     let r = admin
         .post(app.url("/orgs/me/slug"))
@@ -84,7 +42,7 @@ async fn set_slug_happy_path() {
 #[tokio::test]
 async fn set_slug_normalizes_to_lowercase() {
     let app = TestApp::spawn().await;
-    let (admin, _) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, _) = app.register_admin("founder@example.com", "Acme").await;
 
     let r = admin
         .post(app.url("/orgs/me/slug"))
@@ -100,7 +58,7 @@ async fn set_slug_normalizes_to_lowercase() {
 #[tokio::test]
 async fn set_slug_rejects_invalid_format() {
     let app = TestApp::spawn().await;
-    let (admin, _) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, _) = app.register_admin("founder@example.com", "Acme").await;
 
     for bad in ["a", "acme-corp", &"a".repeat(25)] {
         let r = admin
@@ -118,7 +76,7 @@ async fn set_slug_rejects_invalid_format() {
 #[tokio::test]
 async fn set_slug_rejects_reserved() {
     let app = TestApp::spawn().await;
-    let (admin, _) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, _) = app.register_admin("founder@example.com", "Acme").await;
 
     for reserved in ["admin", "argus", "auth"] {
         let r = admin
@@ -136,8 +94,8 @@ async fn set_slug_rejects_reserved() {
 #[tokio::test]
 async fn set_slug_rejects_taken_active() {
     let app = TestApp::spawn().await;
-    let (admin_a, _) = register_admin(&app, "a@example.com", "OrgA").await;
-    let (admin_b, _) = register_admin(&app, "b@example.com", "OrgB").await;
+    let (admin_a, _) = app.register_admin("a@example.com", "OrgA").await;
+    let (admin_b, _) = app.register_admin("b@example.com", "OrgB").await;
 
     let r1 = admin_a
         .post(app.url("/orgs/me/slug"))
@@ -161,8 +119,9 @@ async fn set_slug_rejects_taken_active() {
 #[tokio::test]
 async fn set_slug_rejects_taken_in_grace() {
     let app = TestApp::spawn().await;
-    let (admin_a, org_a_id) = register_admin(&app, "a@example.com", "OrgA").await;
-    let (admin_b, _) = register_admin(&app, "b@example.com", "OrgB").await;
+    let (admin_a, body_a) = app.register_admin("a@example.com", "OrgA").await;
+    let org_a_id = body_a["current_org"]["id"].as_str().unwrap().to_string();
+    let (admin_b, _) = app.register_admin("b@example.com", "OrgB").await;
 
     // OrgA sets "shared" then changes away → "shared" enters grace.
     let r = admin_a
@@ -198,7 +157,7 @@ async fn set_slug_rejects_taken_in_grace() {
 #[tokio::test]
 async fn set_slug_rate_limit_within_30_days_rejected() {
     let app = TestApp::spawn().await;
-    let (admin, _) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, _) = app.register_admin("founder@example.com", "Acme").await;
 
     let r = admin
         .post(app.url("/orgs/me/slug"))
@@ -208,7 +167,6 @@ async fn set_slug_rate_limit_within_30_days_rejected() {
         .unwrap();
     assert_eq!(r.status(), StatusCode::OK);
 
-    // Second change immediately after first → rate limited.
     let r = admin
         .post(app.url("/orgs/me/slug"))
         .json(&json!({ "slug": "acmecorp" }))
@@ -227,7 +185,8 @@ async fn set_slug_rate_limit_within_30_days_rejected() {
 #[tokio::test]
 async fn set_slug_after_30_days_succeeds() {
     let app = TestApp::spawn().await;
-    let (admin, org_id) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, body) = app.register_admin("founder@example.com", "Acme").await;
+    let org_id = body["current_org"]["id"].as_str().unwrap().to_string();
 
     let r = admin
         .post(app.url("/orgs/me/slug"))
@@ -251,17 +210,10 @@ async fn set_slug_after_30_days_succeeds() {
 #[tokio::test]
 async fn member_cannot_set_slug() {
     let app = TestApp::spawn().await;
-    let (admin, _) = register_admin(&app, "founder@example.com", "Acme").await;
-    let create: Value = admin
-        .get(app.url("/me"))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
-    let code = create["org"]["code"].as_str().unwrap().to_string();
-    let member = register_member(&app, "member@example.com", &code).await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let _ = admin;
+    let (member, _) = app.register_member("member@example.com", &code).await;
 
     let r = member
         .post(app.url("/orgs/me/slug"))

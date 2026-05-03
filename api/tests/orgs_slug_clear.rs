@@ -8,28 +8,6 @@ use serde_json::{Value, json};
 
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
-async fn register_admin(app: &TestApp, email: &str, org_name: &str) -> (reqwest::Client, String) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "create",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_name": org_name,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    let org_id = body["org"]["id"].as_str().unwrap().to_string();
-    (client, org_id)
-}
-
 async fn backdate_slug_change(app: &TestApp, org_id_hex: &str, days_ago: i64) {
     let oid = ObjectId::parse_str(org_id_hex).unwrap();
     let backdated = DateTime::from_millis(DateTime::now().timestamp_millis() - days_ago * DAY_MS);
@@ -48,8 +26,9 @@ async fn backdate_slug_change(app: &TestApp, org_id_hex: &str, days_ago: i64) {
 #[tokio::test]
 async fn clear_puts_slug_in_grace_and_locks_against_other_orgs() {
     let app = TestApp::spawn().await;
-    let (admin_a, org_a_id) = register_admin(&app, "a@example.com", "OrgA").await;
-    let (admin_b, _) = register_admin(&app, "b@example.com", "OrgB").await;
+    let (admin_a, body_a) = app.register_admin("a@example.com", "OrgA").await;
+    let org_a_id = body_a["current_org"]["id"].as_str().unwrap().to_string();
+    let (admin_b, _) = app.register_admin("b@example.com", "OrgB").await;
 
     let r = admin_a
         .post(app.url("/orgs/me/slug"))
@@ -79,7 +58,8 @@ async fn clear_puts_slug_in_grace_and_locks_against_other_orgs() {
 #[tokio::test]
 async fn second_clear_within_30_days_rate_limited() {
     let app = TestApp::spawn().await;
-    let (admin, org_id) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, body) = app.register_admin("founder@example.com", "Acme").await;
+    let org_id = body["current_org"]["id"].as_str().unwrap().to_string();
 
     let r = admin
         .post(app.url("/orgs/me/slug"))
@@ -94,7 +74,6 @@ async fn second_clear_within_30_days_rate_limited() {
     let r = admin.delete(app.url("/orgs/me/slug")).send().await.unwrap();
     assert_eq!(r.status(), StatusCode::NO_CONTENT);
 
-    // Immediate second clear → rate limited.
     let r = admin.delete(app.url("/orgs/me/slug")).send().await.unwrap();
     assert_eq!(r.status(), StatusCode::TOO_MANY_REQUESTS);
     let err: Value = r.json().await.unwrap();

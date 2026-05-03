@@ -54,18 +54,18 @@
 
 ## 8. API integration tests — rewrite existing 16 to multi-org model
 
-- [ ] 8.1 Update `tests/common/mod.rs` test helpers: builder for `(identity, org, membership, session)` with explicit role and current_org; helper for "user with N orgs"; helper to assert membership counts.
-- [ ] 8.2 Rewrite `tests/auth_register.rs`: identity + Org + membership all created; existing-email rejected.
-- [ ] 8.3 Rewrite `tests/auth_register_by_slug.rs` and `tests/auth_register_by_grace_slug.rs` for the new identity+membership shape.
-- [ ] 8.4 Rewrite `tests/auth_register_cooldown.rs` for the new cooldown gate.
-- [ ] 8.5 Rewrite `tests/auth_login.rs` to assert default `current_org_id` rule (owned-first, oldest-fallback, null when no memberships).
-- [ ] 8.6 Rewrite `tests/auth_logout.rs`: verify session is deleted; identity and memberships preserved.
-- [ ] 8.7 Rewrite `tests/session_expiry.rs` for the new session shape (`current_org_id` may be null).
-- [ ] 8.8 Rewrite `tests/users_role.rs` operating on memberships; cross-org lookups return NOT_FOUND.
-- [ ] 8.9 Rewrite `tests/users_remove.rs`: only the membership + scoped sessions are removed; identity survives.
-- [ ] 8.10 Rewrite `tests/users_cooldowns.rs` after handler changes.
-- [ ] 8.11 Rewrite `tests/me_leave.rs`: only membership + scoped sessions deleted; identity preserved; sessions for other orgs intact; owner cannot leave.
-- [ ] 8.12 Rewrite `tests/orgs_rotate.rs`, `tests/orgs_slug_set.rs`, `tests/orgs_slug_clear.rs`, `tests/orgs_slug_lookup_format.rs` to construct ctx via memberships.
+- [x] 8.1 Update `tests/common/mod.rs` test helpers: builder for `(identity, org, membership, session)` with explicit role and current_org; helper for "user with N orgs"; helper to assert membership counts.
+- [x] 8.2 Rewrite `tests/auth_register.rs`: identity + Org + membership all created; existing-email rejected.
+- [x] 8.3 Rewrite `tests/auth_register_by_slug.rs` and `tests/auth_register_by_grace_slug.rs` for the new identity+membership shape.
+- [x] 8.4 Rewrite `tests/auth_register_cooldown.rs` for the new cooldown gate.
+- [x] 8.5 Rewrite `tests/auth_login.rs` to assert default `current_org_id` rule (owned-first, oldest-fallback, null when no memberships).
+- [x] 8.6 Rewrite `tests/auth_logout.rs`: verify session is deleted; identity and memberships preserved.
+- [x] 8.7 Rewrite `tests/session_expiry.rs` for the new session shape (`current_org_id` may be null).
+- [x] 8.8 Rewrite `tests/users_role.rs` operating on memberships; cross-org lookups return NOT_FOUND.
+- [x] 8.9 Rewrite `tests/users_remove.rs`: only the membership + scoped sessions are removed; identity survives.
+- [x] 8.10 Rewrite `tests/users_cooldowns.rs` after handler changes.
+- [x] 8.11 Rewrite `tests/me_leave.rs`: only membership + scoped sessions deleted; identity preserved; sessions for other orgs intact; owner cannot leave.
+- [x] 8.12 Rewrite `tests/orgs_rotate.rs`, `tests/orgs_slug_set.rs`, `tests/orgs_slug_clear.rs`, `tests/orgs_slug_lookup_format.rs` to construct ctx via memberships.
 
 ## 9. API integration tests — new
 

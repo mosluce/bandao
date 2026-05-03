@@ -3,31 +3,27 @@ mod common;
 use bson::{DateTime as BsonDateTime, doc};
 use common::TestApp;
 use reqwest::StatusCode;
-use serde_json::json;
 
 #[tokio::test]
 async fn expired_session_is_rejected_and_cookie_cleared() {
     let app = TestApp::spawn().await;
 
-    let resp = app
-        .client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "create",
-            "email": "founder@example.com",
-            "password": "hunter2hunter2",
-            "org_name": "Acme",
-        }))
-        .send()
+    let (client, _) = app.register_admin("founder@example.com", "Acme").await;
+    // Find the session token from the cookie store.
+    let me = client.get(app.url("/me")).send().await.unwrap();
+    assert_eq!(me.status(), StatusCode::OK);
+    // Pull the token directly from the DB — the cookie jar is private to the
+    // reqwest client. There is exactly one session at this point.
+    let session_doc = app
+        .state
+        .db
+        .database
+        .collection::<bson::Document>("dashboard_sessions")
+        .find_one(doc! {})
         .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let token = resp
-        .cookies()
-        .find(|c| c.name() == "argus_session")
-        .expect("session cookie set on register")
-        .value()
-        .to_string();
+        .unwrap()
+        .expect("session row");
+    let token = session_doc.get_str("_id").unwrap().to_string();
 
     // Force the session's expires_at into the past, simulating natural TTL elapse
     // without waiting (we don't trust the Mongo TTL monitor for unit-test timing,
@@ -43,7 +39,7 @@ async fn expired_session_is_rejected_and_cookie_cleared() {
         .unwrap();
     assert_eq!(updated.matched_count, 1, "expected to find the session row");
 
-    let me = app.client.get(app.url("/me")).send().await.unwrap();
+    let me = client.get(app.url("/me")).send().await.unwrap();
     assert_eq!(me.status(), StatusCode::UNAUTHORIZED);
 
     // Middleware should emit a Set-Cookie clearing argus_session.

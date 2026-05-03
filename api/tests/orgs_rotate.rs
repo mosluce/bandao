@@ -4,52 +4,11 @@ use common::TestApp;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-async fn register_admin(app: &TestApp, email: &str, org_name: &str) -> (reqwest::Client, String) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "create",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_name": org_name,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    let code = body["org"]["code"].as_str().unwrap().to_string();
-    (client, code)
-}
-
-async fn register_member(app: &TestApp, email: &str, org_code: &str) -> reqwest::Client {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "join",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_code": org_code,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    client
-}
-
 #[tokio::test]
 async fn admin_can_rotate_org_code_and_old_code_no_longer_joins() {
     let app = TestApp::spawn().await;
-    let (admin, original_code) = register_admin(&app, "founder@example.com", "Acme").await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let original_code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
 
     let rotate = admin
         .post(app.url("/orgs/me/code/rotate"))
@@ -63,10 +22,7 @@ async fn admin_can_rotate_org_code_and_old_code_no_longer_joins() {
     assert_eq!(new_code.chars().count(), 10);
 
     // Old code must no longer be a valid join credential.
-    let stranger = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
+    let stranger = app.fresh_client();
     let join_with_old = stranger
         .post(app.url("/auth/register"))
         .json(&json!({
@@ -83,29 +39,15 @@ async fn admin_can_rotate_org_code_and_old_code_no_longer_joins() {
     assert_eq!(err["error"]["code"], "INVALID_ORG_CODE");
 
     // Joining with the new code still works.
-    let arrival = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let join_with_new = arrival
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "join",
-            "email": "new@example.com",
-            "password": "hunter2hunter2",
-            "org_code": new_code,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(join_with_new.status(), StatusCode::OK);
+    let (_arrival, _) = app.register_member("new@example.com", &new_code).await;
 }
 
 #[tokio::test]
 async fn member_cannot_rotate_org_code() {
     let app = TestApp::spawn().await;
-    let (_admin, code) = register_admin(&app, "founder@example.com", "Acme").await;
-    let member = register_member(&app, "member@example.com", &code).await;
+    let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let (member, _) = app.register_member("member@example.com", &code).await;
 
     let resp = member
         .post(app.url("/orgs/me/code/rotate"))

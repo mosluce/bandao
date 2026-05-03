@@ -4,61 +4,15 @@ use common::TestApp;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-async fn register_admin(app: &TestApp, email: &str, org_name: &str) -> (reqwest::Client, Value) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "create",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_name": org_name,
-        }))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    (client, body)
-}
-
-async fn register_member(
-    app: &TestApp,
-    email: &str,
-    org_code: &str,
-) -> (reqwest::Client, reqwest::Response) {
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
-    let resp = client
-        .post(app.url("/auth/register"))
-        .json(&json!({
-            "mode": "join",
-            "email": email,
-            "password": "hunter2hunter2",
-            "org_code": org_code,
-        }))
-        .send()
-        .await
-        .unwrap();
-    (client, resp)
-}
-
 #[tokio::test]
 async fn rejoin_during_cooldown_is_blocked() {
     let app = TestApp::spawn().await;
-    let (admin, body) = register_admin(&app, "founder@example.com", "Acme").await;
-    let code = body["org"]["code"].as_str().unwrap().to_string();
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
 
     // Member joins, then admin removes them — marker is created.
-    let (_member, join1) = register_member(&app, "transient@example.com", &code).await;
-    assert_eq!(join1.status(), StatusCode::OK);
-    let join1_body: Value = join1.json().await.unwrap();
-    let member_id = join1_body["user"]["id"].as_str().unwrap().to_string();
+    let (_member, join_body) = app.register_member("transient@example.com", &code).await;
+    let member_id = join_body["user"]["id"].as_str().unwrap().to_string();
 
     let removed = admin
         .delete(app.url(&format!("/dashboard-users/{member_id}")))
@@ -67,8 +21,19 @@ async fn rejoin_during_cooldown_is_blocked() {
         .unwrap();
     assert_eq!(removed.status(), StatusCode::NO_CONTENT);
 
-    // Same email tries to rejoin — should be blocked.
-    let (_again, retry) = register_member(&app, "transient@example.com", &code).await;
+    // Same email tries to register-join — should be blocked.
+    let retry = app
+        .fresh_client()
+        .post(app.url("/auth/register"))
+        .json(&json!({
+            "mode": "join",
+            "email": "transient@example.com",
+            "password": "hunter2hunter2",
+            "org_code": code,
+        }))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(retry.status(), StatusCode::CONFLICT);
     let err: Value = retry.json().await.unwrap();
     assert_eq!(err["error"]["code"], "EMAIL_IN_COOLDOWN");
@@ -77,17 +42,15 @@ async fn rejoin_during_cooldown_is_blocked() {
 #[tokio::test]
 async fn rejoin_to_different_org_during_cooldown_succeeds() {
     let app = TestApp::spawn().await;
-    let (admin_a, body_a) = register_admin(&app, "alpha-owner@example.com", "OrgA").await;
-    let (_admin_b, body_b) = register_admin(&app, "beta-owner@example.com", "OrgB").await;
+    let (admin_a, body_a) = app.register_admin("alpha-owner@example.com", "OrgA").await;
+    let (_admin_b, body_b) = app.register_admin("beta-owner@example.com", "OrgB").await;
 
-    let code_a = body_a["org"]["code"].as_str().unwrap().to_string();
-    let code_b = body_b["org"]["code"].as_str().unwrap().to_string();
+    let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
+    let code_b = body_b["current_org"]["code"].as_str().unwrap().to_string();
 
     // Member joins OrgA, then is kicked → cooldown for (OrgA, member email).
-    let (_member, join_a) = register_member(&app, "wanderer@example.com", &code_a).await;
-    assert_eq!(join_a.status(), StatusCode::OK);
-    let join_a_body: Value = join_a.json().await.unwrap();
-    let member_id = join_a_body["user"]["id"].as_str().unwrap().to_string();
+    let (_member, join_a) = app.register_member("wanderer@example.com", &code_a).await;
+    let member_id = join_a["user"]["id"].as_str().unwrap().to_string();
 
     let kick = admin_a
         .delete(app.url(&format!("/dashboard-users/{member_id}")))
@@ -96,21 +59,28 @@ async fn rejoin_to_different_org_during_cooldown_succeeds() {
         .unwrap();
     assert_eq!(kick.status(), StatusCode::NO_CONTENT);
 
-    // Same email joins OrgB — different org, so no cooldown applies.
-    let (_w2, join_b) = register_member(&app, "wanderer@example.com", &code_b).await;
+    // Same email registers in OrgB — different org, so no cooldown applies.
+    // Note: identity for `wanderer@example.com` survived the kick (only the
+    // membership was deleted). So register would EMAIL_TAKEN. Use the new
+    // /me/memberships flow to add another org from the same identity.
+    let (wanderer, _) = app.login("wanderer@example.com", "hunter2hunter2").await;
+    let join_b = wanderer
+        .post(app.url("/me/memberships"))
+        .json(&json!({ "org_code": code_b }))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(join_b.status(), StatusCode::OK);
 }
 
 #[tokio::test]
 async fn rejoin_with_mixed_case_email_matches_lowercased_marker() {
     let app = TestApp::spawn().await;
-    let (admin, body) = register_admin(&app, "founder@example.com", "Acme").await;
-    let code = body["org"]["code"].as_str().unwrap().to_string();
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
 
-    let (_member, join1) = register_member(&app, "transient@example.com", &code).await;
-    assert_eq!(join1.status(), StatusCode::OK);
-    let join1_body: Value = join1.json().await.unwrap();
-    let member_id = join1_body["user"]["id"].as_str().unwrap().to_string();
+    let (_member, join1) = app.register_member("transient@example.com", &code).await;
+    let member_id = join1["user"]["id"].as_str().unwrap().to_string();
 
     let removed = admin
         .delete(app.url(&format!("/dashboard-users/{member_id}")))
@@ -119,9 +89,18 @@ async fn rejoin_with_mixed_case_email_matches_lowercased_marker() {
         .unwrap();
     assert_eq!(removed.status(), StatusCode::NO_CONTENT);
 
-    // Mixed-case rejoin must hit the same marker.
-    let (_retry, retry_resp) =
-        register_member(&app, "Transient@Example.COM", &code).await;
+    // Mixed-case rejoin must hit the same marker (identity survives, but
+    // login-then-/me/memberships should also be blocked by cooldown).
+    // Use the register-join path with a freshly-cased email; identity was
+    // preserved, so EMAIL_TAKEN would be raised first by register. Test the
+    // cooldown via /me/memberships instead.
+    let (transient, _) = app.login("transient@example.com", "hunter2hunter2").await;
+    let retry_resp = transient
+        .post(app.url("/me/memberships"))
+        .json(&json!({ "org_code": code }))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(retry_resp.status(), StatusCode::CONFLICT);
     let err: Value = retry_resp.json().await.unwrap();
     assert_eq!(err["error"]["code"], "EMAIL_IN_COOLDOWN");
@@ -130,13 +109,11 @@ async fn rejoin_with_mixed_case_email_matches_lowercased_marker() {
 #[tokio::test]
 async fn rejoin_after_admin_clears_cooldown_succeeds() {
     let app = TestApp::spawn().await;
-    let (admin, body) = register_admin(&app, "founder@example.com", "Acme").await;
-    let code = body["org"]["code"].as_str().unwrap().to_string();
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
 
-    let (_member, join1) = register_member(&app, "transient@example.com", &code).await;
-    assert_eq!(join1.status(), StatusCode::OK);
-    let join1_body: Value = join1.json().await.unwrap();
-    let member_id = join1_body["user"]["id"].as_str().unwrap().to_string();
+    let (_member, join1) = app.register_member("transient@example.com", &code).await;
+    let member_id = join1["user"]["id"].as_str().unwrap().to_string();
 
     admin
         .delete(app.url(&format!("/dashboard-users/{member_id}")))
@@ -152,7 +129,13 @@ async fn rejoin_after_admin_clears_cooldown_succeeds() {
         .unwrap();
     assert_eq!(cleared.status(), StatusCode::NO_CONTENT);
 
-    // Now rejoin succeeds.
-    let (_again, retry) = register_member(&app, "transient@example.com", &code).await;
+    // Identity survived the kick; log in and rejoin via /me/memberships.
+    let (transient, _) = app.login("transient@example.com", "hunter2hunter2").await;
+    let retry = transient
+        .post(app.url("/me/memberships"))
+        .json(&json!({ "org_code": code }))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(retry.status(), StatusCode::OK);
 }
