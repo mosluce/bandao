@@ -65,18 +65,18 @@
 
 ## 9. API integration tests
 
-- [ ] 9.1 `tests/checkin_state_machine.rs`: every legal transition returns success and updates `checkin_user_status` correctly; every illegal pair returns `INVALID_TRANSITION` and leaves state unchanged.
-- [ ] 9.2 `tests/checkin_multi_site.rs`: full cycle `clock_in → transfer_out → transfer_in → transfer_out → transfer_in → clock_out` succeeds with three `on_site` segments visible in the event list.
-- [ ] 9.3 `tests/checkin_out_of_order.rs`: second event with `occurred_at_client <= last_event.occurred_at_client` for the same AppUser is rejected `OUT_OF_ORDER`; per-AppUser scoping (Bob's old event doesn't conflict with Alice's newer event).
-- [ ] 9.4 `tests/checkin_dual_timestamps.rs`: client time far in the past or future is accepted; `has_skew_warning` flips at the 1-hour boundary; ordering and display use client time.
-- [ ] 9.5 `tests/checkin_transfer_toggle.rs`: with `transfer_enabled=false`, `transfer_out`/`transfer_in` rejected `TRANSFER_DISABLED`; `clock_in`/`clock_out` unaffected; toggling back to true unblocks.
-- [ ] 9.6 `tests/checkin_state_lock.rs`: PATCH `transfer_enabled` succeeds when all AppUsers `off_duty`; rejects `STATE_LOCKED` with `on_duty_count` when anyone on shift; PATCH `timezone` succeeds regardless of state.
-- [ ] 9.7 `tests/checkin_force_checkout.rs`: admin force-checkout succeeds for `on_site` and `in_transit` AppUsers; rejected `NOT_ON_DUTY` for `off_duty`; cross-Org rejected `NOT_FOUND`; `member` rejected `FORBIDDEN`; resulting event has `source=admin_force`, `initiated_by_kind=dashboard_user`, copied location, manual_label `"管理員強制收班"`, optional reason stored.
-- [ ] 9.8 `tests/checkin_geocoding_failsoft.rs`: with a stub geocoder returning `None`, events still record with `region_name = null`; with a stub returning `Some("Taipei City")`, events populate the field.
-- [ ] 9.9 `tests/checkin_admin_views.rs`: `GET /checkin/users` lists current_org AppUsers + status, excludes other Orgs, member rejected; `GET /checkin/users/:id/events` cursor pagination, cross-Org `NOT_FOUND`.
-- [ ] 9.10 `tests/checkin_appuser_scope.rs`: `GET /app/checkin/status` and `/events` only return caller's own data; cannot peek at another AppUser's history through the AppUser surface.
-- [ ] 9.11 `tests/checkin_app_user_status_init.rs`: creating an AppUser via `POST /app-users` immediately yields a `checkin_user_status` row with `status=off_duty`, ready for first `clock_in`.
-- [ ] 9.12 `tests/orgs_timezone.rs`: default new Org has `timezone="Asia/Taipei"`; PATCH to valid IANA value succeeds; invalid value rejected `INVALID_TIMEZONE`; member rejected `FORBIDDEN`; no DB timestamp changes after a TZ update.
+- [x] 9.1 `tests/checkin_state_machine.rs`: every legal transition returns success and updates `checkin_user_status` correctly; every illegal pair returns `INVALID_TRANSITION` and leaves state unchanged.
+- [x] 9.2 `tests/checkin_multi_site.rs`: full cycle `clock_in → transfer_out → transfer_in → transfer_out → transfer_in → clock_out` succeeds with three `on_site` segments visible in the event list.
+- [x] 9.3 `tests/checkin_out_of_order.rs`: second event with `occurred_at_client <= last_event.occurred_at_client` for the same AppUser is rejected `OUT_OF_ORDER`; per-AppUser scoping (Bob's old event doesn't conflict with Alice's newer event).
+- [x] 9.4 `tests/checkin_dual_timestamps.rs`: client time far in the past or future is accepted; `has_skew_warning` flips at the 1-hour boundary; ordering and display use client time.
+- [x] 9.5 `tests/checkin_transfer_toggle.rs`: with `transfer_enabled=false`, `transfer_out`/`transfer_in` rejected `TRANSFER_DISABLED`; `clock_in`/`clock_out` unaffected; toggling back to true unblocks.
+- [x] 9.6 `tests/checkin_state_lock.rs`: PATCH `transfer_enabled` succeeds when all AppUsers `off_duty`; rejects `STATE_LOCKED` with `on_duty_count` when anyone on shift; PATCH `timezone` succeeds regardless of state.
+- [x] 9.7 `tests/checkin_force_checkout.rs`: admin force-checkout succeeds for `on_site` and `in_transit` AppUsers; rejected `NOT_ON_DUTY` for `off_duty`; cross-Org rejected `NOT_FOUND`; `member` rejected `FORBIDDEN`; resulting event has `source=admin_force`, `initiated_by_kind=dashboard_user`, copied location, manual_label `"管理員強制收班"`, optional reason stored.
+- [x] 9.8 `tests/checkin_geocoding_failsoft.rs`: with a stub geocoder returning `None`, events still record with `region_name = null`; with a stub returning `Some("Taipei City")`, events populate the field.
+- [x] 9.9 `tests/checkin_admin_views.rs`: `GET /checkin/users` lists current_org AppUsers + status, excludes other Orgs, member rejected; `GET /checkin/users/:id/events` cursor pagination, cross-Org `NOT_FOUND`.
+- [x] 9.10 `tests/checkin_appuser_scope.rs`: `GET /app/checkin/status` and `/events` only return caller's own data; cannot peek at another AppUser's history through the AppUser surface.
+- [x] 9.11 `tests/checkin_app_user_status_init.rs`: creating an AppUser via `POST /app-users` immediately yields a `checkin_user_status` row with `status=off_duty`, ready for first `clock_in`.
+- [x] 9.12 `tests/orgs_timezone.rs`: default new Org has `timezone="Asia/Taipei"`; PATCH to valid IANA value succeeds; invalid value rejected `INVALID_TIMEZONE`; member rejected `FORBIDDEN`; no DB timestamp changes after a TZ update.
 
 ## 10. admin-web
 
