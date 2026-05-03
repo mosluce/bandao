@@ -43,6 +43,7 @@ pages/        # 路由頁面
   index.vue                # 當前組織總覽 + 離開組織
   members.vue              # 成員管理（含 owner transfer 表單）
   cooldowns.vue            # 冷卻管理
+  app-users/index.vue      # AppUser CRUD（admin only）
   no-org.vue               # 0 個 membership 時的著陸頁
   orgs/new.vue             # 已登入時建立新組織
   orgs/join.vue            # 已登入時用 org_code 加入新組織
@@ -50,7 +51,7 @@ components/   # 跨頁面共用
   OrgSwitcher.vue          # header dropdown，切換 / 建立 / 加入 Org
   OrgCreateForm.vue        # createOrg 包裝
   OrgJoinForm.vue          # joinOrg 包裝
-composables/  # useApi（$fetch 包裝）、useAuth（multi-org reactive state + 行為）、useOrgSlug
+composables/  # useApi（$fetch 包裝）、useAuth（multi-org reactive state + 行為）、useOrgSlug、useAppUsers
 middleware/   # auth（要登入；current_org=null 時導去 /no-org，除非路徑屬於 ORG_AGNOSTIC_PATHS）、guest（已登入則導走）
 types/        # 對應 api 的 DTO 型別（手寫 mirror，OpenAPI codegen 在 ROADMAP）
 assets/css/   # Tailwind entry
@@ -74,6 +75,10 @@ assets/css/   # Tailwind entry
 - 邀請連結優先用 slug，沒有時 fallback 到 code
 
 錯誤訊息對應 `ApiError.code`：`INVALID_SLUG_FORMAT` / `SLUG_RESERVED` / `SLUG_TAKEN` / `SLUG_CHANGE_TOO_SOON`（含 `retry_after` 時間戳）/ `FORBIDDEN`。non-admin 看得見 slug 但沒有 Edit / Clear 按鈕。
+
+## App 使用者管理
+
+`pages/app-users/index.vue`（admin only）。建立 AppUser 時 server 會產一次性初始密碼，admin-web 用 modal 顯示一次（含複製按鈕），關閉後 client 端不再持有；admin 線下告知員工。重設密碼走相同 ceremony：確認 → 產新密碼 → modal 顯示一次 → 該 AppUser 全部 sessions 被斷線、下次登入強制改密碼。停用 / 啟用即時生效（停用會立刻 invalidate 所有 sessions；啟用後沿用舊密碼）。錯誤碼：`USERNAME_TAKEN` / `INVALID_USERNAME_FORMAT` / `FORBIDDEN` / `NO_ACTIVE_ORG`。
 
 ## 擁有權轉移 UI
 

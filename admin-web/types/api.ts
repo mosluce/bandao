@@ -87,6 +87,37 @@ export interface UpdateRoleRequest {
   role: Role
 }
 
+// --- AppUser ---
+
+export type AppUserStatus = 'active' | 'disabled'
+
+export interface AppUserDto {
+  id: string
+  username: string
+  display_name: string
+  status: AppUserStatus
+  needs_password_change: boolean
+  last_login_at?: string
+  created_at: string
+}
+
+export interface CreateAppUserRequest {
+  username: string
+  display_name: string
+}
+
+export interface UpdateAppUserRequest {
+  display_name?: string
+  status?: AppUserStatus
+}
+
+export interface CreateAppUserResponse {
+  user: AppUserDto
+  initial_password: string
+}
+
+export type PasswordResetResponse = CreateAppUserResponse
+
 export interface ApiErrorBody {
   error: {
     code: string

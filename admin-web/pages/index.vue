@@ -393,6 +393,12 @@ async function confirmLeave() {
               成員管理
             </NuxtLink>
             <NuxtLink
+              to="/app-users"
+              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              App 使用者
+            </NuxtLink>
+            <NuxtLink
               to="/cooldowns"
               class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
