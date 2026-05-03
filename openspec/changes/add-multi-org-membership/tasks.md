@@ -80,31 +80,31 @@
 
 ## 10. admin-web: composables and middleware
 
-- [ ] 10.1 Update `composables/useAuth.ts` to expose `user`, `memberships`, `currentOrg` (reactive), `role` (derived), and actions `createOrg`, `joinOrg`, `switchOrg`, `leaveOrg`, `transferOwnership`.
-- [ ] 10.2 Implement localStorage-backed `lastSelectedOrgId`: on app boot, if a value exists and matches a current membership, call `switchOrg` to align server state.
-- [ ] 10.3 Update `middleware/auth.ts` to allow zero-Org state for org-agnostic routes and redirect to the empty-state page if landing on org-scoped routes with no current_org.
-- [ ] 10.4 Add a global "current_org changed" reactive signal so org-scoped pages refetch their data on switch.
-- [ ] 10.5 Update `types/api.ts` to mirror the new DTOs (`MembershipDto`, updated `AuthResponse`, etc.).
+- [x] 10.1 Update `composables/useAuth.ts` to expose `user`, `memberships`, `currentOrg` (reactive), `role` (derived), and actions `createOrg`, `joinOrg`, `switchOrg`, `leaveOrg`, `transferOwnership`.
+- [x] 10.2 Implement localStorage-backed `lastSelectedOrgId`: on app boot, if a value exists and matches a current membership, call `switchOrg` to align server state.
+- [x] 10.3 Update `middleware/auth.ts` to allow zero-Org state for org-agnostic routes and redirect to the empty-state page if landing on org-scoped routes with no current_org.
+- [x] 10.4 Add a global "current_org changed" reactive signal so org-scoped pages refetch their data on switch.
+- [x] 10.5 Update `types/api.ts` to mirror the new DTOs (`MembershipDto`, updated `AuthResponse`, etc.).
 
 ## 11. admin-web: pages and components
 
-- [ ] 11.1 Build header `OrgSwitcher` component: dropdown grouped by "我擁有的" / "我加入的", role badges (擁有者 / 管理員 / 成員), `+ 建立新組織`, `+ 用 org code 加入`.
-- [ ] 11.2 Build empty-state page (e.g. `pages/no-org.vue`): copy "你目前不屬於任何組織"; CTAs `[ 建立新組織 ]` and `[ 加入組織 ]`.
-- [ ] 11.3 Build `OrgCreateModal` and `OrgJoinModal` components (or full pages); wire to `useAuth().createOrg` / `joinOrg`.
-- [ ] 11.4 Update `pages/index.vue` to read `currentOrg` (not `org`) and re-fetch on switch.
-- [ ] 11.5 Update `pages/members.vue`, `pages/cooldowns.vue` similarly; ensure they handle a current_org change without stale data.
-- [ ] 11.6 Add an "Owner transfer" flow on `members.vue` (visible only to owner): pick admin, enter password, confirm; surface INVALID_PASSWORD / INVALID_TARGET / SAME_OWNER.
-- [ ] 11.7 Update `pages/login.vue` and `pages/register.vue` for the new response shapes; make sure landing-after-auth respects `current_org` (or routes to empty-state if null).
+- [x] 11.1 Build header `OrgSwitcher` component: dropdown grouped by "我擁有的" / "我加入的", role badges (擁有者 / 管理員 / 成員), `+ 建立新組織`, `+ 用 org code 加入`.
+- [x] 11.2 Build empty-state page (e.g. `pages/no-org.vue`): copy "你目前不屬於任何組織"; CTAs `[ 建立新組織 ]` and `[ 加入組織 ]`.
+- [x] 11.3 Build `OrgCreateModal` and `OrgJoinModal` components (or full pages); wire to `useAuth().createOrg` / `joinOrg`.
+- [x] 11.4 Update `pages/index.vue` to read `currentOrg` (not `org`) and re-fetch on switch.
+- [x] 11.5 Update `pages/members.vue`, `pages/cooldowns.vue` similarly; ensure they handle a current_org change without stale data.
+- [x] 11.6 Add an "Owner transfer" flow on `members.vue` (visible only to owner): pick admin, enter password, confirm; surface INVALID_PASSWORD / INVALID_TARGET / SAME_OWNER.
+- [x] 11.7 Update `pages/login.vue` and `pages/register.vue` for the new response shapes; make sure landing-after-auth respects `current_org` (or routes to empty-state if null).
 
 ## 12. Cleanup & docs
 
-- [ ] 12.1 Remove the `transfer-org-ownership` line from `ROADMAP.md` Side ideas (delivered in this change).
-- [ ] 12.2 Soften the wording on the `delete-org` ROADMAP entry to note it now cascades memberships only (identities survive).
-- [ ] 12.3 Update `api/README.md` with the new model description (identity vs membership, zero-Org state).
-- [ ] 12.4 Update `admin-web/README.md` with the new flows (org switcher, zero-Org page, transfer ownership).
-- [ ] 12.5 Note the local-DB-wipe expectation in the PR description (no migration, drop-and-recreate).
+- [x] 12.1 Remove the `transfer-org-ownership` line from `ROADMAP.md` Side ideas (delivered in this change).
+- [x] 12.2 Soften the wording on the `delete-org` ROADMAP entry to note it now cascades memberships only (identities survive).
+- [x] 12.3 Update `api/README.md` with the new model description (identity vs membership, zero-Org state).
+- [x] 12.4 Update `admin-web/README.md` with the new flows (org switcher, zero-Org page, transfer ownership).
+- [x] 12.5 Note the local-DB-wipe expectation in the PR description (no migration, drop-and-recreate).
 
 ## 13. Smoke
 
 - [ ] 13.1 Bring up local stack (mongo + api + admin-web), wipe DB, register two identities, each creating their own Org; have one join the other's; verify switching, leaving, owner transfer, zero-org recovery end-to-end in the browser.
-- [ ] 13.2 Run `cargo test` and `pnpm typecheck` + `pnpm build` clean.
+- [x] 13.2 Run `cargo test` and `pnpm typecheck` + `pnpm build` clean.
