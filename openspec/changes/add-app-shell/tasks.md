@@ -1,21 +1,21 @@
 ## 1. Project bootstrap
 
-- [ ] 1.1 From repo root: `rm app/.gitkeep && flutter create --org tw.ccmos.app --project-name argus_app --platforms=ios,android app` to scaffold the project. Confirm `app/pubspec.yaml`, `app/ios/Runner.xcodeproj`, `app/android/app/build.gradle` exist.
-- [ ] 1.2 Set `app/pubspec.yaml`: `version: 0.1.0+1`, Dart SDK constraint `'>=3.5.0 <4.0.0'`, Flutter SDK constraint `'>=3.24.0'`. Add an explicit `flutter:` section with `uses-material-design: true` and `generate: true` (for ARB).
-- [ ] 1.3 In `app/ios/Runner.xcodeproj/project.pbxproj` confirm `PRODUCT_BUNDLE_IDENTIFIER = tw.ccmos.app.argus` for both Debug and Release configurations of the `Runner` target. Adjust if `flutter create` set something else.
-- [ ] 1.4 In `app/android/app/build.gradle` confirm `applicationId "tw.ccmos.app.argus"` and `minSdkVersion 24`.
-- [ ] 1.5 In `app/ios/Runner/Info.plist` set `CFBundleDisplayName = "Argus"`. In `app/android/app/src/main/res/values/strings.xml` create the file (if missing) with `<string name="app_name">Argus</string>` and reference it from `AndroidManifest.xml` via `android:label="@string/app_name"`.
-- [ ] 1.6 Set iOS deployment target to 13.0 in both `app/ios/Podfile` (`platform :ios, '13.0'`) and the Xcode project's `IPHONEOS_DEPLOYMENT_TARGET` build setting.
-- [ ] 1.7 Replace the default app icon with a tinted placeholder (the Flutter default icon, but in Argus brand colour). Document the icon-replacement procedure in `app/README.md` for when the final asset arrives.
-- [ ] 1.8 Add `app/.gitignore` covering Flutter (`.dart_tool/`, `build/`, `.flutter-plugins`, `.flutter-plugins-dependencies`), iOS (`Pods/`, `Podfile.lock` is committed, `*.xcuserstate`, `*.xcworkspace/xcuserdata`), Android (`local.properties`, `key.properties`, `*.iml`), and IDE files (`.idea/`, `.vscode/launch.json` if not committed).
-- [ ] 1.9 Verify the project runs on iOS Simulator and Android Emulator with `flutter run` after `flutter pub get`.
+- [x] 1.1 From repo root: `rm app/.gitkeep && flutter create --org tw.ccmos.app --project-name argus_app --platforms=ios,android app` to scaffold the project. Confirm `app/pubspec.yaml`, `app/ios/Runner.xcodeproj`, `app/android/app/build.gradle` exist.
+- [x] 1.2 Set `app/pubspec.yaml`: `version: 0.1.0+1`, Dart SDK constraint `'>=3.5.0 <4.0.0'`, Flutter SDK constraint `'>=3.24.0'`. Add an explicit `flutter:` section with `uses-material-design: true` and `generate: true` (for ARB).
+- [x] 1.3 In `app/ios/Runner.xcodeproj/project.pbxproj` confirm `PRODUCT_BUNDLE_IDENTIFIER = tw.ccmos.app.argus` for both Debug and Release configurations of the `Runner` target. Adjust if `flutter create` set something else.
+- [x] 1.4 In `app/android/app/build.gradle` confirm `applicationId "tw.ccmos.app.argus"` and `minSdkVersion 24`.
+- [x] 1.5 In `app/ios/Runner/Info.plist` set `CFBundleDisplayName = "Argus"`. In `app/android/app/src/main/res/values/strings.xml` create the file (if missing) with `<string name="app_name">Argus</string>` and reference it from `AndroidManifest.xml` via `android:label="@string/app_name"`.
+- [x] 1.6 Set iOS deployment target to 13.0 in both `app/ios/Podfile` (`platform :ios, '13.0'`) and the Xcode project's `IPHONEOS_DEPLOYMENT_TARGET` build setting.
+- [x] 1.7 Replace the default app icon with a tinted placeholder (the Flutter default icon, but in Argus brand colour). Document the icon-replacement procedure in `app/README.md` for when the final asset arrives.
+- [x] 1.8 Add `app/.gitignore` covering Flutter (`.dart_tool/`, `build/`, `.flutter-plugins`, `.flutter-plugins-dependencies`), iOS (`Pods/`, `Podfile.lock` is committed, `*.xcuserstate`, `*.xcworkspace/xcuserdata`), Android (`local.properties`, `key.properties`, `*.iml`), and IDE files (`.idea/`, `.vscode/launch.json` if not committed).
+- [ ] 1.9 Verify the project runs on iOS Simulator and Android Emulator with `flutter run` after `flutter pub get`. (deferred — section 15 live smoke)
 
 ## 2. Dependencies + analyzer + lints
 
-- [ ] 2.1 Add runtime deps to `pubspec.yaml`: `flutter_riverpod`, `riverpod_annotation`, `go_router`, `dio`, `flutter_secure_storage`, `freezed_annotation`, `json_annotation`, `logger`, plus the SDK `flutter_localizations`. Use latest stable versions at the time of writing.
-- [ ] 2.2 Add dev deps: `build_runner`, `riverpod_generator`, `freezed`, `json_serializable`, `flutter_lints`. Lock to versions compatible with the runtime deps above.
-- [ ] 2.3 Replace generated `analysis_options.yaml` with one that includes `package:flutter_lints/flutter.yaml`, enables `prefer_relative_imports`, `prefer_single_quotes`, `require_trailing_commas`, `avoid_print`, and `unawaited_futures`. Document the rationale (consistency, safety) in a small comment block at the top of the file.
-- [ ] 2.4 Run `flutter pub get`; commit `pubspec.lock`.
+- [x] 2.1 Add runtime deps to `pubspec.yaml`: `flutter_riverpod`, `riverpod_annotation`, `go_router`, `dio`, `flutter_secure_storage`, `freezed_annotation`, `json_annotation`, `logger`, plus the SDK `flutter_localizations`. Use latest stable versions at the time of writing.
+- [x] 2.2 Add dev deps: `build_runner`, `riverpod_generator`, `freezed`, `json_serializable`, `flutter_lints`. Lock to versions compatible with the runtime deps above.
+- [x] 2.3 Replace generated `analysis_options.yaml` with one that includes `package:flutter_lints/flutter.yaml`, enables `prefer_relative_imports`, `prefer_single_quotes`, `require_trailing_commas`, `avoid_print`, and `unawaited_futures`. Document the rationale (consistency, safety) in a small comment block at the top of the file.
+- [x] 2.4 Run `flutter pub get`; commit `pubspec.lock`.
 
 ## 3. Folder skeleton + entry point
 

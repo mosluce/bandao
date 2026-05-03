@@ -1,0 +1,24 @@
+# Lints for argus_app.
+#
+# Why these knobs:
+# - prefer_relative_imports: keep imports inside the package consistent (no
+#   accidental package: imports for our own files).
+# - prefer_single_quotes: one obvious style; avoids per-PR style debates.
+# - require_trailing_commas: stable diffs and trivially-rebaseable refactors.
+# - avoid_print: print() leaks into release; use the logger package.
+# - unawaited_futures: surface accidentally fire-and-forgotten async work.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "lib/l10n/app_localizations*.dart"
+
+linter:
+  rules:
+    prefer_relative_imports: true
+    prefer_single_quotes: true
+    require_trailing_commas: true
+    avoid_print: true
+    unawaited_futures: true
