@@ -47,9 +47,9 @@
 
 ## 6. Auth state + repository + provider
 
-- [ ] 6.1 `lib/features/auth/state/auth_state.dart`: freezed sealed `AuthState` with cases `loading`, `unauthenticated`, `authenticated(AppUser user, Org org, bool needsPasswordChange)`, `error(String message)`.
-- [ ] 6.2 `lib/features/auth/data/auth_repository.dart`: methods `Future<LoginResponse> login(orgCode, username, password)`, `Future<void> logout()`, `Future<MeResponse> me()`, `Future<void> changePassword(currentPassword, newPassword)`. Each is a thin wrapper around the dio client that throws `ApiException` on errors.
-- [ ] 6.3 `lib/features/auth/state/auth_provider.dart`: `@riverpod` `AuthNotifier` exposing `state: AuthState`, methods `login(...)`, `logout()`, `changePassword(...)`, and an internal `_bootstrap()` called on construction that runs the auto-login flow (read token → call `/app/me` → set state). State transitions match the cases in `auth_state.dart`.
+- [x] 6.1 `lib/features/auth/state/auth_state.dart`: freezed sealed `AuthState` with cases `loading`, `unauthenticated`, `authenticated(AppUser user, Org org, bool needsPasswordChange)`, `error(String message)`. (Deviation: Dart 3 `sealed class` instead of freezed — no codegen, same exhaustiveness.)
+- [x] 6.2 `lib/features/auth/data/auth_repository.dart`: methods `Future<LoginResponse> login(orgCode, username, password)`, `Future<void> logout()`, `Future<MeResponse> me()`, `Future<void> changePassword(currentPassword, newPassword)`. Each is a thin wrapper around the dio client that throws `ApiException` on errors.
+- [x] 6.3 `lib/features/auth/state/auth_provider.dart`: `@riverpod` `AuthNotifier` exposing `state: AuthState`, methods `login(...)`, `logout()`, `changePassword(...)`, and an internal `_bootstrap()` called on construction that runs the auto-login flow (read token → call `/app/me` → set state). State transitions match the cases in `auth_state.dart`. (Deviation: hand-written `AsyncNotifierProvider` instead of `@riverpod` codegen — same shape, no build_runner.)
 
 ## 7. go_router + redirect logic
 
