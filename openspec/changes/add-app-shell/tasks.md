@@ -27,11 +27,11 @@
 
 ## 4. Env + secure storage primitives
 
-- [ ] 4.1 `lib/core/env/env.dart`: define `class Env` with `compileTimeDefault()` returning the dart-defined value when non-empty, else `http://10.0.2.2:9090` on Android and `http://localhost:9090` on iOS / others. Use `dart:io` `Platform`. Add a const `appId = 'tw.ccmos.app.argus'` for any rare in-Dart use.
-- [ ] 4.2 `lib/core/storage/secure_storage.dart`: a thin typed wrapper around `FlutterSecureStorage`. Methods: `readToken`, `writeToken`, `clearToken`, `readLastOrgCode`, `writeLastOrgCode`, `clearLastOrgCode`. Each takes/returns `Future<String?>` / `Future<void>`. Riverpod-providable.
-- [ ] 4.3 `lib/core/storage/dev_overrides.dart`: debug-only readers / writers for `dev.api_base_url_override`. Do NOT import this directly anywhere; consumers import it through a conditional import.
-- [ ] 4.4 `lib/core/storage/dev_overrides_release.dart`: release stub exposing the same API surface but always returning `null` and being a no-op on writes. The condition import in consumers picks one or the other based on `dart.library.io` (or use `kDebugMode` checks at the call site — pick whichever is cleaner; document the choice in a comment).
-- [ ] 4.5 `lib/core/storage/api_base_url.dart` (or similar): exposes `effectiveBaseUrl()` Future returning the override when present (debug) else `Env.compileTimeDefault()`. This is what dio reads.
+- [x] 4.1 `lib/core/env/env.dart`: define `class Env` with `compileTimeDefault()` returning the dart-defined value when non-empty, else `http://10.0.2.2:9090` on Android and `http://localhost:9090` on iOS / others. Use `dart:io` `Platform`. Add a const `appId = 'tw.ccmos.app.argus'` for any rare in-Dart use.
+- [x] 4.2 `lib/core/storage/secure_storage.dart`: a thin typed wrapper around `FlutterSecureStorage`. Methods: `readToken`, `writeToken`, `clearToken`, `readLastOrgCode`, `writeLastOrgCode`, `clearLastOrgCode`. Each takes/returns `Future<String?>` / `Future<void>`. Riverpod-providable.
+- [x] 4.3 `lib/core/storage/dev_overrides.dart`: debug-only readers / writers for `dev.api_base_url_override`. Do NOT import this directly anywhere; consumers import it through a conditional import.
+- [x] 4.4 `lib/core/storage/dev_overrides_release.dart`: release stub exposing the same API surface but always returning `null` and being a no-op on writes. The condition import in consumers picks one or the other based on `dart.library.io` (or use `kDebugMode` checks at the call site — pick whichever is cleaner; document the choice in a comment). (Deviation: `dart.library.X` only switches on web vs mobile, not debug vs release. Used `kReleaseMode` early-returns inside `dev_overrides.dart` instead — `kReleaseMode` is a const so the entire branch tree-shakes out in release. No separate release stub file needed; choice is documented inline.)
+- [x] 4.5 `lib/core/storage/api_base_url.dart` (or similar): exposes `effectiveBaseUrl()` Future returning the override when present (debug) else `Env.compileTimeDefault()`. This is what dio reads.
 
 ## 5. API client + interceptors + error mapping
 
