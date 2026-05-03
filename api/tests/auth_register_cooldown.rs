@@ -1,11 +1,26 @@
 mod common;
 
+use bson::doc;
 use common::TestApp;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
+/// Helper: drop the identity row directly. This simulates the pre-launch
+/// scenario where a previously-kicked identity is also gone (e.g. a future
+/// "delete-account" endpoint), so a brand-new register-join with the same
+/// email must hit the cooldown gate instead of EMAIL_TAKEN.
+async fn delete_identity(app: &TestApp, email: &str) {
+    app.state
+        .db
+        .database
+        .collection::<bson::Document>("dashboard_users")
+        .delete_one(doc! { "email": email })
+        .await
+        .unwrap();
+}
+
 #[tokio::test]
-async fn rejoin_during_cooldown_is_blocked() {
+async fn rejoin_during_cooldown_via_register_is_blocked() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
     let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
@@ -21,7 +36,12 @@ async fn rejoin_during_cooldown_is_blocked() {
         .unwrap();
     assert_eq!(removed.status(), StatusCode::NO_CONTENT);
 
-    // Same email tries to register-join — should be blocked.
+    // Identity SURVIVES admin-remove in the new model. To exercise the
+    // register-mode=join cooldown branch we have to drop the identity row
+    // manually (e.g. simulating a future delete-account).
+    delete_identity(&app, "transient@example.com").await;
+
+    // Brand-new register-join with the same email + same org → cooldown wins.
     let retry = app
         .fresh_client()
         .post(app.url("/auth/register"))
@@ -37,6 +57,40 @@ async fn rejoin_during_cooldown_is_blocked() {
     assert_eq!(retry.status(), StatusCode::CONFLICT);
     let err: Value = retry.json().await.unwrap();
     assert_eq!(err["error"]["code"], "EMAIL_IN_COOLDOWN");
+}
+
+#[tokio::test]
+async fn existing_identity_rejoin_via_register_is_email_taken() {
+    let app = TestApp::spawn().await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+
+    let (_member, join_body) = app.register_member("transient@example.com", &code).await;
+    let member_id = join_body["user"]["id"].as_str().unwrap().to_string();
+    admin
+        .delete(app.url(&format!("/dashboard-users/{member_id}")))
+        .send()
+        .await
+        .unwrap();
+
+    // Identity survived the kick; register-join with the same email is
+    // strictly EMAIL_TAKEN (not EMAIL_IN_COOLDOWN), enforcing the
+    // "register is for brand-new identities only" rule.
+    let retry = app
+        .fresh_client()
+        .post(app.url("/auth/register"))
+        .json(&json!({
+            "mode": "join",
+            "email": "transient@example.com",
+            "password": "hunter2hunter2",
+            "org_code": code,
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(retry.status(), StatusCode::CONFLICT);
+    let err: Value = retry.json().await.unwrap();
+    assert_eq!(err["error"]["code"], "EMAIL_TAKEN");
 }
 
 #[tokio::test]
