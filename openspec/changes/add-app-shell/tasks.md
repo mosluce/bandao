@@ -108,9 +108,9 @@
 
 ## 14. Docs
 
-- [ ] 14.1 `app/README.md`: how to run (`flutter pub get`, `dart run build_runner build`, `flutter run`); the platform-aware default base URL (10.0.2.2 vs localhost); how to override via `--dart-define=API_BASE_URL=...`; how to use the dev menu (5-tap on logo); the renaming procedure (4 files: pubspec.yaml, Info.plist, build.gradle applicationId, strings.xml app_name) for when the product name lands; how to add a new locale.
-- [ ] 14.2 Update `README.md` (repo root) to describe `app/` as a real, runnable Flutter project (replacing the previous placeholder bullet) and link to `app/README.md`.
-- [ ] 14.3 Update `AGENTS.md` `app/`(Flutter) section if needed: lock `Riverpod` + `go_router` + `dio` as the chosen tools. Strike-through the "依後續決定" wording.
+- [x] 14.1 `app/README.md`: how to run (`flutter pub get`, `dart run build_runner build`, `flutter run`); the platform-aware default base URL (10.0.2.2 vs localhost); how to override via `--dart-define=API_BASE_URL=...`; how to use the dev menu (5-tap on logo); the renaming procedure (4 files: pubspec.yaml, Info.plist, build.gradle applicationId, strings.xml app_name) for when the product name lands; how to add a new locale.
+- [x] 14.2 Update `README.md` (repo root) to describe `app/` as a real, runnable Flutter project (replacing the previous placeholder bullet) and link to `app/README.md`.
+- [x] 14.3 Update `AGENTS.md` `app/`(Flutter) section if needed: lock `Riverpod` + `go_router` + `dio` as the chosen tools. Strike-through the "依後續決定" wording.
 
 ## 15. Smoke
 

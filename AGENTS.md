@@ -51,9 +51,11 @@ argus 是一個全端服務，由三個應用 + 一個資料層組成：
 ### `app/`（Flutter）
 
 - Dart 走 null safety；公開 API 一律標型別，不仰賴推斷。
-- 架構分層：UI（widget）→ state（riverpod / bloc，依後續決定）→ data（repository）→ network（dio + 由 OpenAPI 生成的 client）。
+- 架構分層：UI（widget）→ state（**Riverpod 2**）→ data（repository）→ network（**dio**，未來接 OpenAPI 生成的 client；目前手寫 mirror）。
+- 路由：**go_router**（declarative + redirect）。
 - 不在 widget 內直接呼叫 HTTP；一律透過 repository。
 - 平台差異（iOS / Android）以條件式分支收斂在 platform 層，不污染 widget。
+- 詳細結構、跑起來方式、dev menu 用法見 [`app/README.md`](./app/README.md)。
 
 ### MongoDB
 

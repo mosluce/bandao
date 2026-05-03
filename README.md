@@ -10,12 +10,13 @@
 | --- | --- | --- |
 | [`api/`](./api/) | Rust + axum + MongoDB | 唯一與資料庫直接通訊的服務層，提供 dashboard 與 app 共用的 HTTP API |
 | [`admin-web/`](./admin-web/) | Nuxt 3 + TypeScript | 給 Org admin / member 使用的管理後台 |
-| [`app/`](./app/) | Flutter（尚未落地） | 終端使用者打卡 App，預計 iOS + Android |
+| [`app/`](./app/) | Flutter（iOS + Android） | 終端使用者 App；目前已完成登入流程，打卡 UI 在 `add-app-checkin` 動工中 |
 
 ## 開發前置
 
 - **Rust** — 由 `api/rust-toolchain.toml` 鎖定；建議用 [rustup](https://rustup.rs/) 或 asdf。
 - **Node 20+** — `admin-web/` 開發用；建議用 nvm / asdf / volta。
+- **Flutter `>= 3.24`** — `app/` 開發用；建議用 asdf 或官方 SDK 安裝器。
 - **Docker** — 跑本地 MongoDB 與 `api/` 的整合測試。
 - **MongoDB 7.x** — 透過 `docker-compose.yml` 起本地實例。
 
@@ -50,9 +51,21 @@ NUXT_PUBLIC_API_BASE_URL=http://localhost:9090
 
 預設 Mongo 連線字串：`mongodb://argus:argus@localhost:27017/argus?authSource=admin`
 
+App 端（Flutter）開發另開：
+
+```bash
+cd app
+flutter pub get
+flutter run                # 自動跑當前 simulator / device
+# Android Emulator 預設打 http://10.0.2.2:9090
+# iOS Simulator 預設打 http://localhost:9090
+# 實機或自訂後端：flutter run --dart-define=API_BASE_URL=http://<host>:<port>
+```
+
 更詳細的環境變數與測試流程：
 - [`api/README.md`](./api/README.md)
 - [`admin-web/README.md`](./admin-web/README.md)
+- [`app/README.md`](./app/README.md)
 
 ## 變更工作流程
 
