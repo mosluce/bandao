@@ -123,7 +123,9 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // ignore — logout is best-effort.
     }
     await storage.clearToken();
-    await storage.clearLastOrgCode();
+    // KEEP last_org_code on logout: per spec, /login pre-fills the org_code
+    // field on subsequent visits — including after logout — so the user only
+    // has to retype username + password.
     state = const AsyncValue<AuthState>.data(AuthState.unauthenticated());
   }
 

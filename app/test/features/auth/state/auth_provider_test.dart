@@ -95,7 +95,7 @@ void main() {
   });
 
   group('AuthNotifier logout()', () {
-    test('clears local state on success', () async {
+    test('clears token but preserves org_code on success', () async {
       final storage = _FakeSecureStorage(token: 'abc', orgCode: 'C');
       final repo = _FakeRepo(meResponse: _meOk);
       final container = _container(storage: storage, repo: repo);
@@ -104,11 +104,12 @@ void main() {
       await container.read(authProvider.notifier).logout();
 
       expect(await storage.readToken(), isNull);
-      expect(await storage.readLastOrgCode(), isNull);
+      // Per spec: org_code is preserved across logout so /login pre-fills.
+      expect(await storage.readLastOrgCode(), 'C');
       expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
     });
 
-    test('clears local state on network failure', () async {
+    test('clears token but preserves org_code on network failure', () async {
       final storage = _FakeSecureStorage(token: 'abc', orgCode: 'C');
       final repo = _FakeRepo(
         meResponse: _meOk,
@@ -120,7 +121,7 @@ void main() {
       await container.read(authProvider.notifier).logout();
 
       expect(await storage.readToken(), isNull);
-      expect(await storage.readLastOrgCode(), isNull);
+      expect(await storage.readLastOrgCode(), 'C');
       expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
     });
   });
