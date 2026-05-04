@@ -8,7 +8,7 @@
 - [x] 1.6 Set iOS deployment target to 13.0 in both `app/ios/Podfile` (`platform :ios, '13.0'`) and the Xcode project's `IPHONEOS_DEPLOYMENT_TARGET` build setting.
 - [x] 1.7 Replace the default app icon with a tinted placeholder (the Flutter default icon, but in Argus brand colour). Document the icon-replacement procedure in `app/README.md` for when the final asset arrives.
 - [x] 1.8 Add `app/.gitignore` covering Flutter (`.dart_tool/`, `build/`, `.flutter-plugins`, `.flutter-plugins-dependencies`), iOS (`Pods/`, `Podfile.lock` is committed, `*.xcuserstate`, `*.xcworkspace/xcuserdata`), Android (`local.properties`, `key.properties`, `*.iml`), and IDE files (`.idea/`, `.vscode/launch.json` if not committed).
-- [ ] 1.9 Verify the project runs on iOS Simulator and Android Emulator with `flutter run` after `flutter pub get`. (deferred — section 15 live smoke)
+- [x] 1.9 Verify the project runs on iOS Simulator and Android Emulator with `flutter run` after `flutter pub get`. (deferred — section 15 live smoke)
 
 ## 2. Dependencies + analyzer + lints
 
@@ -115,4 +115,4 @@
 ## 15. Smoke
 
 - [x] 15.1 `flutter analyze` clean, `flutter test` all green locally.
-- [ ] 15.2 Live smoke: bring up local stack (api on `:9090`, mongo via docker compose). On iOS Simulator, run `flutter run` in `app/`. Walk: see splash → land on `/login` → enter `(org_code, username, initial_password)` → see force-change screen → change password → land on home → see identity → tap logout → return to `/login`. Do the same on Android Emulator (default URL should resolve to `10.0.2.2:9090`). Try the dev menu: tap logo 5x → enter a different URL → save → confirm subsequent login uses it; clear → confirm fallback.
+- [x] 15.2 Live smoke: bring up local stack (api on `:9090`, mongo via docker compose). On iOS Simulator, run `flutter run` in `app/`. Walk: see splash → land on `/login` → enter `(org_code, username, initial_password)` → see force-change screen → change password → land on home → see identity → tap logout → return to `/login`. Do the same on Android Emulator (default URL should resolve to `10.0.2.2:9090`). Try the dev menu: tap logo 5x → enter a different URL → save → confirm subsequent login uses it; clear → confirm fallback.
