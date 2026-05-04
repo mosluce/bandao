@@ -18,7 +18,7 @@ class SplashScreen extends ConsumerWidget {
 
     return Scaffold(
       body: Center(
-        child: auth.maybeWhen(
+        child: auth.when(
           data: (state) {
             if (state is AuthError) {
               return _ErrorBlock(
@@ -33,7 +33,17 @@ class SplashScreen extends ConsumerWidget {
             }
             return const CircularProgressIndicator();
           },
-          orElse: () => const CircularProgressIndicator(),
+          loading: () => const CircularProgressIndicator(),
+          // build() threw and AsyncValue is .error — surface the real
+          // exception so we can debug instead of pretending it's still
+          // loading.
+          error: (Object err, StackTrace st) => _ErrorBlock(
+            message: 'Bootstrap exception:\n$err',
+            onRetry: () => ref.read(authProvider.notifier).retry(),
+            onLogout: () => ref.read(authProvider.notifier).logout(),
+            retryLabel: l10n.splashRetry,
+            logoutLabel: l10n.splashLogout,
+          ),
         ),
       ),
     );

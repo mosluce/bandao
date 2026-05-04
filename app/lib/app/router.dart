@@ -99,7 +99,13 @@ String? _redirectFor(AuthState auth, GoRouterState state) {
       if (loc == AppRoutes.forceChange) return null;
       return AppRoutes.forceChange;
     case AuthAuthenticated(needsPasswordChange: false):
-      if (loc == AppRoutes.login || loc == AppRoutes.forceChange) {
+      // /splash is the parking spot during auth bootstrap — once we know the
+      // user is authenticated with no flag, send them home. Same for /login
+      // and /force-change-password. Everything else (e.g. /, /dev-server-config)
+      // is fine to stay put.
+      if (loc == AppRoutes.login ||
+          loc == AppRoutes.forceChange ||
+          loc == AppRoutes.splash) {
         return AppRoutes.home;
       }
       return null;

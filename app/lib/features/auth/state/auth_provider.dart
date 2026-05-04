@@ -49,6 +49,13 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // Network errors / unknowns: keep the token, surface error so UI
       // can show a retry button.
       return AuthState.error(e.message);
+    } catch (e) {
+      // Anything not an ApiException (e.g. JSON parse TypeError) would
+      // otherwise propagate out of `build()` and leave the AsyncNotifier in
+      // AsyncValue.error — the splash treats that as "loading" and the
+      // router stays on /splash. Surface it as a recoverable AuthError so
+      // the splash can render a retry button with the real message.
+      return AuthState.error('解析失敗：$e');
     }
   }
 
@@ -73,6 +80,11 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     required String username,
     required String password,
   }) async {
+    // Wait for `build()` (auto-login `_bootstrap`) to settle before mutating
+    // state. Otherwise the build Future can resolve mid-login and overwrite
+    // our `data(authenticated)` with the bootstrap result, leaving the user
+    // stranded on /splash with a stale GET /app/me request fired off.
+    await future;
     state = const AsyncValue<AuthState>.data(AuthState.loading());
     final storage = ref.read(secureStorageProvider);
     try {
@@ -102,6 +114,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
 
   /// Best-effort logout: always clear local state regardless of network.
   Future<void> logout() async {
+    await future;
     final storage = ref.read(secureStorageProvider);
     try {
       final repo = await ref.read(authRepositoryProvider.future);
@@ -121,6 +134,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     required String currentPassword,
     required String newPassword,
   }) async {
+    await future;
     final repo = await ref.read(authRepositoryProvider.future);
     await repo.changePassword(
       currentPassword: currentPassword,
