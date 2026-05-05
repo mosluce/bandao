@@ -55,9 +55,11 @@ async fn cross_org_app_users_excluded_from_board() {
 #[tokio::test]
 async fn member_cannot_view_checkin_board() {
     let app = TestApp::spawn().await;
-    let (_admin, body) = app.register_admin("admin@example.com", "Acme").await;
+    let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
     let code = body["current_org"]["code"].as_str().unwrap().to_string();
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let r = member.get(app.url("/checkin/users")).send().await.unwrap();
     assert_eq!(r.status(), StatusCode::FORBIDDEN);

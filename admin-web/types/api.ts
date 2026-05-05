@@ -204,6 +204,38 @@ export interface LocationListParams {
   to?: string
 }
 
+export type JoinRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+export interface JoinRequestDto {
+  id: string
+  org: { id: string, name: string, code: string }
+  status: JoinRequestStatus
+  application_message?: string
+  rejection_reason?: string
+  requested_at: string
+  decided_at?: string
+}
+
+export interface OrgPendingJoinRequestDto {
+  id: string
+  user_id: string
+  email: string
+  status: JoinRequestStatus
+  application_message?: string
+  rejection_reason?: string
+  requested_at: string
+  decided_at?: string
+}
+
+export interface SubmitJoinRequestRequest {
+  org_code: string
+  application_message?: string
+}
+
+export interface RejectJoinRequestRequest {
+  rejection_reason?: string
+}
+
 export interface ApiErrorBody {
   error: {
     code: string

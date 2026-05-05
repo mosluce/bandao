@@ -215,8 +215,9 @@ async fn member_cannot_set_slug() {
         .as_str()
         .unwrap()
         .to_string();
-    let _ = admin;
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let r = member
         .post(app.url("/orgs/me/slug"))

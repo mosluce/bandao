@@ -12,7 +12,9 @@ async fn admin_promotes_member_to_admin() {
         .as_str()
         .unwrap()
         .to_string();
-    let (_member, member_body) = app.register_member("member@example.com", &code).await;
+    let (_member, member_body) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
     let resp = admin
@@ -30,12 +32,14 @@ async fn admin_promotes_member_to_admin() {
 #[tokio::test]
 async fn member_cannot_change_roles() {
     let app = TestApp::spawn().await;
-    let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
     let code = admin_body["current_org"]["code"]
         .as_str()
         .unwrap()
         .to_string();
-    let (member, member_body) = app.register_member("member@example.com", &code).await;
+    let (member, member_body) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
     let resp = member
@@ -91,7 +95,9 @@ async fn demoting_non_owner_admin_succeeds() {
         .as_str()
         .unwrap()
         .to_string();
-    let (_member, member_body) = app.register_member("member@example.com", &code).await;
+    let (_member, member_body) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
     // Promote first.

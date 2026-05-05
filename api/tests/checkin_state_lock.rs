@@ -77,9 +77,11 @@ async fn timezone_patch_not_blocked_by_state_lock() {
 #[tokio::test]
 async fn member_cannot_patch_settings() {
     let app = TestApp::spawn().await;
-    let (_admin, body) = app.register_admin("admin@example.com", "Acme").await;
+    let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
     let code = body["current_org"]["code"].as_str().unwrap().to_string();
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let r = member
         .patch(app.url("/orgs/me/settings"))

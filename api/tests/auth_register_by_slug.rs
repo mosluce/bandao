@@ -23,7 +23,28 @@ async fn register_by_active_slug_joins_same_org() {
     let set_body: Value = set_resp.json().await.unwrap();
     assert_eq!(set_body["slug"], "acme");
 
-    let (_joiner, join_body) = app.register_member("member@example.com", "acme").await;
-    assert_eq!(join_body["current_org"]["id"], org_id);
-    assert_eq!(join_body["role"], "member");
+    // Slug-based register-join now produces a pending join_request and a
+    // zero-org session. Verify the pending request was filed against the
+    // correct org.
+    let (_joiner, join_body) = app
+        .register_member_pending("member@example.com", "acme")
+        .await;
+    assert!(join_body["current_org"].is_null());
+    assert!(join_body["role"].is_null());
+    let pending: Value = admin
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(
+        pending
+            .as_array()
+            .map(|a| a.iter().any(|r| r["email"] == "member@example.com"))
+            .unwrap_or(false),
+        "expected pending request for slug-based join, got {pending:?}"
+    );
+    let _ = org_id;
 }

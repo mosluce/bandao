@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 async fn logged_in_user_joins_via_org_code() {
     let app = TestApp::spawn().await;
 
-    let (_owner_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
+    let (owner_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
     let org_a_id = body_a["current_org"]["id"].as_str().unwrap().to_string();
 
@@ -19,6 +19,8 @@ async fn logged_in_user_joins_via_org_code() {
         .await;
     let visitor_id = ObjectId::parse_str(visitor_body["user"]["id"].as_str().unwrap()).unwrap();
 
+    // POST /me/memberships now files a pending join_request rather than
+    // immediately granting membership.
     let resp = visitor
         .post(app.url("/me/memberships"))
         .json(&json!({ "org_code": code_a }))
@@ -26,14 +28,48 @@ async fn logged_in_user_joins_via_org_code() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    assert_eq!(body["current_org"]["id"], org_a_id);
-    assert_eq!(body["role"], "member");
-    let memberships = body["memberships"].as_array().unwrap();
-    assert_eq!(memberships.len(), 2);
 
+    // Visitor still has just their own org; no extra membership yet.
+    assert_eq!(app.membership_count(visitor_id).await, 1);
+
+    // owner_a sees the pending request and approves.
+    let pending: Value = owner_a
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let req_id = pending
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["email"] == "visitor@example.com")
+        .and_then(|r| r["id"].as_str())
+        .expect("pending visitor")
+        .to_string();
+    let approve = owner_a
+        .post(app.url(&format!("/orgs/me/join-requests/{req_id}/approve")))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(approve.status(), StatusCode::NO_CONTENT);
+
+    // After approval, visitor has 2 memberships and can switch to OrgA.
     let count = app.membership_count(visitor_id).await;
     assert_eq!(count, 2);
+    let switched: Value = visitor
+        .post(app.url("/me/current-org"))
+        .json(&json!({ "org_id": org_a_id }))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(switched["current_org"]["id"], org_a_id);
+    assert_eq!(switched["role"], "member");
 }
 
 #[tokio::test]
@@ -57,8 +93,39 @@ async fn join_via_active_slug_uses_same_org() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    assert_eq!(body["current_org"]["id"], org_a_id);
+    // Pending request was filed against OrgA via slug lookup.
+    let pending: Value = admin_a
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let arr = pending.as_array().unwrap();
+    assert!(arr.iter().any(|r| r["email"] == "visitor@example.com"));
+    // Approve and verify membership lands in OrgA.
+    let req_id = arr
+        .iter()
+        .find(|r| r["email"] == "visitor@example.com")
+        .and_then(|r| r["id"].as_str())
+        .unwrap()
+        .to_string();
+    admin_a
+        .post(app.url(&format!("/orgs/me/join-requests/{req_id}/approve")))
+        .send()
+        .await
+        .unwrap();
+    let switched: Value = visitor
+        .post(app.url("/me/current-org"))
+        .json(&json!({ "org_id": org_a_id }))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(switched["current_org"]["id"], org_a_id);
 }
 
 #[tokio::test]
@@ -99,7 +166,7 @@ async fn join_via_grace_period_slug() {
         .await
         .unwrap();
 
-    // Visitor joins via the grace-period "orga".
+    // Visitor joins via the grace-period "orga" — pending request → approve.
     let (visitor, _) = app.register_admin("visitor@example.com", "Visitor").await;
     let resp = visitor
         .post(app.url("/me/memberships"))
@@ -108,18 +175,49 @@ async fn join_via_grace_period_slug() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    assert_eq!(body["current_org"]["id"], org_a_id);
+    let pending: Value = admin_a
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let req_id = pending
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["email"] == "visitor@example.com")
+        .and_then(|r| r["id"].as_str())
+        .expect("pending visitor (grace)")
+        .to_string();
+    admin_a
+        .post(app.url(&format!("/orgs/me/join-requests/{req_id}/approve")))
+        .send()
+        .await
+        .unwrap();
+    let switched: Value = visitor
+        .post(app.url("/me/current-org"))
+        .json(&json!({ "org_id": org_a_id }))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(switched["current_org"]["id"], org_a_id);
 }
 
 #[tokio::test]
 async fn duplicate_membership_is_rejected() {
     let app = TestApp::spawn().await;
 
-    let (_owner_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
+    let (owner_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
 
-    let (visitor, _) = app.register_member("visitor@example.com", &code_a).await;
+    let (visitor, _) = app
+        .register_member(&owner_a, "visitor@example.com", &code_a)
+        .await;
     // visitor is already a member; joining again must be ALREADY_MEMBER.
     let resp = visitor
         .post(app.url("/me/memberships"))
@@ -159,7 +257,9 @@ async fn cooldown_blocks_join_via_me_memberships() {
     // OrgA admin kicks the visitor — cooldown for (OrgA, visitor email) lands.
     let (admin_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
-    let (_visitor, visitor_body) = app.register_member("visitor@example.com", &code_a).await;
+    let (_visitor, visitor_body) = app
+        .register_member(&admin_a, "visitor@example.com", &code_a)
+        .await;
     let visitor_id = visitor_body["user"]["id"].as_str().unwrap().to_string();
 
     let kick = admin_a

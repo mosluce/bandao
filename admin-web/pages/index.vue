@@ -163,9 +163,39 @@ async function onLogout() {
 }
 
 const orgSettings = useOrgSettings()
+const joinRequests = useJoinRequests()
 const transferToggleSaving = ref(false)
 const transferToggleError = ref('')
 const stateLockedCount = ref<number | null>(null)
+
+const pendingJoinCount = ref(0)
+let pendingJoinTimer: ReturnType<typeof setInterval> | null = null
+
+async function refreshPendingJoinCount() {
+  if (!auth.isAdmin.value || !auth.currentOrg.value) {
+    pendingJoinCount.value = 0
+    return
+  }
+  try {
+    pendingJoinCount.value = await joinRequests.countOrgPending()
+  }
+  catch {
+    // best-effort badge — don't surface errors here
+  }
+}
+
+watch(
+  [() => auth.currentOrg.value?.id, () => auth.isAdmin.value],
+  () => refreshPendingJoinCount(),
+  { immediate: true },
+)
+
+onMounted(() => {
+  pendingJoinTimer = setInterval(refreshPendingJoinCount, 30_000)
+})
+onBeforeUnmount(() => {
+  if (pendingJoinTimer) clearInterval(pendingJoinTimer)
+})
 
 const locationTrackingToggleSaving = ref(false)
 const locationTrackingToggleError = ref('')
@@ -522,6 +552,18 @@ async function confirmLeave() {
               class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               冷卻管理
+            </NuxtLink>
+            <NuxtLink
+              to="/admin/join-requests"
+              class="relative rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              加入申請
+              <span
+                v-if="pendingJoinCount > 0"
+                class="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white"
+              >
+                {{ pendingJoinCount }}
+              </span>
             </NuxtLink>
           </div>
         </div>

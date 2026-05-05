@@ -109,6 +109,15 @@ pub enum ApiError {
     /// Location ping batch is empty or exceeds the per-batch cap (100).
     #[error("invalid batch size")]
     InvalidBatch,
+    /// User attempted to submit a join request while one is already pending
+    /// for the same `(user_id, org_id)`. Triggers off the partial unique
+    /// index on `join_requests`.
+    #[error("a join request is already pending for this org")]
+    JoinRequestPending,
+    /// Operation requires the target row to be in a specific state and it
+    /// isn't (e.g. trying to cancel an already-decided join request).
+    #[error("operation not valid in current state")]
+    InvalidState,
 
     #[error("password hashing failed")]
     Password,
@@ -166,6 +175,8 @@ impl ApiError {
             }
             ApiError::InvalidRange => (StatusCode::BAD_REQUEST, "INVALID_RANGE"),
             ApiError::InvalidBatch => (StatusCode::BAD_REQUEST, "INVALID_BATCH"),
+            ApiError::JoinRequestPending => (StatusCode::CONFLICT, "JOIN_REQUEST_PENDING"),
+            ApiError::InvalidState => (StatusCode::BAD_REQUEST, "INVALID_STATE"),
             ApiError::Password
             | ApiError::Db(_)
             | ApiError::BsonSer(_)

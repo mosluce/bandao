@@ -8,14 +8,16 @@ use serde_json::Value;
 #[tokio::test]
 async fn non_owner_member_can_self_leave() {
     let app = TestApp::spawn().await;
-    let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
     let code = admin_body["current_org"]["code"]
         .as_str()
         .unwrap()
         .to_string();
     let org_id = ObjectId::parse_str(admin_body["current_org"]["id"].as_str().unwrap()).unwrap();
 
-    let (member, member_body) = app.register_member("member@example.com", &code).await;
+    let (member, member_body) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
     let member_id = ObjectId::parse_str(member_body["user"]["id"].as_str().unwrap()).unwrap();
 
     let resp = member.post(app.url("/me/leave")).send().await.unwrap();
@@ -77,7 +79,9 @@ async fn leave_without_active_org_is_no_active_org() {
         .as_str()
         .unwrap()
         .to_string();
-    let (_, second_body) = app.register_member("second@example.com", &code).await;
+    let (_, second_body) = app
+        .register_member(&admin, "second@example.com", &code)
+        .await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
     admin
         .patch(app.url(&format!("/dashboard-users/{second_id}/role")))

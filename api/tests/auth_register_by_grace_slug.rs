@@ -69,9 +69,34 @@ async fn join_works_during_grace_then_fails_after_expiry() {
         .unwrap();
     assert_eq!(r.status(), StatusCode::OK);
 
-    // Old slug "acme" still resolves via grace; new identity registers + joins.
-    let (_grace_user, grace_body) = app.register_member("graceuser@example.com", "acme").await;
-    assert_eq!(grace_body["current_org"]["id"], org_id);
+    // Old slug "acme" still resolves via grace; new identity registers and a
+    // pending join_request is filed against the grace org. The session is
+    // zero-org until admin approves.
+    let (_grace_user, grace_body) = app
+        .register_member_pending("graceuser@example.com", "acme")
+        .await;
+    assert!(grace_body["current_org"].is_null());
+    assert!(
+        grace_body["memberships"]
+            .as_array()
+            .map(|a| a.is_empty())
+            .unwrap_or(false)
+    );
+    // Verify a pending request exists against the org for this email.
+    let pending: Value = admin
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let arr = pending.as_array().unwrap();
+    assert!(
+        arr.iter().any(|r| r["email"] == "graceuser@example.com"),
+        "expected pending request for graceuser@example.com, got: {pending:?}"
+    );
+    let _ = org_id;
 
     // Force-expire the grace reservation.
     expire_reservation(&app, "acme").await;

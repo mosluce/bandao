@@ -8,23 +8,47 @@ use serde_json::{Value, json};
 async fn leave_only_kicks_sessions_pointing_at_left_org() {
     let app = TestApp::spawn().await;
 
-    let (_owner_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
+    let (owner_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
     let org_a_id = body_a["current_org"]["id"].as_str().unwrap().to_string();
 
-    let (_owner_b, body_b) = app.register_admin("b-owner@example.com", "OrgB").await;
+    let (owner_b, body_b) = app.register_admin("b-owner@example.com", "OrgB").await;
     let code_b = body_b["current_org"]["code"].as_str().unwrap().to_string();
     let org_b_id = body_b["current_org"]["id"].as_str().unwrap().to_string();
 
-    // Visitor joins OrgA via register, then OrgB via /me/memberships.
-    let (visitor_a_session, _) = app.register_member("visitor@example.com", &code_a).await;
+    // Visitor joins OrgA via register, then OrgB via /me/memberships. Both
+    // require admin approval under the new flow.
+    let (visitor_a_session, _) = app
+        .register_member(&owner_a, "visitor@example.com", &code_a)
+        .await;
     visitor_a_session
         .post(app.url("/me/memberships"))
         .json(&json!({ "org_code": code_b }))
         .send()
         .await
         .unwrap();
-    // visitor_a_session.current_org is now OrgB after the join.
+    let pending_b: Value = owner_b
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let req_id_b = pending_b
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["email"] == "visitor@example.com")
+        .and_then(|r| r["id"].as_str())
+        .expect("pending visitor in OrgB")
+        .to_string();
+    owner_b
+        .post(app.url(&format!("/orgs/me/join-requests/{req_id_b}/approve")))
+        .send()
+        .await
+        .unwrap();
+    // Pin first session back to OrgA.
     visitor_a_session
         .post(app.url("/me/current-org"))
         .json(&json!({ "org_id": org_a_id }))
@@ -67,11 +91,13 @@ async fn admin_remove_only_kicks_target_sessions_for_that_org() {
     let (admin_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
     let org_a_id = body_a["current_org"]["id"].as_str().unwrap().to_string();
-    let (_owner_b, body_b) = app.register_admin("b-owner@example.com", "OrgB").await;
+    let (owner_b, body_b) = app.register_admin("b-owner@example.com", "OrgB").await;
     let code_b = body_b["current_org"]["code"].as_str().unwrap().to_string();
     let org_b_id = body_b["current_org"]["id"].as_str().unwrap().to_string();
 
-    let (visitor, visitor_body) = app.register_member("visitor@example.com", &code_a).await;
+    let (visitor, visitor_body) = app
+        .register_member(&admin_a, "visitor@example.com", &code_a)
+        .await;
     let visitor_id = visitor_body["user"]["id"].as_str().unwrap().to_string();
     visitor
         .post(app.url("/me/memberships"))
@@ -79,8 +105,28 @@ async fn admin_remove_only_kicks_target_sessions_for_that_org() {
         .send()
         .await
         .unwrap();
-    // /me/memberships swaps current_org to the joined Org per spec, so put the
-    // first session back on OrgA — that's the session the kick should kill.
+    let pending_b: Value = owner_b
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let req_id_b = pending_b
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["email"] == "visitor@example.com")
+        .and_then(|r| r["id"].as_str())
+        .expect("pending visitor in OrgB")
+        .to_string();
+    owner_b
+        .post(app.url(&format!("/orgs/me/join-requests/{req_id_b}/approve")))
+        .send()
+        .await
+        .unwrap();
+    // Pin first session back to OrgA — that's the session the kick should kill.
     visitor
         .post(app.url("/me/current-org"))
         .json(&json!({ "org_id": org_a_id }))

@@ -143,9 +143,10 @@ async fn force_checkout_member_rejected() {
 
     // Add a member to the same Org and have them try.
     let (admin, body) = app.login("admin@example.com", "hunter2hunter2").await;
-    let _ = admin;
     let code = body["current_org"]["code"].as_str().unwrap().to_string();
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let r = member
         .post(app.url(&format!("/checkin/users/{alice_id}/force-checkout")))

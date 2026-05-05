@@ -99,6 +99,38 @@ pub struct Membership {
     pub updated_at: DateTime,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum JoinRequestStatus {
+    Pending,
+    Approved,
+    Rejected,
+    Cancelled,
+}
+
+/// One row per join attempt. Pending rows gate `dashboard_memberships`
+/// creation — see `org-join-requests` capability spec. Terminal states
+/// (`approved`/`rejected`/`cancelled`) are retained for audit; the
+/// `(user_id, org_id, status)` partial unique index covers only `pending`
+/// so a rejected user can re-apply.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JoinRequest {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub user_id: ObjectId,
+    pub org_id: ObjectId,
+    pub status: JoinRequestStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub application_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rejection_reason: Option<String>,
+    pub requested_at: DateTime,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decided_at: Option<DateTime>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decided_by: Option<ObjectId>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardSession {
     #[serde(rename = "_id")]

@@ -11,7 +11,9 @@ async fn role_demotion_takes_effect_on_next_request_without_relogin() {
 
     let (founder, body_a) = app.register_admin("founder@example.com", "Acme").await;
     let code = body_a["current_org"]["code"].as_str().unwrap().to_string();
-    let (target, target_body) = app.register_member("second@example.com", &code).await;
+    let (target, target_body) = app
+        .register_member(&founder, "second@example.com", &code)
+        .await;
     let target_id = target_body["user"]["id"].as_str().unwrap().to_string();
 
     // Promote second to admin.

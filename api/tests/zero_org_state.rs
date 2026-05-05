@@ -14,7 +14,9 @@ async fn build_zero_org_user(app: &TestApp) -> (reqwest::Client, String) {
         .as_str()
         .unwrap()
         .to_string();
-    let (_second, second_body) = app.register_member("second@example.com", &code).await;
+    let (_second, second_body) = app
+        .register_member(&founder, "second@example.com", &code)
+        .await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
 
     founder
@@ -103,11 +105,14 @@ async fn user_recovers_via_me_memberships() {
     let app = TestApp::spawn().await;
 
     // OrgA exists with another owner.
-    let (_owner_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
+    let (owner_a, body_a) = app.register_admin("a-owner@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
+    let org_a_id = body_a["current_org"]["id"].as_str().unwrap().to_string();
 
     let (zero, _) = build_zero_org_user(&app).await;
 
+    // Zero-org user files a pending join request; recovery requires admin
+    // approval before they pick up a current_org.
     let resp = zero
         .post(app.url("/me/memberships"))
         .json(&json!({ "org_code": code_a }))
@@ -115,7 +120,39 @@ async fn user_recovers_via_me_memberships() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = resp.json().await.unwrap();
-    assert_eq!(body["current_org"]["code"], code_a);
-    assert_eq!(body["role"], "member");
+
+    let pending: Value = owner_a
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let req_id = pending
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["email"] == "founder@example.com")
+        .and_then(|r| r["id"].as_str())
+        .expect("pending zero-org user")
+        .to_string();
+    owner_a
+        .post(app.url(&format!("/orgs/me/join-requests/{req_id}/approve")))
+        .send()
+        .await
+        .unwrap();
+
+    // After approval, user can switch and is a member.
+    let switched: Value = zero
+        .post(app.url("/me/current-org"))
+        .json(&json!({ "org_id": org_a_id }))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(switched["current_org"]["code"], code_a);
+    assert_eq!(switched["role"], "member");
 }

@@ -68,8 +68,9 @@ async fn member_cannot_create_app_user() {
     let app = TestApp::spawn().await;
     let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
     let code = body["current_org"]["code"].as_str().unwrap().to_string();
-    let _ = admin;
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let resp = member
         .post(app.url("/app-users"))

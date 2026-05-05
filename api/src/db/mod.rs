@@ -5,6 +5,7 @@ pub mod checkin_user_status;
 pub mod dashboard_memberships;
 pub mod dashboard_sessions;
 pub mod dashboard_users;
+pub mod join_requests;
 pub mod location_pings;
 pub mod orgs;
 pub mod removed_memberships;
@@ -18,7 +19,7 @@ use mongodb::{Client, Collection, Database, IndexModel};
 
 use crate::domain::{
     AppSession, AppUser, CheckinEvent, CheckinUserStatus, DashboardSession, DashboardUser,
-    LocationPing, Membership, Org, OrgSlugReservation, RemovedMembership,
+    JoinRequest, LocationPing, Membership, Org, OrgSlugReservation, RemovedMembership,
 };
 use crate::error::ApiResult;
 
@@ -29,6 +30,7 @@ pub use checkin_user_status::{CheckinStatusInsertError, CheckinUserStatusReposit
 pub use dashboard_memberships::{MembershipInsertError, MembershipRepository};
 pub use dashboard_sessions::DashboardSessionRepository;
 pub use dashboard_users::DashboardUserRepository;
+pub use join_requests::{JoinRequestInsertError, JoinRequestRepository};
 pub use location_pings::{InsertManyOutcome, LOCATION_PING_BATCH_MAX, LocationPingRepository};
 pub use orgs::OrgRepository;
 pub use removed_memberships::RemovedMembershipRepository;
@@ -48,6 +50,7 @@ pub struct Db {
     pub checkin_events: CheckinEventRepository,
     pub checkin_user_status: CheckinUserStatusRepository,
     pub location_pings: LocationPingRepository,
+    pub join_requests: JoinRequestRepository,
 }
 
 impl Db {
@@ -92,6 +95,9 @@ impl Db {
             ),
             location_pings: LocationPingRepository::new(
                 database.collection::<LocationPing>("location_pings"),
+            ),
+            join_requests: JoinRequestRepository::new(
+                database.collection::<JoinRequest>("join_requests"),
             ),
             database,
         })
@@ -209,6 +215,49 @@ impl Db {
                     .options(
                         IndexOptions::builder()
                             .name("dashboard_memberships_org_id".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        let join_requests: Collection<JoinRequest> = self.database.collection("join_requests");
+        // Partial unique on `pending` only — same (user_id, org_id) can have
+        // multiple terminal-state rows (rejected, cancelled, approved) for
+        // audit, but only one in-flight pending.
+        join_requests
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "user_id": 1, "org_id": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .unique(true)
+                            .partial_filter_expression(doc! { "status": "pending" })
+                            .name("join_requests_pending_user_org_unique".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        join_requests
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "org_id": 1, "status": 1, "requested_at": -1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("join_requests_org_status_requested_at".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        join_requests
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "user_id": 1, "status": 1, "requested_at": -1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("join_requests_user_status_requested_at".to_string())
                             .build(),
                     )
                     .build(),

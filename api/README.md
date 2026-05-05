@@ -94,11 +94,37 @@ Slug 換掉時舊 slug 進 30 天 grace（`slug_reservations.expires_at` + Mongo
 Logged-in 使用者操作多 Org 的 endpoints：
 
 - `POST /me/orgs` body `{ "org_name": "..." }` 建立新 Org，呼叫者成為 owner，session current_org 換到新 Org
-- `POST /me/memberships` body `{ "org_code": "..." }` 加入既有 Org（接受 org_code / active slug / grace slug），cooldown 規則與 register mode=join 相同
+- `POST /me/memberships` body `{ "org_code": "..." }` 提交加入申請（**不再立刻成為 member**；走 `org-join-requests` 審核流程，等同 `POST /me/join-requests`），cooldown 規則與 register mode=join 相同
 - `POST /me/current-org` body `{ "org_id": "..." }` 切換目前 session 的 active Org（必須是自己的 membership）
 - `GET /me` 回 `{ user, memberships: [{ org, role }, ...], current_org, role }`
 
-`POST /auth/register` 嚴格只給新 identity 用：email 已存在直接 `EMAIL_TAKEN`，請用 login + `/me/orgs` 或 `/me/memberships` 替代。
+`POST /auth/register` 嚴格只給新 identity 用：email 已存在直接 `EMAIL_TAKEN`，請用 login + `/me/orgs` 或 `/me/memberships` 替代。`mode=join` 也走審核流程 — 註冊成功後 session 帶 `current_org=null`，等 admin 批准。
+
+## 加入申請審核（org-join-requests）
+
+兩條既有的 join 路徑（`register mode=join` + `POST /me/memberships`）都改成「先申請、再審核」：申請成功後產生 `join_requests` 表的 pending row，session 仍發但 `current_org=null`，admin 批准後才寫入 `dashboard_memberships`。
+
+Endpoints：
+
+| Endpoint | 用途 |
+| --- | --- |
+| `POST /me/join-requests` | body `{ org_code, application_message? }`，提申請（≤ 500 字）|
+| `GET /me/join-requests` | 列自己所有申請（pending / approved / rejected / cancelled）|
+| `DELETE /me/join-requests/:id` | 申請者主動取消自己的 pending |
+| `GET /orgs/me/join-requests?status=pending` | admin 列當前 Org 的申請（admin-only）|
+| `POST /orgs/me/join-requests/:id/approve` | admin 批准 → 寫 `dashboard_memberships` 並 flip status |
+| `POST /orgs/me/join-requests/:id/reject` | body `{ rejection_reason? }` admin 拒絕（≤ 500 字）|
+
+錯誤碼：
+
+| Code | HTTP | 說明 |
+| --- | --- | --- |
+| `JOIN_REQUEST_PENDING` | 409 | 同 `(user_id, org_id)` 已有 pending row（partial unique index）|
+| `INVALID_STATE` | 400 | 對非 pending 的 row 執行 cancel / approve / reject |
+| `EMAIL_IN_COOLDOWN` | 409 | 申請建立時或 admin 批准時都會 re-check `removed_memberships` |
+| `ALREADY_MEMBER` | 409 | 申請時已是 active member |
+
+Cooldown 觸發點從「membership 建立時」搬到「join_request 建立時」+ 「admin approve 時 defense-in-depth」。被 kick / 自離的 email 7 天內都不能重新提交申請。
 
 ## 成員退出 / 移除 / 擁有權轉移（owner / cooldown）
 
@@ -112,7 +138,7 @@ Endpoints：
 - `DELETE /dashboard-users/cooldowns/:email` admin 提前釋放冷卻
 - `POST /orgs/me/owner` body `{ "new_owner_user_id", "current_password" }` owner 轉移擁有權給同 Org 的另一位 admin（密碼重認證；轉移後原 owner 變成普通 admin）
 
-被移除 / 自離後寫入 `removed_memberships` marker（`org_id` + lowercase email），cooldown 7 天。任何 membership 建立路徑（register mode=join + `POST /me/memberships`）都會檢查 marker；命中 → `EMAIL_IN_COOLDOWN`。Marker 由 Mongo TTL（`cooldown_until`）自動 GC。
+被移除 / 自離後寫入 `removed_memberships` marker（`org_id` + lowercase email），cooldown 7 天。任何 join 申請建立路徑（register mode=join + `POST /me/memberships` + `POST /me/join-requests`）都會檢查 marker；命中 → `EMAIL_IN_COOLDOWN`。admin approve join_request 時 re-check 一次 cooldown 作為 defense-in-depth。Marker 由 Mongo TTL（`cooldown_until`）自動 GC。
 
 | Code | HTTP | 說明 |
 | --- | --- | --- |

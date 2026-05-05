@@ -15,7 +15,9 @@ async fn admin_removes_member_succeeds_membership_only() {
         .to_string();
     let org_id = ObjectId::parse_str(admin_body["current_org"]["id"].as_str().unwrap()).unwrap();
 
-    let (member, member_body) = app.register_member("member@example.com", &code).await;
+    let (member, member_body) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
     let member_id_hex = member_body["user"]["id"].as_str().unwrap().to_string();
     let member_id = ObjectId::parse_str(&member_id_hex).unwrap();
 
@@ -70,7 +72,9 @@ async fn admin_removes_non_owner_admin_succeeds() {
         .as_str()
         .unwrap()
         .to_string();
-    let (_member, member_body) = app.register_member("second@example.com", &code).await;
+    let (_member, member_body) = app
+        .register_member(&admin, "second@example.com", &code)
+        .await;
     let other_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
     // Promote the second user to admin.
@@ -102,7 +106,9 @@ async fn admin_cannot_remove_owner() {
         .to_string();
 
     // A second admin (non-owner) tries to remove the owner.
-    let (_second, second_body) = app.register_member("second@example.com", &code).await;
+    let (_second, second_body) = app
+        .register_member(&founder, "second@example.com", &code)
+        .await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
     let promote = founder
         .patch(app.url(&format!("/dashboard-users/{second_id}/role")))
@@ -151,8 +157,9 @@ async fn member_cannot_remove_anyone() {
         .unwrap()
         .to_string();
 
-    let (member, _member_body) = app.register_member("member@example.com", &code).await;
-    let _ = admin;
+    let (member, _member_body) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let resp = member
         .delete(app.url(&format!("/dashboard-users/{admin_id}")))

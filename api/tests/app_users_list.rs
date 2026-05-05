@@ -38,9 +38,11 @@ async fn admin_lists_only_current_org_app_users() {
 #[tokio::test]
 async fn member_cannot_list_app_users() {
     let app = TestApp::spawn().await;
-    let (_admin, body) = app.register_admin("admin@example.com", "Acme").await;
+    let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
     let code = body["current_org"]["code"].as_str().unwrap().to_string();
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let resp = member.get(app.url("/app-users")).send().await.unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -54,7 +56,9 @@ async fn no_active_org_returns_no_active_org() {
     // dashboard zero-Org tests.
     let (founder, body) = app.register_admin("founder@example.com", "Acme").await;
     let code = body["current_org"]["code"].as_str().unwrap().to_string();
-    let (_second, second_body) = app.register_member("second@example.com", &code).await;
+    let (_second, second_body) = app
+        .register_member(&founder, "second@example.com", &code)
+        .await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
     founder
         .patch(app.url(&format!("/dashboard-users/{second_id}/role")))

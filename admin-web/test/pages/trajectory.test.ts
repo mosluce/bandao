@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 
 import TrajectoryPage from '~/pages/checkin/[appUserId]/trajectory.vue'
 

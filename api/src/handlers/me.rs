@@ -7,13 +7,12 @@ use bson::oid::ObjectId;
 use serde::Deserialize;
 
 use crate::auth::extractor::AuthContext;
-use crate::auth::slug as slug_auth;
 use crate::db::MembershipInsertError;
 use crate::domain::{RemovalKind, Role};
 use crate::error::{ApiError, ApiResult};
 use crate::handlers::auth::{
     AuthResponse, MembershipDto, OrgDto, UserDto, build_auth_response, create_org_unique,
-    enforce_join_cooldown, load_membership_orgs, validate_org_name,
+    load_membership_orgs, validate_org_name,
 };
 use crate::state::AppState;
 
@@ -107,7 +106,10 @@ pub async fn create_org(
     Ok(Json(build_auth_response(user, pairs, current_org)))
 }
 
-/// `POST /me/memberships` — org-agnostic. Joins an existing Org as a member.
+/// `POST /me/memberships` — org-agnostic. Forwards to the join-request
+/// submission flow (see `org-join-requests` capability). Backward-compat
+/// kept for callers that still hit this URL; behavior is now "submit a
+/// pending join request" not "create a membership".
 pub async fn join_membership(
     State(state): State<AppState>,
     ctx: AuthContext,
@@ -120,36 +122,22 @@ pub async fn join_membership(
         .await?
         .ok_or(ApiError::Unauthorized)?;
 
-    let org = slug_auth::resolve_org_for_join(&state.db, &req.org_code).await?;
-
-    // Cooldown applies to existing identities adding new memberships, mirroring
-    // register mode=join.
-    let email_key = user.email.trim().to_ascii_lowercase();
-    enforce_join_cooldown(&state, org.id, &email_key).await?;
-
-    match state
-        .db
-        .dashboard_memberships
-        .create(user.id, org.id, Role::Member)
-        .await
-    {
-        Ok(_) => {}
-        Err(MembershipInsertError::Duplicate) => return Err(ApiError::AlreadyMember),
-        Err(MembershipInsertError::Db(err)) => return Err(ApiError::Db(err)),
-    }
-
-    state
-        .db
-        .dashboard_sessions
-        .update_current_org(&ctx.session_token, Some(org.id))
+    crate::handlers::join_requests::submit_inner(&state, user.id, &user.email, &req.org_code, None)
         .await?;
 
+    // Behavior change vs prior: do NOT update current_org_id and do NOT
+    // mutate memberships. Just refresh the /me payload so the caller can
+    // observe their unchanged current_org while their pending request is
+    // visible via GET /me/join-requests.
     let memberships = state.db.dashboard_memberships.list_by_user(user.id).await?;
     let pairs = load_membership_orgs(&state, memberships).await?;
-    let current_org = pairs
-        .iter()
-        .find(|(_, o)| o.id == org.id)
-        .map(|(_, o)| o.clone());
+    let current_org = match ctx.current_org_id {
+        Some(org_id) => pairs
+            .iter()
+            .find(|(_, o)| o.id == org_id)
+            .map(|(_, o)| o.clone()),
+        None => None,
+    };
 
     Ok(Json(build_auth_response(user, pairs, current_org)))
 }

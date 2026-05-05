@@ -104,7 +104,9 @@ async fn member_cannot_reset_password() {
     let create = app.create_app_user(&admin, "alice", "Alice").await;
     let id = create["user"]["id"].as_str().unwrap().to_string();
 
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
     let resp = member
         .post(app.url(&format!("/app-users/{id}/password-reset")))
         .send()

@@ -313,7 +313,9 @@ async fn member_role_blocked() {
 
     // Register a second dashboard identity that joins the same Org as a
     // regular member.
-    let (member_client, _) = app.register_member("member@example.com", &code).await;
+    let (member_client, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let r = member_client
         .get(app.url(&format!("/checkin/users/{app_user_id}/locations")))

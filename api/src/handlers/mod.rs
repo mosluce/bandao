@@ -5,6 +5,7 @@ pub mod app_users;
 pub mod auth;
 pub mod checkin;
 pub mod checkin_dto;
+pub mod join_requests;
 pub mod location_tracking;
 pub mod me;
 pub mod orgs;
@@ -33,6 +34,11 @@ pub fn router(state: AppState) -> Router {
         .route("/me", get(me::me))
         .route("/me/orgs", post(me::create_org))
         .route("/me/memberships", post(me::join_membership))
+        .route(
+            "/me/join-requests",
+            get(join_requests::list_mine).post(join_requests::submit),
+        )
+        .route("/me/join-requests/{id}", delete(join_requests::cancel))
         .route("/me/current-org", post(me::switch_current_org))
         .route("/me/leave", post(me::leave))
         .route("/orgs/me/code/rotate", post(orgs::rotate_code))
@@ -42,6 +48,15 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/orgs/me/owner", post(orgs::transfer_owner))
         .route("/orgs/me/settings", patch(checkin::update_settings))
+        .route("/orgs/me/join-requests", get(join_requests::list_for_org))
+        .route(
+            "/orgs/me/join-requests/{id}/approve",
+            post(join_requests::approve),
+        )
+        .route(
+            "/orgs/me/join-requests/{id}/reject",
+            post(join_requests::reject),
+        )
         .route("/dashboard-users", get(users::list_in_org))
         .route("/dashboard-users/cooldowns", get(users::list_cooldowns))
         .route(

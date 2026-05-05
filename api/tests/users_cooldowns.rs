@@ -12,7 +12,7 @@ async fn list_cooldowns_returns_only_callers_org() {
     let (admin_a, body_a) = app.register_admin("alpha-owner@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
     let (_m_a, member_a) = app
-        .register_member("transient-a@example.com", &code_a)
+        .register_member(&admin_a, "transient-a@example.com", &code_a)
         .await;
     let id_a = member_a["user"]["id"].as_str().unwrap().to_string();
     admin_a
@@ -25,7 +25,7 @@ async fn list_cooldowns_returns_only_callers_org() {
     let (admin_b, body_b) = app.register_admin("beta-owner@example.com", "OrgB").await;
     let code_b = body_b["current_org"]["code"].as_str().unwrap().to_string();
     let (_m_b, member_b) = app
-        .register_member("transient-b@example.com", &code_b)
+        .register_member(&admin_b, "transient-b@example.com", &code_b)
         .await;
     let id_b = member_b["user"]["id"].as_str().unwrap().to_string();
     admin_b
@@ -64,12 +64,14 @@ async fn clear_cooldown_for_missing_marker_returns_204() {
 #[tokio::test]
 async fn member_cannot_call_cooldown_endpoints() {
     let app = TestApp::spawn().await;
-    let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
     let code = admin_body["current_org"]["code"]
         .as_str()
         .unwrap()
         .to_string();
-    let (member, _member_body) = app.register_member("member@example.com", &code).await;
+    let (member, _member_body) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let list = member
         .get(app.url("/dashboard-users/cooldowns"))

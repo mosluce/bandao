@@ -54,7 +54,9 @@ async fn zero_org_user_can_create_org_to_recover() {
         .as_str()
         .unwrap()
         .to_string();
-    let (_second, second_body) = app.register_member("second@example.com", &code).await;
+    let (_second, second_body) = app
+        .register_member(&founder, "second@example.com", &code)
+        .await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
     founder
         .patch(app.url(&format!("/dashboard-users/{second_id}/role")))

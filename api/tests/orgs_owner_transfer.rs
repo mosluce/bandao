@@ -15,7 +15,9 @@ async fn setup_owner_and_admin(
         .unwrap()
         .to_string();
 
-    let (second, second_body) = app.register_member("second@example.com", &code).await;
+    let (second, second_body) = app
+        .register_member(&founder, "second@example.com", &code)
+        .await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
     founder
         .patch(app.url(&format!("/dashboard-users/{second_id}/role")))
@@ -80,10 +82,12 @@ async fn non_owner_cannot_transfer() {
 #[tokio::test]
 async fn member_cannot_transfer() {
     let app = TestApp::spawn().await;
-    let (_admin, body) = app.register_admin("founder@example.com", "Acme").await;
+    let (admin, body) = app.register_admin("founder@example.com", "Acme").await;
     let code = body["current_org"]["code"].as_str().unwrap().to_string();
     let owner_id = body["user"]["id"].as_str().unwrap().to_string();
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let resp = member
         .post(app.url("/orgs/me/owner"))
@@ -124,7 +128,9 @@ async fn target_must_be_admin() {
         .as_str()
         .unwrap()
         .to_string();
-    let (_member, member_body) = app.register_member("member@example.com", &code).await;
+    let (_member, member_body) = app
+        .register_member(&founder, "member@example.com", &code)
+        .await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
     // Target is a member, not admin.

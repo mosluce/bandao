@@ -108,17 +108,17 @@ async fn login_default_current_org_falls_back_to_oldest_membership() {
     let (admin_a, body_a) = app.register_admin("a@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
     let org_a_id = body_a["current_org"]["id"].as_str().unwrap().to_string();
-    let _ = admin_a;
 
     let (admin_b, body_b) = app.register_admin("b@example.com", "OrgB").await;
     let code_b = body_b["current_org"]["code"].as_str().unwrap().to_string();
-    let _ = admin_b;
 
-    // Visitor registers via mode=join into OrgA.
-    let (visitor, visitor_body) = app.register_member("visitor@example.com", &code_a).await;
+    // Visitor registers via mode=join into OrgA, admin_a approves.
+    let (visitor, visitor_body) = app
+        .register_member(&admin_a, "visitor@example.com", &code_a)
+        .await;
     let visitor_id = ObjectId::parse_str(visitor_body["user"]["id"].as_str().unwrap()).unwrap();
 
-    // The secondary join goes through /me/memberships.
+    // The secondary join goes through /me/memberships → also pending now.
     let join_b = visitor
         .post(app.url("/me/memberships"))
         .json(&json!({ "org_code": code_b }))
@@ -126,6 +126,29 @@ async fn login_default_current_org_falls_back_to_oldest_membership() {
         .await
         .unwrap();
     assert_eq!(join_b.status(), StatusCode::OK);
+    // admin_b approves the pending request for OrgB.
+    let pending_b: Value = admin_b
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let req_id_b = pending_b
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["email"] == "visitor@example.com")
+        .and_then(|r| r["id"].as_str())
+        .expect("pending visitor in OrgB")
+        .to_string();
+    let approve_b = admin_b
+        .post(app.url(&format!("/orgs/me/join-requests/{req_id_b}/approve")))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(approve_b.status(), StatusCode::NO_CONTENT);
 
     // Re-login → expect oldest membership (OrgA). Force timestamps explicit
     // by stamping joined_at directly, since the test runs sub-millisecond
@@ -159,7 +182,9 @@ async fn login_default_current_org_is_null_when_no_memberships() {
         .to_string();
 
     // Bring in a second admin who can take over before the founder bows out.
-    let (second_client, second_body) = app.register_member("second@example.com", &code).await;
+    let (second_client, second_body) = app
+        .register_member(&admin, "second@example.com", &code)
+        .await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
     // Promote second to admin so we can transfer ownership.
     let promote = admin

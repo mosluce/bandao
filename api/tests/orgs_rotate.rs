@@ -41,19 +41,23 @@ async fn admin_can_rotate_org_code_and_old_code_no_longer_joins() {
     let err: Value = join_with_old.json().await.unwrap();
     assert_eq!(err["error"]["code"], "INVALID_ORG_CODE");
 
-    // Joining with the new code still works.
-    let (_arrival, _) = app.register_member("new@example.com", &new_code).await;
+    // Joining with the new code still works (pending-then-approve flow).
+    let (_arrival, _) = app
+        .register_member(&admin, "new@example.com", &new_code)
+        .await;
 }
 
 #[tokio::test]
 async fn member_cannot_rotate_org_code() {
     let app = TestApp::spawn().await;
-    let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
+    let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
     let code = admin_body["current_org"]["code"]
         .as_str()
         .unwrap()
         .to_string();
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let resp = member
         .post(app.url("/orgs/me/code/rotate"))

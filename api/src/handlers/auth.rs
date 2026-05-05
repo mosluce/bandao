@@ -203,45 +203,47 @@ pub async fn register(
                 return Err(ApiError::EmailTaken);
             }
 
+            // Resolve the Org and run cooldown BEFORE creating the user, so
+            // a cooldown failure leaves no orphan dashboard_user rows.
             let org = slug_auth::resolve_org_for_join(&state.db, &org_code).await?;
-
-            // Cooldown enforcement: a marker for (org, lowercase(email)) blocks rejoin
-            // until cooldown_until expires. Lookup is case-insensitive via lowercased key.
             let email_key = email.trim().to_ascii_lowercase();
             enforce_join_cooldown(&state, org.id, &email_key).await?;
 
+            // Behavior change vs prior: register mode=join no longer creates
+            // a `dashboard_memberships` row directly. It creates the user
+            // identity + a pending `join_requests` row. Session is issued
+            // with `current_org_id=null` (zero-Org state) until an admin
+            // approves the request. See `org-join-requests` capability.
             let password_hash = password::hash(&password)?;
             let user = state
                 .db
                 .dashboard_users
                 .create(ObjectId::new(), &email, &password_hash)
                 .await?;
-            let membership = match state
+
+            match state
                 .db
-                .dashboard_memberships
-                .create(user.id, org.id, Role::Member)
+                .join_requests
+                .insert_pending(user.id, org.id, None)
                 .await
             {
-                Ok(m) => m,
-                Err(MembershipInsertError::Duplicate) => {
-                    // Brand-new identity colliding on (user_id, org_id) should be
-                    // unreachable; treat as internal and clean up the user row.
+                Ok(_) => {}
+                Err(crate::db::JoinRequestInsertError::Duplicate) => {
+                    // Brand-new identity should never collide on the partial
+                    // unique index, but if it somehow does, roll back.
                     let _ = state.db.dashboard_users.delete_by_id(user.id).await;
-                    return Err(ApiError::Internal);
+                    return Err(ApiError::JoinRequestPending);
                 }
-                Err(MembershipInsertError::Db(err)) => {
+                Err(crate::db::JoinRequestInsertError::Db(err)) => {
                     let _ = state.db.dashboard_users.delete_by_id(user.id).await;
                     return Err(ApiError::Db(err));
                 }
-            };
-            issue_session(
-                &state,
-                &jar,
-                user,
-                vec![(membership, org.clone())],
-                Some(org),
-            )
-            .await
+            }
+
+            // Zero-org session — user must wait for admin approval. They
+            // can poll `/me/join-requests` to see status and cancel if they
+            // change their mind.
+            issue_session(&state, &jar, user, Vec::new(), None).await
         }
     }
 }

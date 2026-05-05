@@ -99,7 +99,9 @@ async fn member_cannot_update_app_user() {
     let create = app.create_app_user(&admin, "alice", "Alice").await;
     let id = create["user"]["id"].as_str().unwrap().to_string();
 
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
     let resp = member
         .patch(app.url(&format!("/app-users/{id}")))
         .json(&json!({ "display_name": "Hijacked" }))

@@ -88,6 +88,12 @@ assets/css/   # Tailwind entry
 
 `pages/app-users/index.vue`（admin only）。建立 AppUser 時 server 會產一次性初始密碼，admin-web 用 modal 顯示一次（含複製按鈕），關閉後 client 端不再持有；admin 線下告知員工。重設密碼走相同 ceremony：確認 → 產新密碼 → modal 顯示一次 → 該 AppUser 全部 sessions 被斷線、下次登入強制改密碼。停用 / 啟用即時生效（停用會立刻 invalidate 所有 sessions；啟用後沿用舊密碼）。錯誤碼：`USERNAME_TAKEN` / `INVALID_USERNAME_FORMAT` / `FORBIDDEN` / `NO_ACTIVE_ORG`。
 
+## 加入申請審核 UI
+
+`pages/admin/join-requests.vue`：admin-only。列當前 Org 的申請，可篩 pending / approved / rejected / cancelled。pending row 有 `[同意]` `[拒絕]` 兩個 action — 拒絕會開 modal 讓 admin 填可選的 `rejection_reason`（≤ 500 字）。`/`（home）的「加入申請」連結會顯示紅點 badge（`N 筆待審核`），由 30 秒輪詢的 `useJoinRequests.countOrgPending()` 驅動。
+
+申請者端：`/no-org` 頁列出自己的申請紀錄（`useJoinRequests.listMine()`），pending 的可一鍵取消，rejected 的會顯示拒絕理由。`OrgJoinForm`（home 設定面 + `/orgs/join`）submit 後不再立刻把 user 加進 Org，而是顯示「已送出申請，等待 X 管理員審核」提示。
+
 ## 擁有權轉移 UI
 
 `pages/members.vue`：當前使用者是 owner 時，每位非自己的 admin 會多一個「轉移擁有權」按鈕。點下去 inline 展開密碼欄位，密碼正確 + 對方確實是 admin 才會成功。轉移後 `org.owner_id` 變成對方，原 owner 立刻變成可降級 / 可被踢 / 可自離的普通 admin（UI 自動 reflect，因為 `auth.refresh()` 會被呼叫）。錯誤碼：`INVALID_PASSWORD` / `INVALID_TARGET` / `SAME_OWNER` / `FORBIDDEN`。

@@ -169,8 +169,15 @@ impl TestApp {
         (client, body)
     }
 
-    /// Register a new identity that joins an existing Org via `mode=join`.
-    pub async fn register_member(&self, email: &str, org_code: &str) -> (reqwest::Client, Value) {
+    /// Register a new identity that submits a pending join_request via
+    /// `mode=join`. Returns the joiner's client + register response body
+    /// (zero-org state). For the legacy "register-and-also-be-a-member"
+    /// pattern that most tests want, use `register_member_approved`.
+    pub async fn register_member_pending(
+        &self,
+        email: &str,
+        org_code: &str,
+    ) -> (reqwest::Client, Value) {
         let client = self.fresh_client();
         let resp = client
             .post(self.url("/auth/register"))
@@ -190,6 +197,79 @@ impl TestApp {
         );
         let body: Value = resp.json().await.expect("register join body");
         (client, body)
+    }
+
+    /// Register a member and have the admin approve them in one shot. The
+    /// returned body is the joiner's `/me` after the approve, mirroring the
+    /// pre-approval-flow behavior of `register_member`.
+    pub async fn register_member_approved(
+        &self,
+        admin: &reqwest::Client,
+        email: &str,
+        org_code: &str,
+    ) -> (reqwest::Client, Value) {
+        let (joiner, _) = self.register_member_pending(email, org_code).await;
+        // Admin lists pending requests and approves the matching one.
+        let pending: Value = admin
+            .get(self.url("/orgs/me/join-requests"))
+            .send()
+            .await
+            .expect("list pending")
+            .json()
+            .await
+            .expect("pending json");
+        let request_id = pending
+            .as_array()
+            .and_then(|arr| arr.iter().find(|r| r["email"] == email))
+            .and_then(|r| r["id"].as_str())
+            .unwrap_or_else(|| panic!("no pending request for {email}"))
+            .to_string();
+        let approve = admin
+            .post(self.url(&format!("/orgs/me/join-requests/{request_id}/approve")))
+            .send()
+            .await
+            .expect("approve");
+        assert_eq!(approve.status(), reqwest::StatusCode::NO_CONTENT);
+
+        // Joiner refreshes /me — but their session has current_org=null
+        // until we explicitly switch them in. Switch the joiner's session
+        // to the just-approved org so their `/me` shape mirrors the legacy
+        // register_member return.
+        let me_after_first = joiner
+            .get(self.url("/me"))
+            .send()
+            .await
+            .expect("me after approve")
+            .json::<Value>()
+            .await
+            .expect("me json");
+        let org_id = me_after_first["memberships"]
+            .as_array()
+            .and_then(|arr| arr.first())
+            .and_then(|m| m["org"]["id"].as_str())
+            .unwrap_or_else(|| panic!("no membership after approve"))
+            .to_string();
+        let switched = joiner
+            .post(self.url("/me/current-org"))
+            .json(&json!({ "org_id": org_id }))
+            .send()
+            .await
+            .expect("switch current_org")
+            .json::<Value>()
+            .await
+            .expect("switched json");
+        (joiner, switched)
+    }
+
+    /// Backward-compat alias matching the pre-approval-flow signature most
+    /// tests still use. Requires an admin client to do the approve step.
+    pub async fn register_member(
+        &self,
+        admin: &reqwest::Client,
+        email: &str,
+        org_code: &str,
+    ) -> (reqwest::Client, Value) {
+        self.register_member_approved(admin, email, org_code).await
     }
 
     /// Log in an existing identity. Returns the cookie-bearing client + body.

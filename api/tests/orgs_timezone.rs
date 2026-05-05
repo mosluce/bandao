@@ -64,9 +64,11 @@ async fn invalid_timezone_rejected() {
 #[tokio::test]
 async fn member_cannot_change_timezone() {
     let app = TestApp::spawn().await;
-    let (_admin, body) = app.register_admin("admin@example.com", "Acme").await;
+    let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
     let code = body["current_org"]["code"].as_str().unwrap().to_string();
-    let (member, _) = app.register_member("member@example.com", &code).await;
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
 
     let r = member
         .patch(app.url("/orgs/me/settings"))

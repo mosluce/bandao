@@ -29,7 +29,9 @@ async fn rejoin_during_cooldown_via_register_is_blocked() {
         .to_string();
 
     // Member joins, then admin removes them — marker is created.
-    let (_member, join_body) = app.register_member("transient@example.com", &code).await;
+    let (_member, join_body) = app
+        .register_member(&admin, "transient@example.com", &code)
+        .await;
     let member_id = join_body["user"]["id"].as_str().unwrap().to_string();
 
     let removed = admin
@@ -71,7 +73,9 @@ async fn existing_identity_rejoin_via_register_is_email_taken() {
         .unwrap()
         .to_string();
 
-    let (_member, join_body) = app.register_member("transient@example.com", &code).await;
+    let (_member, join_body) = app
+        .register_member(&admin, "transient@example.com", &code)
+        .await;
     let member_id = join_body["user"]["id"].as_str().unwrap().to_string();
     admin
         .delete(app.url(&format!("/dashboard-users/{member_id}")))
@@ -109,7 +113,9 @@ async fn rejoin_to_different_org_during_cooldown_succeeds() {
     let code_b = body_b["current_org"]["code"].as_str().unwrap().to_string();
 
     // Member joins OrgA, then is kicked → cooldown for (OrgA, member email).
-    let (_member, join_a) = app.register_member("wanderer@example.com", &code_a).await;
+    let (_member, join_a) = app
+        .register_member(&admin_a, "wanderer@example.com", &code_a)
+        .await;
     let member_id = join_a["user"]["id"].as_str().unwrap().to_string();
 
     let kick = admin_a
@@ -142,7 +148,9 @@ async fn rejoin_with_mixed_case_email_matches_lowercased_marker() {
         .unwrap()
         .to_string();
 
-    let (_member, join1) = app.register_member("transient@example.com", &code).await;
+    let (_member, join1) = app
+        .register_member(&admin, "transient@example.com", &code)
+        .await;
     let member_id = join1["user"]["id"].as_str().unwrap().to_string();
 
     let removed = admin
@@ -178,7 +186,9 @@ async fn rejoin_after_admin_clears_cooldown_succeeds() {
         .unwrap()
         .to_string();
 
-    let (_member, join1) = app.register_member("transient@example.com", &code).await;
+    let (_member, join1) = app
+        .register_member(&admin, "transient@example.com", &code)
+        .await;
     let member_id = join1["user"]["id"].as_str().unwrap().to_string();
 
     admin

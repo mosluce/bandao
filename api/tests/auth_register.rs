@@ -79,28 +79,55 @@ async fn register_join_mode_happy_path() {
     let app = TestApp::spawn().await;
 
     // Bootstrap an org with an admin to harvest its code.
-    let (_creator, create_body) = app.register_admin("founder@example.com", "Acme").await;
+    let (admin, create_body) = app.register_admin("founder@example.com", "Acme").await;
     let org_code = create_body["current_org"]["code"]
         .as_str()
         .unwrap()
         .to_string();
-    let org_id = create_body["current_org"]["id"]
+    let _ = create_body["current_org"]["id"]
         .as_str()
         .unwrap()
         .to_string();
 
-    // Different client = empty cookie jar.
-    let (joiner, join_body) = app.register_member("member@example.com", &org_code).await;
+    // mode=join now creates a pending join_request and a zero-org session
+    // for the joiner — they are NOT yet a member until admin approves.
+    let (joiner, join_body) = app
+        .register_member_pending("member@example.com", &org_code)
+        .await;
     assert_eq!(join_body["user"]["email"], "member@example.com");
-    assert_eq!(join_body["role"], "member");
-    assert_eq!(join_body["current_org"]["id"], org_id);
+    assert!(
+        join_body["current_org"].is_null(),
+        "expected zero-org current_org, got {join_body:?}"
+    );
+    assert!(
+        join_body["role"].is_null(),
+        "expected null role, got {join_body:?}"
+    );
     let memberships = join_body["memberships"].as_array().unwrap();
-    assert_eq!(memberships.len(), 1);
-    assert_eq!(memberships[0]["role"], "member");
+    assert!(memberships.is_empty(), "expected empty memberships array");
 
-    // joiner can hit /me.
+    // Pending join_request visible to admin.
+    let pending: Value = admin
+        .get(app.url("/orgs/me/join-requests"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(
+        pending
+            .as_array()
+            .map(|a| a.iter().any(|r| r["email"] == "member@example.com"))
+            .unwrap_or(false),
+        "expected pending request, got {pending:?}"
+    );
+
+    // joiner can still hit /me — zero-org session is valid.
     let me = joiner.get(app.url("/me")).send().await.unwrap();
     assert_eq!(me.status(), StatusCode::OK);
+    let me_body: Value = me.json().await.unwrap();
+    assert!(me_body["current_org"].is_null());
 }
 
 #[tokio::test]
