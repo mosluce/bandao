@@ -30,10 +30,16 @@ pnpm dev
 ```bash
 pnpm dev          # 開發 server，預設 :3000
 pnpm typecheck    # vue-tsc / Nuxt TypeScript 檢查
+pnpm test         # vitest 一次性執行（CI 用）
+pnpm test:watch   # vitest 監看模式（本地開發）
 pnpm build        # 產 production bundle 到 .output/
 pnpm preview      # 跑 production bundle 本地預覽
 pnpm generate     # 預先 render（SPA 模式下幾乎等同 build）
 ```
+
+## 測試
+
+`vitest` + `@nuxt/test-utils` + `happy-dom` + `@vue/test-utils`。測試檔放 `admin-web/test/`，目錄結構 mirror `pages/components/composables/middleware`，跟 `app/test/` 慣例一致。`pages/privacy.test.ts` 是寫 component test 的範本，新增測試時直接複製改寫即可。CI 在 typecheck 後、build 前跑 `pnpm test`，失敗就擋下來。
 
 ## 結構
 

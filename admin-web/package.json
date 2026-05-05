@@ -8,12 +8,18 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "nuxt typecheck"
   },
   "devDependencies": {
+    "@nuxt/test-utils": "^4.0.3",
     "@nuxtjs/tailwindcss": "^6.12.2",
+    "@vue/test-utils": "^2.4.10",
+    "happy-dom": "^20.9.0",
     "nuxt": "3.21.2",
     "typescript": "^5.6.3",
+    "vitest": "^4.1.5",
     "vue-tsc": "^2.1.10"
   }
 }
