@@ -10,6 +10,7 @@ import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
 import '../features/auth/state/auth_provider.dart';
 import '../features/auth/state/auth_state.dart';
+import '../features/checkin/presentation/history_screen.dart';
 
 /// Locked routes for v1.
 class AppRoutes {
@@ -19,6 +20,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String forceChange = '/force-change-password';
   static const String home = '/';
+  static const String history = '/history';
   static const String devServerConfig = '/dev-server-config';
 }
 
@@ -64,6 +66,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.home,
         builder: (BuildContext context, GoRouterState state) =>
             const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.history,
+        builder: (BuildContext context, GoRouterState state) =>
+            const HistoryScreen(),
       ),
       GoRoute(
         path: AppRoutes.devServerConfig,

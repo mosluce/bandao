@@ -5,6 +5,7 @@ pub mod app_users;
 pub mod auth;
 pub mod checkin;
 pub mod checkin_dto;
+pub mod location_tracking;
 pub mod me;
 pub mod orgs;
 pub mod users;
@@ -76,6 +77,14 @@ pub fn router(state: AppState) -> Router {
             "/checkin/users/{id}/force-checkout",
             post(checkin::force_checkout),
         )
+        .route(
+            "/checkin/users/{id}/locations",
+            get(location_tracking::list_locations),
+        )
+        .route(
+            "/checkin/users/{id}/locations/export",
+            get(location_tracking::export_locations),
+        )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             require_session,
@@ -89,6 +98,10 @@ pub fn router(state: AppState) -> Router {
         .route("/app/me/password", post(app_auth::change_password))
         .route("/app/checkin/events", post(app_checkin::submit_event).get(app_checkin::list_events))
         .route("/app/checkin/status", get(app_checkin::status))
+        .route(
+            "/app/checkin/locations",
+            post(location_tracking::submit_location_pings),
+        )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             app_require_session,

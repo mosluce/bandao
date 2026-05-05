@@ -51,6 +51,17 @@ impl Org {
             .and_then(|d| d.get_bool("transfer_enabled").ok())
             .unwrap_or(true)
     }
+
+    /// Read `Org.settings.checkin.location_tracking_enabled`, defaulting to
+    /// `false` when the sub-document or the field is absent. Privacy-default
+    /// — no Org collects location pings without an explicit admin opt-in.
+    pub fn checkin_location_tracking_enabled(&self) -> bool {
+        self.settings
+            .get_document("checkin")
+            .ok()
+            .and_then(|d| d.get_bool("location_tracking_enabled").ok())
+            .unwrap_or(false)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -290,4 +301,32 @@ impl CheckinEventType {
     pub fn is_transfer(self) -> bool {
         matches!(self, CheckinEventType::TransferIn | CheckinEventType::TransferOut)
     }
+}
+
+// --- Location tracking ---
+
+/// One periodic GPS sample submitted by an AppUser during their shift.
+/// Sparse compared to checkin events: a 100m client-side distance filter and
+/// a 60s minimum interval mean a typical shift produces tens to hundreds of
+/// pings, not thousands. Pings carry no reverse-geocoded label by design —
+/// volume rules out per-ping Nominatim calls; the admin map renders raw
+/// coordinates.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocationPing {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub org_id: ObjectId,
+    pub app_user_id: ObjectId,
+    pub lat: f64,
+    pub lng: f64,
+    /// Horizontal accuracy radius in meters (CoreLocation / FusedLocationProvider
+    /// 68% confidence). May be absent if the OS didn't supply one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accuracy_meters: Option<f64>,
+    /// AppUser-supplied wall time at the moment the OS callback fired.
+    pub occurred_at_client: DateTime,
+    /// Server-side wall time on receipt. The 90-day TTL index runs against
+    /// THIS field, not `occurred_at_client`, so a forward-jumped client clock
+    /// can't extend the retention window.
+    pub occurred_at_server: DateTime,
 }

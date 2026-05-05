@@ -10,6 +10,15 @@ class SecureStorageKeys {
   static const String bearerToken = 'auth.bearer_token';
   static const String lastOrgCode = 'auth.last_org_code';
   static const String apiBaseUrlOverride = 'dev.api_base_url_override';
+  static const String backgroundSyncTipSeen = 'home.background_sync_tip_seen';
+  static const String locationTrackingLastCleanStop =
+      'argus.location_tracking.last_clean_stop';
+  static const String privacyUrlOverride = 'dev.privacy_url_override';
+
+  /// Per-AppUser consent flag — formatted as
+  /// `argus.location_tracking.consent.<app_user_id>`.
+  static String locationTrackingConsentKey(String appUserId) =>
+      'argus.location_tracking.consent.$appUserId';
 }
 
 /// Thin typed wrapper around `flutter_secure_storage`. The wrapper exists so
@@ -51,6 +60,57 @@ class SecureStorage {
 
   Future<void> clearApiBaseUrlOverride() =>
       _storage.delete(key: SecureStorageKeys.apiBaseUrlOverride);
+
+  Future<bool> readBackgroundSyncTipSeen() async {
+    final v = await _storage.read(key: SecureStorageKeys.backgroundSyncTipSeen);
+    return v == 'true';
+  }
+
+  Future<void> markBackgroundSyncTipSeen() => _storage.write(
+        key: SecureStorageKeys.backgroundSyncTipSeen,
+        value: 'true',
+      );
+
+  Future<DateTime?> readLocationTrackingLastCleanStop() async {
+    final v = await _storage.read(
+      key: SecureStorageKeys.locationTrackingLastCleanStop,
+    );
+    if (v == null || v.isEmpty) return null;
+    return DateTime.tryParse(v);
+  }
+
+  Future<void> writeLocationTrackingLastCleanStop(DateTime t) => _storage.write(
+        key: SecureStorageKeys.locationTrackingLastCleanStop,
+        value: t.toIso8601String(),
+      );
+
+  Future<void> clearLocationTrackingLastCleanStop() => _storage.delete(
+        key: SecureStorageKeys.locationTrackingLastCleanStop,
+      );
+
+  Future<bool> readLocationTrackingConsent(String appUserId) async {
+    final v = await _storage.read(
+      key: SecureStorageKeys.locationTrackingConsentKey(appUserId),
+    );
+    return v == 'true';
+  }
+
+  Future<void> writeLocationTrackingConsent(String appUserId) => _storage.write(
+        key: SecureStorageKeys.locationTrackingConsentKey(appUserId),
+        value: 'true',
+      );
+
+  Future<String?> readPrivacyUrlOverride() =>
+      _storage.read(key: SecureStorageKeys.privacyUrlOverride);
+
+  Future<void> writePrivacyUrlOverride(String url) => _storage.write(
+        key: SecureStorageKeys.privacyUrlOverride,
+        value: url,
+      );
+
+  Future<void> clearPrivacyUrlOverride() => _storage.delete(
+        key: SecureStorageKeys.privacyUrlOverride,
+      );
 }
 
 /// Riverpod provider so consumers can `ref.read(secureStorageProvider)`.

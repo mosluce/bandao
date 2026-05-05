@@ -13,6 +13,7 @@ class ApiErrorCode {
   static const String forbidden = 'FORBIDDEN';
   static const String validation = 'VALIDATION';
   static const String network = 'NETWORK_ERROR';
+  static const String locationTrackingDisabled = 'LOCATION_TRACKING_DISABLED';
 }
 
 /// Normalized exception thrown out of the dio error interceptor. The rest of
@@ -102,6 +103,8 @@ extension ApiExceptionFriendly on ApiException {
       case ApiErrorCode.validation:
         // Server-supplied message is most informative for validation errors.
         return message.isEmpty ? l10n.errorGeneric : message;
+      case ApiErrorCode.locationTrackingDisabled:
+        return l10n.errorLocationTrackingDisabled;
       default:
         return message.isEmpty ? l10n.errorGeneric : message;
     }

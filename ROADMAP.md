@@ -21,8 +21,9 @@
 
 ### 下一批 changes（已規劃）
 
-- **[cross]** `add-app-checkin`：接續 `add-app-shell` 的 Flutter 專案，做 home 上的事件按鈕（上/下/轉出/轉入）、GPS 權限與抓座標、device-local persistent queue（drift SQLite）+ queue processor（嚴格序列化、`2xx` 才送下一筆）、事件歷史頁、queue 狀態 UI。依賴：`add-app-shell`（已 propose、實作中）+ `/app/checkin/*` 已具備。
-- **[cross]** `add-location-tracking`：上班期間定時回傳定位形成軌跡（預設關、Org toggle 開啟），同樣受 state-locked 規則。儲存策略（取樣頻率 / 壓縮 / 保留期）需 explore。依賴：`add-app-checkin`（消化既有 queue / GPS 模式）。
+- **[admin-web]** `add-org-privacy-policy`：admin-web public page `/privacy`，平台統一範本式內容（適用範圍 / 蒐集資料 / 目的 / 保留期 / 存取 / 權利 / cookies / 聯絡 / 更新通知 9 sections + 法律未審查 disclaimer）。動機：`add-location-tracking-app` 的 consent dialog 要連到此頁；同時補上一直缺的個資法 §8 義務。Forward-looking 內容已包含 location tracking 90 天保留與 events 5 年保留。**此項 archive 後從 ROADMAP 自刪。**
+- **[api]** `add-location-tracking-server`：API 端的 location tracking 接收層。新增 `POST /app/checkin/locations` 收 batch pings、`GET /checkin/users/:id/locations?from=&to=` admin 查軌跡、`GET /checkin/locations/export` 匯出 CSV streaming。`Org.checkin.location_tracking_enabled` 加欄位（預設 false、state-locked 同 transfer_enabled）。MongoDB TTL index 90 天。依賴：`add-org-privacy-policy`（worker consent 連結要有目的地）。
+- **[admin-web]** `add-location-tracking-dashboard`：admin-web 軌跡視覺化 + Org settings UI。`/checkin/users/:id/trajectory?date=YYYY-MM-DD` + Leaflet + OSM tiles + polyline + 事件 markers + 自動 fit bounds。Org settings page 加 `location_tracking_enabled` toggle（state-locked，跟 transfer 同位置）。匯出按鈕（時間範圍 + CSV download）。依賴：`add-location-tracking-server` + `add-location-tracking-app`。
 
 ### Side ideas（尚未排程）
 
@@ -30,7 +31,9 @@
 - **[cross]** OpenAPI codegen：admin-web / app 的 API 型別目前手寫鏡像 Rust DTO。等 schema 穩了改成從 OpenAPI / utoipa 生成，避免漂移。
 - **[cross]** Per-Org email 唯一性：MVP 用全域唯一 email 換取登入流程簡單。若未來要支援同一人在多 Org 各持帳號，需要在登入引入 Org selector，連帶調整 `dashboard_users` 索引與 `/auth/login` 介面。
 - **[admin-web]** 軌跡視覺化：軌跡上線後 dashboard 需要地圖頁顯示某 AppUser 某日的點線。預期使用 Leaflet 或 MapLibre。依賴：`add-location-tracking`。
+- **[app]** Android live smoke for location tracking：`add-location-tracking-app` 的 17.8 推遲 — Android emulator 跑 17.3–17.6 等同流程，確認 `工作期間定位追蹤中` sticky notification 在背景仍顯示、強制關閉復原 banner 觸發、toggle off 立即停。觸發：app 要 cut Android beta release 前。
 - **[admin-web]** ESLint：MVP 暫時不裝 lint。確定 Nuxt 版本穩定後加回 `@nuxt/eslint` 模組與 `pnpm lint` 腳本。
+- **[admin-web]** `add-admin-web-test-infra`：admin-web 目前完全沒有測試 framework。設置 vitest + Nuxt component testing + happy-dom，加 `pnpm test` 腳本，把 `add-org-privacy-policy` 的 deferred §3 測試（render、no middleware、9 sections + disclaimer + placeholder email）一起補上。觸發：升 Nuxt v4 或 ESLint 動工時順便。
 - **[admin-web]** 升 Nuxt v4（≥ 4.4.4）：對齊現代 ecosystem、吃 v4 dev server / Vite 加速。動的時候：搬源碼到 `app/`、`@nuxtjs/tailwindcss` 視情況升 7.x、重新 `pnpm install` smoke 一輪。觸發：admin-web 要動結構時順手。背景 agent 已排程 2026-05-17 檢查 nuxt/nuxt#34957 是否修復，可解 `nuxt: "3.21.2"` 的 exact pin。
 - **[cross]** 邀請連結加入需 admin 審核：`/register?code=...` 改成「申請加入 → admin 審批 → 成為 member」兩段流程。新增 pending membership 狀態、admin 端審核 UI / API、可選的拒絕理由。動機：對抗 invite link 被外流時的濫用，跟 vanity slug 這種「公開 URL」搭配特別合理。
 - **[cross]** 註冊需驗證信箱：register 後寄驗證信，verify endpoint 點過才開啟完整功能。需要 token store、寄信 provider（SES / Resend / SMTP）抽象、未驗證帳號是否能 join 的策略。動機：防 typo / 防偽造 email 註冊、復原密碼前置條件。

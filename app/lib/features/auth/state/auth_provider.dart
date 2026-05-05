@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_error.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../checkin/data/checkin_queue_db.dart';
+import '../../checkin/state/handover_notice_provider.dart';
 import '../data/auth_repository.dart';
 import 'auth_state.dart';
 
@@ -36,6 +38,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     try {
       final repo = await ref.read(authRepositoryProvider.future);
       final me = await repo.me();
+      await _runHandoverWipe(me.user.id);
       return AuthState.authenticated(
         user: me.user,
         org: me.org,
@@ -56,6 +59,24 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // router stays on /splash. Surface it as a recoverable AuthError so
       // the splash can render a retry button with the real message.
       return AuthState.error('解析失敗：$e');
+    }
+  }
+
+  /// Filter the device-local queue to the currently authenticated user.
+  /// Rows whose `app_user_id` doesn't match are deleted; on a non-zero count,
+  /// the home screen's SnackBar listener picks up the notice via
+  /// `pendingHandoverNoticeProvider`.
+  Future<void> _runHandoverWipe(String currentUserId) async {
+    try {
+      final db = ref.read(checkinQueueDbProvider);
+      final deleted = await db.wipeForOtherUsers(currentUserId);
+      if (deleted > 0) {
+        ref.read(pendingHandoverNoticeProvider.notifier).state =
+            '前個帳號的 $deleted 筆未送事件已清除';
+      }
+    } catch (_) {
+      // Wipe failures shouldn't block login. The next tick can't submit
+      // mismatched rows anyway because the bearer token won't match.
     }
   }
 
@@ -103,6 +124,11 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           needsPasswordChange: res.needsPasswordChange,
         ),
       );
+      // Run AFTER state flip so home is mounted and its listener can pick up
+      // the toast notice. Yielding via microtask gives go_router a chance to
+      // navigate before we publish the message.
+      // ignore: unawaited_futures
+      Future<void>.microtask(() => _runHandoverWipe(res.user.id));
     } on ApiException catch (e, st) {
       // Login failures must not pollute the auth state with an "error" case
       // that the redirect would interpret as "not on /login". Stay on
@@ -143,6 +169,43 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       newPassword: newPassword,
     );
     state = AsyncValue<AuthState>.data(await _fetchMe());
+  }
+
+  /// Best-effort refetch of `/app/me` without re-running the handover wipe.
+  /// Used by the home screen's app-resume hook to keep cached `Org` settings
+  /// (especially `transfer_enabled`) and `AppUser` fields fresh while the
+  /// session is unchanged. Resume is NOT a login event, so `wipeForOtherUsers`
+  /// must NOT run from this path — that would risk wiping the current user's
+  /// own queue if a transient `/me` failure had returned a stale id earlier.
+  ///
+  /// On `401` we clear the session as if a regular `/me` had failed auth.
+  /// On any other failure we leave the cached state untouched.
+  Future<void> refreshMe() async {
+    await future;
+    final current = state.value;
+    if (current is! AuthAuthenticated) return;
+    try {
+      final repo = await ref.read(authRepositoryProvider.future);
+      final me = await repo.me();
+      state = AsyncValue<AuthState>.data(
+        AuthState.authenticated(
+          user: me.user,
+          org: me.org,
+          needsPasswordChange: me.needsPasswordChange,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (_isAuthFailure(e)) {
+        final storage = ref.read(secureStorageProvider);
+        await storage.clearToken();
+        state = const AsyncValue<AuthState>.data(AuthState.unauthenticated());
+      }
+      // Other errors: leave cached state alone, user can retry by
+      // backgrounding+foregrounding again.
+    } catch (_) {
+      // Best-effort — a parse error on a refresh shouldn't blow away the
+      // logged-in shell.
+    }
   }
 }
 

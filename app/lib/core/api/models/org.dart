@@ -1,31 +1,48 @@
 /// Org checkin sub-document. Mirrors `OrgCheckinDto` in
 /// `api/src/handlers/auth.rs`.
 class OrgCheckin {
-  const OrgCheckin({required this.transferEnabled});
+  const OrgCheckin({
+    required this.transferEnabled,
+    this.locationTrackingEnabled = false,
+  });
 
   final bool transferEnabled;
+  final bool locationTrackingEnabled;
 
   factory OrgCheckin.fromJson(Map<String, dynamic> json) => OrgCheckin(
         transferEnabled: json['transfer_enabled'] as bool,
+        locationTrackingEnabled:
+            json['location_tracking_enabled'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'transfer_enabled': transferEnabled,
+        'location_tracking_enabled': locationTrackingEnabled,
       };
 
-  OrgCheckin copyWith({bool? transferEnabled}) =>
-      OrgCheckin(transferEnabled: transferEnabled ?? this.transferEnabled);
+  OrgCheckin copyWith({
+    bool? transferEnabled,
+    bool? locationTrackingEnabled,
+  }) =>
+      OrgCheckin(
+        transferEnabled: transferEnabled ?? this.transferEnabled,
+        locationTrackingEnabled:
+            locationTrackingEnabled ?? this.locationTrackingEnabled,
+      );
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OrgCheckin && other.transferEnabled == transferEnabled;
+      other is OrgCheckin &&
+          other.transferEnabled == transferEnabled &&
+          other.locationTrackingEnabled == locationTrackingEnabled;
 
   @override
-  int get hashCode => transferEnabled.hashCode;
+  int get hashCode => Object.hash(transferEnabled, locationTrackingEnabled);
 
   @override
-  String toString() => 'OrgCheckin(transferEnabled: $transferEnabled)';
+  String toString() =>
+      'OrgCheckin(transfer: $transferEnabled, locationTracking: $locationTrackingEnabled)';
 }
 
 /// Org DTO mirroring `OrgDto` in `api/src/handlers/auth.rs`.

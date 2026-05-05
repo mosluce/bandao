@@ -18,6 +18,13 @@ class Env {
   static const String _dartDefine =
       String.fromEnvironment('API_BASE_URL');
 
+  /// Compile-time privacy policy URL (admin-web `/privacy`). Override at
+  /// build with `--dart-define=PRIVACY_URL=https://argus.example.com/privacy`.
+  /// At runtime the dev menu can override via secure storage; production
+  /// builds rely on this constant.
+  static const String _privacyUrlDartDefine =
+      String.fromEnvironment('PRIVACY_URL');
+
   /// Lookup function for the current OS. Indirected so tests can override
   /// without monkey-patching `dart:io`.
   static bool Function() _isAndroid = () => Platform.isAndroid;
@@ -31,6 +38,19 @@ class Env {
       return 'http://10.0.2.2:9090';
     }
     return 'http://localhost:9090';
+  }
+
+  /// Compile-time default for the public privacy policy URL. Returns the
+  /// dart-define value when present, else the dev admin-web URL on the
+  /// matching loopback per platform.
+  static String privacyUrlCompileTimeDefault() {
+    if (_privacyUrlDartDefine.isNotEmpty) {
+      return _privacyUrlDartDefine;
+    }
+    if (_isAndroid()) {
+      return 'http://10.0.2.2:3000/privacy';
+    }
+    return 'http://localhost:3000/privacy';
   }
 
   /// Test hook: swap the OS check with a fake. Restore via [resetForTest].

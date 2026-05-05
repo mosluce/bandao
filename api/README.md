@@ -159,7 +159,7 @@ login 失敗（org_code 不存在、username 不存在、wrong password、status
 
 ## 打卡 / Checkin
 
-四個事件 + 三狀態的狀態機。AppUser 透過 `/app/checkin/*` 提交事件，admin 透過 `/checkin/*` 看即時看板與強制收班。下一個 ROADMAP item `add-app-shell` 會 bootstrap Flutter app 消化這個 surface。
+四個事件 + 三狀態的狀態機。AppUser 透過 `/app/checkin/*` 提交事件，admin 透過 `/checkin/*` 看即時看板與強制收班。Flutter app（`app/`）已經消化這個 surface — 詳見 `add-app-checkin` 的 device-local queue + workmanager 背景同步。
 
 ### 狀態機
 
@@ -201,10 +201,11 @@ status: off_duty | on_site | in_transit
 
 每個 AppUser 的事件嚴格按 `occurred_at_client` 升序：新事件 `client` 時間若 ≤ 該 AppUser 上一筆，回 `409 OUT_OF_ORDER`。
 
-**App 端 queue 契約（`add-app-shell` 將實作）**：
-- 事件先寫進 device-local 持久 queue（SQLite / Hive / shared_preferences），重啟後仍在。
-- 嚴格序列化送出：每筆等到 `2xx` 才送下一筆。
-- 失敗則同一筆以同 `occurred_at_client` 重試（不要重新 timestamp）。
+**App 端 queue 契約（`add-app-checkin` 已實作）**：
+- 事件先寫進 device-local 持久 queue（drift / SQLite，table `pending_events`），重啟後仍在。
+- 嚴格序列化送出：每筆等到 `2xx` 才送下一筆（單一 in-flight，沒有平行）。
+- 失敗則同一筆以同 `occurred_at_client` 重試（不要重新 timestamp），`5xx` / network 走 1/2/4/8/16/30s exp backoff、4xx state-machine errors 標 `failed` 不重試。
+- Login-handover queue wipe：每次成功登入比對每列的 `app_user_id`，不同 user 的 row 直接刪，避免共用裝置的事件被誤投到下一個帳號。
 
 只要 app 遵守這個契約，正常運作下不會觸發 `OUT_OF_ORDER`。
 
@@ -232,6 +233,64 @@ status: off_duty | on_site | in_transit
 | `INVALID_TRANSITION` | 422 | 狀態機不允許此 transition；body 含 `from` / `attempted` |
 | `TRANSFER_DISABLED` | 403 | Org 關閉 transfer，不接受 transfer_out / transfer_in |
 | `OUT_OF_ORDER` | 409 | 新事件的 `occurred_at_client` ≤ 該 AppUser 上一筆 |
-| `STATE_LOCKED` | 409 | 有人非 off_duty 時無法調整 `transfer_enabled`；body 含 `on_duty_count` |
+| `STATE_LOCKED` | 409 | 有人非 off_duty 時無法調整 `transfer_enabled` 或 `location_tracking_enabled`；body 含 `on_duty_count` |
 | `NOT_ON_DUTY` | 409 | 強制收班的目標目前已下班 |
 | `INVALID_TIMEZONE` | 400 | timezone 不在 IANA primary-name 列表中 |
+
+## 位置軌跡 / Location tracking
+
+選擇性開啟的「上班期間定時記錄位置」功能。Worker 端每 60 秒採樣一次 GPS（且距離上次記錄超過 100 公尺才存），分批 push 到 server，server 留 90 天自動清掉，admin 可看軌跡或匯出 xlsx。客戶端的實作在 `add-location-tracking-app` change（依此 server 端 surface）。
+
+### Toggle
+
+`Org.settings.checkin.location_tracking_enabled: bool`，預設 `false`、隨 Org 建立時不存就視為 `false`。Admin 透過 `PATCH /orgs/me/settings` 帶 `{"location_tracking_enabled": true|false}` 切換。
+
+State-lock：跟 `transfer_enabled` 共用同一個 lock — 只要任一 toggle 出現在 PATCH body，就會檢查 `current_org` 內是否有 AppUser 非 off_duty，有就回 `409 STATE_LOCKED`。理由是「mid-shift 改設定都會造成資料不一致」，沒必要分兩個 lock 規則。
+
+### Mobile-facing endpoint `/app/checkin/locations`（Bearer auth）
+
+| Endpoint | 說明 |
+| --- | --- |
+| `POST /app/checkin/locations` | body `{ pings: [{ lat, lng, accuracy?, occurred_at_client }, ...] }`；1..=100 筆；caller 從 token 推；toggle off 整批 `403 LOCATION_TRACKING_DISABLED`；個別 ping 失敗走 partial accept |
+
+Response shape (201)：
+
+```json
+{
+  "accepted_count": 3,
+  "rejected": [
+    { "index": 1, "code": "INVALID_PING_TIMESTAMP", "message": "..." }
+  ]
+}
+```
+
+即使 `accepted_count == 0` 仍回 201 — partial accept 的 channel 是 `rejected[]`，不是 4xx。Client 看 indices 對應自己 batch 的 row 處理。
+
+Per-ping validation：`lat ∈ [-90, 90]`、`lng ∈ [-180, 180]`、`accuracy ≥ 0`（若有），`occurred_at_client` 必須是 RFC3339、不可為未來、不可超過 30 天前。
+
+### Admin-facing endpoints（dashboard cookie + admin role）
+
+| Endpoint | 說明 |
+| --- | --- |
+| `GET /checkin/users/:id/locations?before=&limit=` | 該 AppUser 的 ping 歷史，cursor 分頁 newest-first（default 200、max 1000） |
+| `GET /checkin/users/:id/locations/export?from=&to=` | xlsx 下載；`from` / `to` 必填且 `to - from ≤ 90 天`、`from ≥ now - 90 天`、`to ≥ from`；違反一律 `400 INVALID_RANGE` |
+
+xlsx 結構：1 個 sheet `locations`、header row（`occurred_at_client (UTC)`、`occurred_at_server (UTC)`、`lat`、`lng`、`accuracy_meters`）+ 凍結首列、依 `occurred_at_client` 升序。
+
+### 保留期 / TTL
+
+`location_pings` 集合的 TTL index 建在 `occurred_at_server` 上，`expireAfterSeconds = 90 * 24 * 3600`。為什麼不用 `occurred_at_client`：client 時鐘亂跳會讓 client-time TTL 提早或延後刪資料；server-time 穩定但「retention reference」跟「logical time」分離。Mongo TTL monitor 約每 60 秒掃一次，所以實際保留是「90 天 ± 一分鐘」。
+
+### 不做 reverse geocoding
+
+Pings 不寫 `region_name`。原因：100 worker × 60s 取樣 × 8 hr 在 100m filter 後仍 ~150K pings/天，per-ping Nominatim 會打爆 free-tier。Admin map 直接畫 lat/lng；要文字化由 admin-web 自己 lazy-geocode（之後可加 cache，看 `Reverse geocoding cache` ROADMAP 條目）。
+
+### Error codes（這個 change 新增）
+
+| Code | HTTP | 說明 |
+| --- | --- | --- |
+| `LOCATION_TRACKING_DISABLED` | 403 | Org 沒開 toggle、AppUser 上傳 ping 整批被擋 |
+| `INVALID_BATCH` | 400 | ping 為空或超過 100 筆 |
+| `INVALID_RANGE` | 400 | export 的 `from` / `to` 缺欄位、>90 天、太老、`to < from` |
+| `INVALID_PING_TIMESTAMP` | (per-ping) | 單筆 ping 不是 RFC3339 / 在未來 / 超過 30 天前；只出現在 `rejected[]`，不是 ApiError |
+| `INVALID_PING_COORDINATES` | (per-ping) | lat / lng 範圍外或 accuracy 負值；只出現在 `rejected[]` |

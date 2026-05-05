@@ -57,4 +57,7 @@ class FakeAuthNotifier extends AuthNotifier {
   Future<void> retry() async {
     await onRetry?.call();
   }
+
+  @override
+  Future<void> refreshMe() async {}
 }

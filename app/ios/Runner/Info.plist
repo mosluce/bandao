@@ -45,5 +45,16 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Argus 需要您的位置記錄打卡事件以及工作期間的軌跡（若您所屬組織開啟此功能）。</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+		<string>location</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>tw.ccmos.app.argus.queue-drain</string>
+	</array>
 </dict>
 </plist>

@@ -269,7 +269,10 @@ pub async fn update_settings(
     RequireAdmin(active): RequireAdmin,
     Json(req): Json<UpdateOrgSettingsRequest>,
 ) -> ApiResult<Json<OrgSettingsDto>> {
-    if req.transfer_enabled.is_none() && req.timezone.is_none() {
+    if req.transfer_enabled.is_none()
+        && req.timezone.is_none()
+        && req.location_tracking_enabled.is_none()
+    {
         // No-op patch — echo current settings rather than 400.
         let org = state
             .db
@@ -280,7 +283,12 @@ pub async fn update_settings(
         return Ok(Json(OrgSettingsDto::from_org(&org)));
     }
 
-    if req.transfer_enabled.is_some() {
+    // State-lock unification: EITHER toggle being part of the patch triggers
+    // the on-duty count check. Both toggles share one lock — the underlying
+    // concern (data inconsistency caused by mid-shift settings flip) is the
+    // same, and the admin mental model "settings are locked while workers
+    // are on shift" reads cleanest as a single rule.
+    if req.transfer_enabled.is_some() || req.location_tracking_enabled.is_some() {
         let on_duty_count = state
             .db
             .checkin_user_status
@@ -300,7 +308,12 @@ pub async fn update_settings(
     let updated = state
         .db
         .orgs
-        .update_settings(active.org_id, req.transfer_enabled, req.timezone.as_deref())
+        .update_settings(
+            active.org_id,
+            req.transfer_enabled,
+            req.timezone.as_deref(),
+            req.location_tracking_enabled,
+        )
         .await?;
     Ok(Json(OrgSettingsDto::from_org(&updated)))
 }

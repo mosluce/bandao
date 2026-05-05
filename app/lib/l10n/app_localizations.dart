@@ -49,6 +49,8 @@ class AppLocalizations {
       _isZh ? '連線失敗，請確認網路' : 'Connection failed. Check your network.';
   String get errorGeneric =>
       _isZh ? '發生錯誤，請稍後再試' : 'Something went wrong';
+  String get errorLocationTrackingDisabled =>
+      _isZh ? '組織已關閉定位追蹤' : 'Your organization has disabled location tracking';
 
   // Force change password
   String get forceChangeTitle =>
@@ -68,6 +70,129 @@ class AppLocalizations {
   String get homeStubSubtitle =>
       _isZh ? '打卡狀態將顯示於此。' : 'Checkin status will appear here.';
 
+  // Logout confirm dialog (shown when queue holds non-empty rows for the
+  // current user). Wipes happen on different-user login.
+  String get logoutConfirmTitle =>
+      _isZh ? '確定要登出嗎？' : 'Sign out?';
+  String logoutConfirmBody(int n) => _isZh
+      ? '你還有 $n 筆事件未處理。登出後若由其他帳號登入，這些事件會被清除。'
+      : 'You have $n unsynced event(s). Signing out then signing in as a '
+          'different account will erase them.';
+  String get logoutConfirmCancel => _isZh ? '取消' : 'Cancel';
+  String get logoutConfirmProceed => _isZh ? '仍要登出' : 'Sign out anyway';
+
+  // Checkin event labels
+  String get eventClockIn => _isZh ? '上班' : 'Clock in';
+  String get eventClockOut => _isZh ? '下班' : 'Clock out';
+  String get eventTransferOut => _isZh ? '轉出' : 'Transfer out';
+  String get eventTransferIn => _isZh ? '轉入' : 'Transfer in';
+
+  // Status pill
+  String get statusOffDuty => _isZh ? '尚未上班' : 'Off duty';
+  String get statusOnSite => _isZh ? '上班中' : 'On site';
+  String get statusInTransit => _isZh ? '轉場中' : 'In transit';
+  String elapsedShift(int hours, int minutes) => _isZh
+      ? '已上班 $hours 時 $minutes 分'
+      : 'On shift ${hours}h ${minutes}m';
+  String get statusUnknownLocation => _isZh ? '位置確認中…' : 'Locating…';
+
+  // Queue chip
+  String get queueChipSending => _isZh ? '送出中' : 'Sending…';
+  String queueChipPending(int n) =>
+      _isZh ? '待送出 $n 筆' : 'Queued $n';
+  String queueChipFailed(int n) =>
+      _isZh ? '$n 筆失敗' : '$n failed';
+
+  // Location permission
+  String get locationBlockerMessage =>
+      _isZh ? '需要定位權限才能打卡' : 'Location permission required to clock in';
+  String get locationBlockerOpenSettings =>
+      _isZh ? '開啟設定' : 'Open settings';
+  String get locationUnavailable =>
+      _isZh ? '無法取得位置，請確認 GPS 是否開啟' : 'Could not capture location.';
+
+  // Location tracking consent dialog
+  String get locationConsentTitle =>
+      _isZh ? '啟用定位追蹤' : 'Enable location tracking';
+  String get locationConsentBody => _isZh
+      ? '您所屬組織開啟了工作期間定位追蹤。在此功能下：'
+      : 'Your organization has enabled work-shift location tracking. While active:';
+  String get locationConsentBulletCadence =>
+      _isZh ? '上班期間約每分鐘記錄一次位置' : 'Position is recorded roughly every minute';
+  String get locationConsentBulletDistance =>
+      _isZh ? '移動超過 100 公尺才會儲存' : 'Only saved when you have moved more than 100m';
+  String get locationConsentBulletRetention =>
+      _isZh ? '保存 90 天後自動清除' : 'Stored for 90 days, then automatically deleted';
+  String get locationConsentBulletAudience =>
+      _isZh ? '僅供您所屬組織的管理員查閱' : 'Visible only to your organization\'s admins';
+  String get locationConsentPrivacyLink =>
+      _isZh ? '查看完整隱私政策' : 'View full privacy policy';
+  String get locationConsentCancel => _isZh ? '取消' : 'Cancel';
+  String get locationConsentProceed =>
+      _isZh ? '同意並上班' : 'Agree & clock in';
+
+  // Tracking chip on home
+  String get trackingChipLabel => _isZh ? '定位追蹤中' : 'Tracking location';
+
+  // Force-quit recovery banner
+  String get trackingRecoveryBannerMessage =>
+      _isZh ? '定位追蹤上次中斷過，已恢復記錄。' : 'Location tracking was interrupted; recording resumed.';
+  String get trackingRecoveryBannerDismiss => _isZh ? '了解' : 'Got it';
+
+  // Handover toast — template constructed in auth_provider; this getter
+  // is the english fallback. Server-side string isn't localized here because
+  // the message is built at notice-emit time. Kept for English builds.
+  String handoverWipedNotice(int n) =>
+      _isZh ? '前個帳號的 $n 筆未送事件已清除' : 'Cleared $n unsent events from previous account';
+
+  // Onboarding tip (iOS background limitation)
+  String get backgroundTipTitle =>
+      _isZh ? '背景同步說明' : 'Background sync note';
+  String get backgroundTipBody => _isZh
+      ? 'iOS 會自行決定何時執行背景同步，請勿強制關閉 Argus，'
+          '以免待送的打卡事件延遲上傳。'
+      : 'iOS schedules background sync at its discretion. '
+          'Do not force-quit Argus while events are queued.';
+  String get backgroundTipDismiss => _isZh ? '了解' : 'Got it';
+
+  // History
+  String get historyTitle => _isZh ? '事件歷史' : 'History';
+  String get historyEntry => _isZh ? '事件歷史' : 'View history';
+  String get historyEmpty =>
+      _isZh ? '目前還沒有打卡事件' : 'No checkin events yet';
+  String get historyLoadMore => _isZh ? '載入更多' : 'Load more';
+  String get historyCopyDetails => _isZh ? '複製細節' : 'Copy details';
+  String get historyDismiss => _isZh ? '關閉' : 'Dismiss';
+  String get historyCopiedToast =>
+      _isZh ? '細節已複製' : 'Details copied to clipboard';
+
+  // History row badges
+  String get badgePending => _isZh ? '待送出' : 'pending';
+  String get badgeSending => _isZh ? '送出中' : 'sending';
+  String get badgeFailed => _isZh ? '失敗' : 'failed';
+  String get badgeSynced => _isZh ? '已上傳' : 'synced';
+
+  // Error code friendly translations
+  String friendlyErrorCode(String code, String fallbackMessage) {
+    if (!_isZh) return fallbackMessage.isEmpty ? code : fallbackMessage;
+    switch (code) {
+      case 'INVALID_TRANSITION':
+        return '狀態不允許此事件';
+      case 'OUT_OF_ORDER':
+        return '事件時間早於前次事件';
+      case 'TRANSFER_DISABLED':
+        return '組織已停用「轉場」功能';
+      case 'NEEDS_PASSWORD_CHANGE':
+        return '請先變更密碼';
+      case 'UNAUTHORIZED':
+        return '登入已失效';
+      case 'NETWORK_ERROR':
+        return '連線失敗';
+      default:
+        return fallbackMessage.isEmpty ? code : fallbackMessage;
+    }
+  }
+
   // Dev menu
   String get devMenuTitle => _isZh ? '伺服器' : 'Server';
   String get devMenuCurrentLabel =>
@@ -76,7 +201,12 @@ class AppLocalizations {
       _isZh ? '覆寫基礎網址' : 'Override base URL';
   String get devMenuSave => _isZh ? '儲存' : 'Save';
   String get devMenuClear => _isZh ? '清除' : 'Clear';
+  String get devMenuSaved => _isZh ? '已儲存' : 'Saved';
   String get devMenuApiPrefix => 'API';
+  String get devMenuPrivacyCurrentLabel =>
+      _isZh ? '目前隱私政策網址' : 'Current privacy policy URL';
+  String get devMenuPrivacyInputLabel =>
+      _isZh ? '覆寫隱私政策網址' : 'Override privacy policy URL';
 
   // Splash
   String get splashRetry => _isZh ? '重試' : 'Retry';

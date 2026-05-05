@@ -44,6 +44,9 @@ base64 = "0.22"
 async-trait = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
+# xlsx export (admin location-tracking export endpoint). Pure Rust, no native deps.
+rust_xlsxwriter = "0.79"
+
 [dev-dependencies]
 tokio = { version = "1.43", features = ["macros", "rt-multi-thread", "test-util"] }
 testcontainers = "0.23"

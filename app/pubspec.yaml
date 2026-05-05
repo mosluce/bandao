@@ -2,7 +2,7 @@ name: argus_app
 description: "Argus mobile app for AppUsers."
 publish_to: 'none'
 
-version: 0.1.0+1
+version: 0.3.0+3
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -31,11 +31,38 @@ dependencies:
   # Logging
   logger: ^2.5.0
 
+  # Location
+  geolocator: ^13.0.1
+  app_settings: ^5.1.1
+
+  # Open privacy policy URL in an in-app browser from the consent dialog.
+  url_launcher: ^6.3.1
+
+  # Connectivity
+  connectivity_plus: ^6.1.0
+
+  # Background sync
+  workmanager: ^0.5.2
+
+  # Local SQLite queue (drift)
+  drift: ^2.21.0
+  sqlite3_flutter_libs: ^0.5.27
+  path_provider: ^2.1.5
+  path: ^1.9.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
   flutter_lints: ^5.0.0
+
+  # Codegen for drift
+  drift_dev: ^2.21.0
+  build_runner: ^2.4.13
+
+  # url_launcher mocking in widget tests
+  plugin_platform_interface: ^2.1.8
+  url_launcher_platform_interface: ^2.3.2
 
 flutter:
   uses-material-design: true

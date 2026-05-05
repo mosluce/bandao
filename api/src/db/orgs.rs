@@ -40,15 +40,17 @@ impl OrgRepository {
         Ok(org)
     }
 
-    /// Apply a partial settings patch — `transfer_enabled` lands under
-    /// `settings.checkin.transfer_enabled`; `timezone` is a top-level field.
-    /// State-lock and timezone validation are handler-side concerns; this
-    /// method just runs the writes. Returns the updated Org.
+    /// Apply a partial settings patch — `transfer_enabled` and
+    /// `location_tracking_enabled` land under `settings.checkin.*`;
+    /// `timezone` is a top-level field. State-lock and timezone validation
+    /// are handler-side concerns; this method just runs the writes. Returns
+    /// the updated Org.
     pub async fn update_settings(
         &self,
         id: ObjectId,
         transfer_enabled: Option<bool>,
         timezone: Option<&str>,
+        location_tracking_enabled: Option<bool>,
     ) -> ApiResult<Org> {
         let now = DateTime::now();
         let mut set = doc! { "updated_at": now };
@@ -57,6 +59,9 @@ impl OrgRepository {
         }
         if let Some(flag) = transfer_enabled {
             set.insert("settings.checkin.transfer_enabled", flag);
+        }
+        if let Some(flag) = location_tracking_enabled {
+            set.insert("settings.checkin.location_tracking_enabled", flag);
         }
         let result = self
             .coll

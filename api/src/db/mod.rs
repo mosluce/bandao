@@ -5,6 +5,7 @@ pub mod checkin_user_status;
 pub mod dashboard_memberships;
 pub mod dashboard_sessions;
 pub mod dashboard_users;
+pub mod location_pings;
 pub mod orgs;
 pub mod removed_memberships;
 pub mod slug_reservations;
@@ -17,7 +18,7 @@ use mongodb::{Client, Collection, Database, IndexModel};
 
 use crate::domain::{
     AppSession, AppUser, CheckinEvent, CheckinUserStatus, DashboardSession, DashboardUser,
-    Membership, Org, OrgSlugReservation, RemovedMembership,
+    LocationPing, Membership, Org, OrgSlugReservation, RemovedMembership,
 };
 use crate::error::ApiResult;
 
@@ -25,6 +26,7 @@ pub use app_sessions::AppSessionRepository;
 pub use app_users::{AppUserInsertError, AppUserRepository};
 pub use checkin_events::CheckinEventRepository;
 pub use checkin_user_status::{CheckinStatusInsertError, CheckinUserStatusRepository};
+pub use location_pings::{InsertManyOutcome, LOCATION_PING_BATCH_MAX, LocationPingRepository};
 pub use dashboard_memberships::{MembershipInsertError, MembershipRepository};
 pub use dashboard_sessions::DashboardSessionRepository;
 pub use dashboard_users::DashboardUserRepository;
@@ -45,6 +47,7 @@ pub struct Db {
     pub app_sessions: AppSessionRepository,
     pub checkin_events: CheckinEventRepository,
     pub checkin_user_status: CheckinUserStatusRepository,
+    pub location_pings: LocationPingRepository,
 }
 
 impl Db {
@@ -86,6 +89,9 @@ impl Db {
             ),
             checkin_user_status: CheckinUserStatusRepository::new(
                 database.collection::<CheckinUserStatus>("checkin_user_status"),
+            ),
+            location_pings: LocationPingRepository::new(
+                database.collection::<LocationPing>("location_pings"),
             ),
             database,
         })
@@ -344,6 +350,50 @@ impl Db {
                     .options(
                         IndexOptions::builder()
                             .name("checkin_user_status_org_status".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        // location_pings: per-AppUser pagination, per-Org export, plus a
+        // 90-day TTL keyed on `occurred_at_server` so client-clock drift can't
+        // skew retention. Mongo's TTL monitor runs ~every 60s, so retention is
+        // "90 days ± a minute".
+        let location_pings: Collection<LocationPing> =
+            self.database.collection("location_pings");
+        location_pings
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "app_user_id": 1, "occurred_at_client": -1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("location_pings_user_client_time".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        location_pings
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "org_id": 1, "occurred_at_client": -1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("location_pings_org_client_time".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        location_pings
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "occurred_at_server": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .expire_after(Duration::from_secs(90 * 24 * 3600))
+                            .name("location_pings_ttl".to_string())
                             .build(),
                     )
                     .build(),

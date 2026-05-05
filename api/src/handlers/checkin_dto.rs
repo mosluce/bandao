@@ -186,6 +186,8 @@ pub struct UpdateOrgSettingsRequest {
     pub transfer_enabled: Option<bool>,
     #[serde(default)]
     pub timezone: Option<String>,
+    #[serde(default)]
+    pub location_tracking_enabled: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -197,6 +199,7 @@ pub struct OrgSettingsDto {
 #[derive(Debug, Serialize)]
 pub struct OrgCheckinSettingsDto {
     pub transfer_enabled: bool,
+    pub location_tracking_enabled: bool,
 }
 
 impl OrgSettingsDto {
@@ -205,6 +208,7 @@ impl OrgSettingsDto {
             timezone: org.timezone.clone(),
             checkin: OrgCheckinSettingsDto {
                 transfer_enabled: org.checkin_transfer_enabled(),
+                location_tracking_enabled: org.checkin_location_tracking_enabled(),
             },
         }
     }

@@ -1,3 +1,4 @@
+import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,6 +10,7 @@ import 'package:argus_app/core/storage/secure_storage.dart';
 import 'package:argus_app/features/auth/data/auth_repository.dart';
 import 'package:argus_app/features/auth/state/auth_provider.dart';
 import 'package:argus_app/features/auth/state/auth_state.dart';
+import 'package:argus_app/features/checkin/data/checkin_queue_db.dart';
 
 void main() {
   group('AuthNotifier auto-login', () {
@@ -131,13 +133,18 @@ ProviderContainer _container({
   required _FakeSecureStorage storage,
   required _FakeRepo repo,
 }) {
+  final db = CheckinQueueDb.forTesting(NativeDatabase.memory());
   final container = ProviderContainer(
     overrides: <Override>[
       secureStorageProvider.overrideWithValue(storage),
       authRepositoryProvider.overrideWith((ref) async => repo),
+      checkinQueueDbProvider.overrideWithValue(db),
     ],
   );
-  addTearDown(container.dispose);
+  addTearDown(() async {
+    container.dispose();
+    await db.close();
+  });
   return container;
 }
 
@@ -187,6 +194,36 @@ class _FakeSecureStorage implements SecureStorage {
 
   @override
   Future<void> clearApiBaseUrlOverride() async => _override = null;
+
+  @override
+  Future<bool> readBackgroundSyncTipSeen() async => false;
+
+  @override
+  Future<void> markBackgroundSyncTipSeen() async {}
+
+  @override
+  Future<DateTime?> readLocationTrackingLastCleanStop() async => null;
+
+  @override
+  Future<void> writeLocationTrackingLastCleanStop(DateTime t) async {}
+
+  @override
+  Future<void> clearLocationTrackingLastCleanStop() async {}
+
+  @override
+  Future<bool> readLocationTrackingConsent(String appUserId) async => false;
+
+  @override
+  Future<void> writeLocationTrackingConsent(String appUserId) async {}
+
+  @override
+  Future<String?> readPrivacyUrlOverride() async => null;
+
+  @override
+  Future<void> writePrivacyUrlOverride(String url) async {}
+
+  @override
+  Future<void> clearPrivacyUrlOverride() async {}
 }
 
 class _FakeRepo implements AuthRepository {

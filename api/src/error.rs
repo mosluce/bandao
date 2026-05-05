@@ -98,6 +98,17 @@ pub enum ApiError {
     /// `Org.timezone` write failed IANA validation.
     #[error("invalid timezone identifier")]
     InvalidTimezone,
+    /// AppUser submitted a location ping batch but the org has
+    /// `location_tracking_enabled = false`. Whole batch rejected.
+    #[error("location tracking is disabled for this org")]
+    LocationTrackingDisabled,
+    /// Export endpoint's `from` / `to` query violates one of:
+    /// both required, `to >= from`, span ≤ 90 days, `from ≥ now - 90 days`.
+    #[error("invalid time range")]
+    InvalidRange,
+    /// Location ping batch is empty or exceeds the per-batch cap (100).
+    #[error("invalid batch size")]
+    InvalidBatch,
 
     #[error("password hashing failed")]
     Password,
@@ -154,6 +165,11 @@ impl ApiError {
             ApiError::StateLocked { .. } => (StatusCode::CONFLICT, "STATE_LOCKED"),
             ApiError::NotOnDuty => (StatusCode::CONFLICT, "NOT_ON_DUTY"),
             ApiError::InvalidTimezone => (StatusCode::BAD_REQUEST, "INVALID_TIMEZONE"),
+            ApiError::LocationTrackingDisabled => {
+                (StatusCode::FORBIDDEN, "LOCATION_TRACKING_DISABLED")
+            }
+            ApiError::InvalidRange => (StatusCode::BAD_REQUEST, "INVALID_RANGE"),
+            ApiError::InvalidBatch => (StatusCode::BAD_REQUEST, "INVALID_BATCH"),
             ApiError::Password
             | ApiError::Db(_)
             | ApiError::BsonSer(_)

@@ -63,6 +63,7 @@ pub struct OrgDto {
 #[derive(Debug, Serialize)]
 pub struct OrgCheckinDto {
     pub transfer_enabled: bool,
+    pub location_tracking_enabled: bool,
 }
 
 impl OrgDto {
@@ -75,6 +76,7 @@ impl OrgDto {
             timezone: org.timezone.clone(),
             checkin: OrgCheckinDto {
                 transfer_enabled: org.checkin_transfer_enabled(),
+                location_tracking_enabled: org.checkin_location_tracking_enabled(),
             },
             slug: org.slug.clone(),
             slug_changed_at: org

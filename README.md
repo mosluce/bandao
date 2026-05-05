@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | [`api/`](./api/) | Rust + axum + MongoDB | 唯一與資料庫直接通訊的服務層，提供 dashboard 與 app 共用的 HTTP API |
 | [`admin-web/`](./admin-web/) | Nuxt 3 + TypeScript | 給 Org admin / member 使用的管理後台 |
-| [`app/`](./app/) | Flutter（iOS + Android） | 終端使用者 App；目前已完成登入流程，打卡 UI 在 `add-app-checkin` 動工中 |
+| [`app/`](./app/) | Flutter（iOS + Android） | 終端使用者 App；登入 + 打卡（上班/下班/轉場）+ device-local queue + 背景同步 + 事件歷史 + 上班期間軌跡記錄（Org toggle 開啟） |
 
 ## 開發前置
 
@@ -56,6 +56,8 @@ App 端（Flutter）開發另開：
 ```bash
 cd app
 flutter pub get
+dart run build_runner build --delete-conflicting-outputs   # drift codegen
+cd ios && pod install && cd -                              # 首次或加新 native plugin 後
 flutter run                # 自動跑當前 simulator / device
 # Android Emulator 預設打 http://10.0.2.2:9090
 # iOS Simulator 預設打 http://localhost:9090
