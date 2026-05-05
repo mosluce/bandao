@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::config::Config;
 use crate::db::Db;
 use crate::services::reverse_geocoder::{
-    NominatimGeocoder, ReverseGeocoder, SharedReverseGeocoder,
+    CachedReverseGeocoder, NominatimGeocoder, ReverseGeocoder, SharedReverseGeocoder,
 };
 
 #[derive(Clone)]
@@ -18,7 +18,11 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(db: Db, config: Config) -> Self {
-        let geocoder: SharedReverseGeocoder = Arc::new(NominatimGeocoder::new());
+        // Wrap Nominatim in an LRU cache decorator — see
+        // `services/reverse_geocoder.rs`. Tests bypass this by injecting a
+        // raw geocoder via `with_geocoder`.
+        let geocoder: SharedReverseGeocoder =
+            Arc::new(CachedReverseGeocoder::new(NominatimGeocoder::new()));
         Self {
             db: Arc::new(db),
             config: Arc::new(config),

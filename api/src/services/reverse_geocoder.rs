@@ -7,10 +7,12 @@
 //! geocoding provider 抽象" is real and near-term. Designing the trait now
 //! is roughly free and lets future provider swaps stay isolated.
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::num::NonZeroUsize;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
+use lru::LruCache;
 use serde::Deserialize;
 
 /// Default timeout per request — Nominatim may be slow but the event-submit
@@ -98,8 +100,8 @@ struct NominatimResponse {
 
 #[derive(Debug, Deserialize)]
 struct NominatimAddress {
-    /// City / town / village in priority order. We collapse to one label
-    /// rather than trying to be clever about administrative hierarchy.
+    #[serde(default)]
+    road: Option<String>,
     #[serde(default)]
     city: Option<String>,
     #[serde(default)]
@@ -117,10 +119,10 @@ struct NominatimAddress {
 }
 
 impl NominatimAddress {
-    /// Pick the best-fitting label. Prefers smallest-grain location (suburb >
-    /// city > town > village > county > state > country) so admin-web shows
-    /// "信義區" instead of "Taiwan" when possible.
-    fn best_label(&self) -> Option<String> {
+    /// Smallest-grain administrative label — same fallback chain as before
+    /// (suburb > city > town > village > county > state > country) so a
+    /// missing road still surfaces something meaningful.
+    fn district(&self) -> Option<String> {
         self.suburb
             .clone()
             .or_else(|| self.city.clone())
@@ -129,6 +131,21 @@ impl NominatimAddress {
             .or_else(|| self.county.clone())
             .or_else(|| self.state.clone())
             .or_else(|| self.country.clone())
+    }
+
+    fn road(&self) -> Option<String> {
+        self.road.clone()
+    }
+
+    /// Compose `"{district} · {road}"` when both are present. Falls back to
+    /// whichever single field is set, or `None` when neither is.
+    fn compose(&self) -> Option<String> {
+        match (self.district(), self.road()) {
+            (Some(d), Some(r)) => Some(format!("{d} · {r}")),
+            (Some(d), None) => Some(d),
+            (None, Some(r)) => Some(r),
+            (None, None) => None,
+        }
     }
 }
 
@@ -142,7 +159,7 @@ impl ReverseGeocoder for NominatimGeocoder {
                 ("format", "jsonv2"),
                 ("lat", lat.to_string().as_str()),
                 ("lon", lng.to_string().as_str()),
-                ("zoom", "14"),
+                ("zoom", "17"),
                 ("addressdetails", "1"),
             ])
             .header("Accept-Language", self.accept_language.as_str())
@@ -166,12 +183,12 @@ impl ReverseGeocoder for NominatimGeocoder {
                 return None;
             }
         };
-        // Prefer best_label from structured address; fall back to the raw
-        // `display_name` so we surface *something* even when the structure
-        // is sparse.
+        // Prefer the structured `{district} · {road}` compose; fall back to
+        // the raw `display_name` so we surface *something* even when the
+        // structure is sparse.
         body.address
             .as_ref()
-            .and_then(|a| a.best_label())
+            .and_then(|a| a.compose())
             .or(body.display_name)
             .filter(|s| !s.trim().is_empty())
     }
@@ -196,6 +213,88 @@ impl ReverseGeocoder for StaticReverseGeocoder {
     }
 }
 
+/// Default LRU capacity. ~10k unique grid cells × ~200 bytes ≈ 2 MB.
+pub const CACHE_CAPACITY: usize = 10_000;
+
+/// Default per-entry TTL. Long enough that warm areas keep hitting cache,
+/// short enough that the underlying Nominatim data doesn't drift.
+pub const CACHE_TTL: Duration = Duration::from_secs(3600);
+
+/// Round `(lat, lng)` to ~11 m grid cells (4 decimal places). Same building
+/// or parking lot collapses to one cache key.
+fn cache_key(lat: f64, lng: f64) -> (i64, i64) {
+    let scale = 10_000.0_f64;
+    ((lat * scale).round() as i64, (lng * scale).round() as i64)
+}
+
+#[derive(Clone)]
+struct CacheEntry {
+    value: Option<String>,
+    expires_at: Instant,
+}
+
+/// Decorator that caches `lookup` results in a process-local LRU. Wrap any
+/// `ReverseGeocoder` (production wraps [`NominatimGeocoder`]; tests typically
+/// inject [`StaticReverseGeocoder`] without a cache wrapper).
+pub struct CachedReverseGeocoder<G: ReverseGeocoder> {
+    inner: G,
+    cache: Arc<RwLock<LruCache<(i64, i64), CacheEntry>>>,
+    ttl: Duration,
+    now: fn() -> Instant,
+}
+
+impl<G: ReverseGeocoder> CachedReverseGeocoder<G> {
+    pub fn new(inner: G) -> Self {
+        Self::with_options(inner, CACHE_CAPACITY, CACHE_TTL)
+    }
+
+    /// Test-only knobs. Production code uses [`Self::new`].
+    pub fn with_options(inner: G, capacity: usize, ttl: Duration) -> Self {
+        let cap = NonZeroUsize::new(capacity.max(1)).expect("non-zero capacity");
+        Self {
+            inner,
+            cache: Arc::new(RwLock::new(LruCache::new(cap))),
+            ttl,
+            now: Instant::now,
+        }
+    }
+}
+
+#[async_trait]
+impl<G: ReverseGeocoder> ReverseGeocoder for CachedReverseGeocoder<G> {
+    async fn lookup(&self, lat: f64, lng: f64) -> Option<String> {
+        let key = cache_key(lat, lng);
+        let now = (self.now)();
+
+        // Read path: take a write lock anyway because LruCache::get marks the
+        // entry as recently used (which mutates the linked list). RwLock would
+        // need `peek` to avoid that, but then we lose LRU semantics.
+        if let Ok(mut guard) = self.cache.write()
+            && let Some(entry) = guard.get(&key)
+        {
+            if entry.expires_at > now {
+                return entry.value.clone();
+            }
+            // expired — fall through, will be replaced below
+            guard.pop(&key);
+        }
+
+        let value = self.inner.lookup(lat, lng).await;
+
+        if let Ok(mut guard) = self.cache.write() {
+            guard.put(
+                key,
+                CacheEntry {
+                    value: value.clone(),
+                    expires_at: now + self.ttl,
+                },
+            );
+        }
+
+        value
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,31 +311,210 @@ mod tests {
         assert_eq!(stub.lookup(0.0, 0.0).await, None);
     }
 
-    #[test]
-    fn best_label_prefers_finer_grain() {
-        let addr = NominatimAddress {
-            suburb: Some("信義區".into()),
-            city: Some("台北市".into()),
+    fn addr() -> NominatimAddress {
+        NominatimAddress {
+            road: None,
+            suburb: None,
+            city: None,
             town: None,
             village: None,
             county: None,
             state: None,
-            country: Some("Taiwan".into()),
-        };
-        assert_eq!(addr.best_label().as_deref(), Some("信義區"));
+            country: None,
+        }
     }
 
     #[test]
-    fn best_label_falls_back_when_suburb_missing() {
-        let addr = NominatimAddress {
-            suburb: None,
+    fn district_prefers_finer_grain() {
+        let a = NominatimAddress {
+            suburb: Some("信義區".into()),
             city: Some("台北市".into()),
-            town: None,
-            village: None,
-            county: None,
-            state: None,
             country: Some("Taiwan".into()),
+            ..addr()
         };
-        assert_eq!(addr.best_label().as_deref(), Some("台北市"));
+        assert_eq!(a.district().as_deref(), Some("信義區"));
+    }
+
+    #[test]
+    fn district_falls_back_when_suburb_missing() {
+        let a = NominatimAddress {
+            city: Some("台北市".into()),
+            country: Some("Taiwan".into()),
+            ..addr()
+        };
+        assert_eq!(a.district().as_deref(), Some("台北市"));
+    }
+
+    #[test]
+    fn compose_uses_district_and_road() {
+        let a = NominatimAddress {
+            road: Some("忠孝東路五段".into()),
+            suburb: Some("信義區".into()),
+            city: Some("台北市".into()),
+            ..addr()
+        };
+        assert_eq!(a.compose().as_deref(), Some("信義區 · 忠孝東路五段"));
+    }
+
+    #[test]
+    fn compose_falls_back_to_district_alone() {
+        let a = NominatimAddress {
+            suburb: Some("信義區".into()),
+            ..addr()
+        };
+        assert_eq!(a.compose().as_deref(), Some("信義區"));
+    }
+
+    #[test]
+    fn compose_falls_back_to_road_alone() {
+        let a = NominatimAddress {
+            road: Some("忠孝東路五段".into()),
+            ..addr()
+        };
+        assert_eq!(a.compose().as_deref(), Some("忠孝東路五段"));
+    }
+
+    #[test]
+    fn compose_returns_none_when_empty() {
+        assert_eq!(addr().compose(), None);
+    }
+
+    #[test]
+    fn compose_handles_western_address() {
+        let a = NominatimAddress {
+            road: Some("Stevens Creek Boulevard".into()),
+            city: Some("Cupertino".into()),
+            ..addr()
+        };
+        assert_eq!(
+            a.compose().as_deref(),
+            Some("Cupertino · Stevens Creek Boulevard"),
+        );
+    }
+
+    // ---- CachedReverseGeocoder ----
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// Counts upstream calls so cache hits / misses are observable.
+    struct CountingGeocoder {
+        calls: Arc<AtomicUsize>,
+        response: Option<String>,
+    }
+
+    #[async_trait]
+    impl ReverseGeocoder for CountingGeocoder {
+        async fn lookup(&self, _lat: f64, _lng: f64) -> Option<String> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.response.clone()
+        }
+    }
+
+    #[test]
+    fn cache_key_4_decimals() {
+        // 25.03301 rounds to 25.0330 → key 250_330
+        assert_eq!(cache_key(25.03301, 121.56541).0, 250_330);
+        // close enough to share a key
+        assert_eq!(cache_key(25.0330, 121.5654), cache_key(25.03304, 121.56539));
+        // far enough apart to differ
+        assert_ne!(cache_key(25.0330, 121.5654), cache_key(25.0335, 121.5654));
+    }
+
+    #[tokio::test]
+    async fn cache_hit_skips_inner() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let inner = CountingGeocoder {
+            calls: calls.clone(),
+            response: Some("信義區 · 忠孝東路五段".into()),
+        };
+        let cached = CachedReverseGeocoder::new(inner);
+
+        let _ = cached.lookup(25.0330, 121.5654).await;
+        let _ = cached.lookup(25.03301, 121.56541).await; // same key
+        let _ = cached.lookup(25.03304, 121.56539).await; // same key
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "inner called once");
+    }
+
+    #[tokio::test]
+    async fn cache_negative_result_is_cached() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let inner = CountingGeocoder {
+            calls: calls.clone(),
+            response: None,
+        };
+        let cached = CachedReverseGeocoder::new(inner);
+
+        assert_eq!(cached.lookup(0.0, 0.0).await, None);
+        assert_eq!(cached.lookup(0.0, 0.0).await, None);
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "None is cached too");
+    }
+
+    #[tokio::test]
+    async fn cache_distinct_keys_each_call_inner() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let inner = CountingGeocoder {
+            calls: calls.clone(),
+            response: Some("X".into()),
+        };
+        let cached = CachedReverseGeocoder::new(inner);
+
+        let _ = cached.lookup(25.0330, 121.5654).await;
+        let _ = cached.lookup(25.0335, 121.5654).await; // different 4-decimal key
+
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn cache_evicts_oldest_when_full() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let inner = CountingGeocoder {
+            calls: calls.clone(),
+            response: Some("X".into()),
+        };
+        let cached = CachedReverseGeocoder::with_options(inner, 2, CACHE_TTL);
+
+        // Fill: A, B → cache [A (LRU), B (MRU)]
+        let _ = cached.lookup(0.0, 0.0).await; // A
+        let _ = cached.lookup(0.0, 1.0).await; // B
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+
+        // Hit A → cache [B (LRU), A (MRU)]
+        let _ = cached.lookup(0.0, 0.0).await;
+        assert_eq!(calls.load(Ordering::SeqCst), 2, "A still cached");
+
+        // Insert C → evicts B (LRU) → cache [A, C]
+        let _ = cached.lookup(0.0, 2.0).await; // C
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+
+        // A still cached
+        let _ = cached.lookup(0.0, 0.0).await;
+        assert_eq!(calls.load(Ordering::SeqCst), 3, "A still cached");
+
+        // B was evicted → miss
+        let _ = cached.lookup(0.0, 1.0).await;
+        assert_eq!(calls.load(Ordering::SeqCst), 4, "B was evicted");
+    }
+
+    #[tokio::test]
+    async fn cache_ttl_expires() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let inner = CountingGeocoder {
+            calls: calls.clone(),
+            response: Some("X".into()),
+        };
+        // 1 ms TTL — sleep past it.
+        let cached = CachedReverseGeocoder::with_options(inner, 100, Duration::from_millis(1));
+
+        let _ = cached.lookup(0.0, 0.0).await;
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        let _ = cached.lookup(0.0, 0.0).await;
+
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            2,
+            "second lookup re-hit inner after TTL",
+        );
     }
 }

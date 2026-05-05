@@ -41,7 +41,7 @@ const PLATFORM_CONTACT_EMAIL = 'noreply@example.com'
             <span class="font-medium">帳號識別資料</span>：您建立帳號時提供的 email、使用者名稱、顯示名稱，以及經雜湊（hash）後的密碼。我們不會以明文儲存您的密碼。
           </li>
           <li>
-            <span class="font-medium">出勤事件</span>：您於 Argus App 提交的打卡事件（上班、下班、轉出、轉入），含按下按鈕當下的座標、可選的 GPS 精度，以及由本平台自動執行的反向地理編碼結果（如「信義區」這類區域名稱）。
+            <span class="font-medium">出勤事件</span>：您於 Argus App 提交的打卡事件（上班、下班、轉出、轉入），含按下按鈕當下的座標、可選的 GPS 精度，以及由本平台自動執行的反向地理編碼結果（如「信義區 · 忠孝東路五段」這類包含區域與街道的名稱）。本平台僅收集到街道層級，不包含巷弄與門牌號碼。
           </li>
           <li>
             <span class="font-medium">位置軌跡</span>：若您所屬組織開啟「定位追蹤」功能，工作期間您的裝置會每分鐘記錄一次位置（同時須移動超過 100 公尺才會儲存），用以協助雇主了解現場狀況。下班後不再記錄。

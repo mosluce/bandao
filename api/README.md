@@ -215,8 +215,11 @@ status: off_duty | on_site | in_transit
 
 - User-Agent: `argus-api/<version>`，符合 [Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/) 要求
 - 2 秒 timeout
+- `zoom=17, addressdetails=1` — 可拿到 `road` 欄位，組合成 `"{district} · {road}"`（例：`"信義區 · 忠孝東路五段"`、`"Cupertino · Stevens Creek Boulevard"`）。缺其中一個就降為單側；兩個都缺 fallback 到 `display_name` 或 `null`。隱私邊界停在路名，不收巷弄與門牌。
 - 任何失敗（timeout / non-2xx / parse error）→ `region_name = null`，事件照常記錄（fail-soft）
 - accept-language 預設 `"zh-TW,en"`
+
+**Cache 層**：`AppState` 把 `NominatimGeocoder` 包進 `CachedReverseGeocoder` decorator — process-local LRU、capacity 10000、TTL 1 小時、key = lat/lng 取 4 位小數（≈ 11m 格網）。同棟建築 / 同停車場的多筆事件命中同 key 直接回快取，Nominatim 呼叫量大幅降低。Cache miss 走原 lookup → 寫快取；TTL 過後視為 miss。負結果（`None`）也會快取避免重打失敗的 endpoint。Restart 後快取清空（無持久化）。Tests 直接注入 `StaticReverseGeocoder` 跳過 cache，行為可預期。
 
 **換 provider**：`ReverseGeocoder` 是 trait，要切 Mapbox / Google / 自架時新增一個 impl 注入 `AppState` 即可，handler 不變。Nominatim 的 free-tier 適合 dev / pilot，production 通常要換家。
 
