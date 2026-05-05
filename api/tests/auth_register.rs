@@ -35,7 +35,9 @@ async fn register_create_mode_happy_path() {
     assert!(body["user"].get("role").is_none() || body["user"]["role"].is_null());
     assert_eq!(body["current_org"]["name"], "Acme");
     assert_eq!(body["role"], "admin");
-    let code = body["current_org"]["code"].as_str().expect("current_org.code");
+    let code = body["current_org"]["code"]
+        .as_str()
+        .expect("current_org.code");
     assert_eq!(code.chars().count(), 10);
     // Creator becomes the owner.
     assert_eq!(body["current_org"]["owner_id"], body["user"]["id"]);
@@ -78,8 +80,14 @@ async fn register_join_mode_happy_path() {
 
     // Bootstrap an org with an admin to harvest its code.
     let (_creator, create_body) = app.register_admin("founder@example.com", "Acme").await;
-    let org_code = create_body["current_org"]["code"].as_str().unwrap().to_string();
-    let org_id = create_body["current_org"]["id"].as_str().unwrap().to_string();
+    let org_code = create_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let org_id = create_body["current_org"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Different client = empty cookie jar.
     let (joiner, join_body) = app.register_member("member@example.com", &org_code).await;
@@ -139,7 +147,10 @@ async fn register_rejects_email_taken_join_mode() {
 
     // Bootstrap target org.
     let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Bootstrap a second identity in a separate org.
     let (_other_admin, _) = app.register_admin("dup@example.com", "OtherOrg").await;

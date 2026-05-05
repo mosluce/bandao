@@ -8,11 +8,7 @@ use common::ts;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-async fn patch_settings(
-    app: &TestApp,
-    admin: &reqwest::Client,
-    body: Value,
-) -> reqwest::Response {
+async fn patch_settings(app: &TestApp, admin: &reqwest::Client, body: Value) -> reqwest::Response {
     admin
         .patch(app.url("/orgs/me/settings"))
         .json(&body)

@@ -98,11 +98,7 @@ impl AppUserRepository {
 
     /// Update `display_name` only. `username`, `org_id`, and other identity
     /// fields are intentionally not settable here.
-    pub async fn update_profile(
-        &self,
-        id: ObjectId,
-        display_name: &str,
-    ) -> ApiResult<AppUser> {
+    pub async fn update_profile(&self, id: ObjectId, display_name: &str) -> ApiResult<AppUser> {
         let now = DateTime::now();
         let result = self
             .coll
@@ -117,11 +113,7 @@ impl AppUserRepository {
 
     /// Update `status` only. Caller is responsible for the session-cascade
     /// when `disabled` is the new value.
-    pub async fn update_status(
-        &self,
-        id: ObjectId,
-        status: AppUserStatus,
-    ) -> ApiResult<AppUser> {
+    pub async fn update_status(&self, id: ObjectId, status: AppUserStatus) -> ApiResult<AppUser> {
         let now = DateTime::now();
         let status_bson = bson::to_bson(&status)?;
         let result = self
@@ -137,11 +129,7 @@ impl AppUserRepository {
 
     /// Replace `password_hash` and force `needs_password_change = true`.
     /// Used by admin password-reset.
-    pub async fn update_password(
-        &self,
-        id: ObjectId,
-        password_hash: &str,
-    ) -> ApiResult<AppUser> {
+    pub async fn update_password(&self, id: ObjectId, password_hash: &str) -> ApiResult<AppUser> {
         let now = DateTime::now();
         let result = self
             .coll

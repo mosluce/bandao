@@ -86,10 +86,10 @@ impl OrgSlugReservationRepository {
 
 fn is_duplicate_key(err: &mongodb::error::Error) -> bool {
     use mongodb::error::ErrorKind;
-    if let ErrorKind::Write(write_failure) = err.kind.as_ref() {
-        if let mongodb::error::WriteFailure::WriteError(we) = write_failure {
-            return we.code == 11000;
-        }
+    if let ErrorKind::Write(write_failure) = err.kind.as_ref()
+        && let mongodb::error::WriteFailure::WriteError(we) = write_failure
+    {
+        return we.code == 11000;
     }
     false
 }

@@ -153,7 +153,10 @@ async fn login_default_current_org_is_null_when_no_memberships() {
 
     // Identity exists but has no memberships: register, then leave the only Org.
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Bring in a second admin who can take over before the founder bows out.
     let (second_client, second_body) = app.register_member("second@example.com", &code).await;
@@ -186,7 +189,10 @@ async fn login_default_current_org_is_null_when_no_memberships() {
 
     // Re-login: current_org is null, memberships is empty.
     let (_, login_body) = app.login("founder@example.com", "hunter2hunter2").await;
-    assert!(login_body["current_org"].is_null(), "current_org should be null");
+    assert!(
+        login_body["current_org"].is_null(),
+        "current_org should be null"
+    );
     assert!(login_body["role"].is_null(), "role should be null");
     assert_eq!(login_body["memberships"].as_array().unwrap().len(), 0);
 }

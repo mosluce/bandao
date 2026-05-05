@@ -20,7 +20,10 @@ pub struct GeoPointDto {
 
 impl GeoPointDto {
     pub fn from_geo(g: &GeoPoint) -> Self {
-        Self { lat: g.lat, lng: g.lng }
+        Self {
+            lat: g.lat,
+            lng: g.lng,
+        }
     }
 }
 
@@ -66,8 +69,9 @@ pub struct CheckinEventDto {
 
 impl CheckinEventDto {
     pub fn from_event(e: &CheckinEvent) -> Self {
-        let skew_ms =
-            (e.occurred_at_client.timestamp_millis() - e.occurred_at_server.timestamp_millis()).abs();
+        let skew_ms = (e.occurred_at_client.timestamp_millis()
+            - e.occurred_at_server.timestamp_millis())
+        .abs();
         Self {
             id: e.id.to_hex(),
             app_user_id: e.app_user_id.to_hex(),

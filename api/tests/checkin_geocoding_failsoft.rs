@@ -12,7 +12,6 @@ use common::ts;
 use reqwest::StatusCode;
 use serde_json::Value;
 
-
 #[tokio::test]
 async fn geocode_none_records_null_region_name() {
     let app = TestApp::spawn_with_geocoder(StaticReverseGeocoder::new(None)).await;

@@ -36,10 +36,7 @@ pub async fn list(
     RequireAdmin(active): RequireAdmin,
 ) -> ApiResult<Json<Vec<AppUserDto>>> {
     let users = state.db.app_users.list_by_org(active.org_id).await?;
-    let mut out: Vec<AppUserDto> = users
-        .iter()
-        .map(AppUserDto::from_app_user)
-        .collect();
+    let mut out: Vec<AppUserDto> = users.iter().map(AppUserDto::from_app_user).collect();
     // Newest-first reads naturally on the admin list.
     out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     Ok(Json(out))
@@ -139,14 +136,18 @@ pub async fn update(
         user = state.db.app_users.update_profile(user.id, trimmed).await?;
     }
 
-    if let Some(new_status) = req.status {
-        if user.status != new_status {
-            user = state.db.app_users.update_status(user.id, new_status).await?;
-            if matches!(new_status, AppUserStatus::Disabled) {
-                // Force-kick: drop every session for this AppUser. Re-enable
-                // does NOT auto-issue a session — they have to log back in.
-                state.db.app_sessions.delete_by_app_user(user.id).await?;
-            }
+    if let Some(new_status) = req.status
+        && user.status != new_status
+    {
+        user = state
+            .db
+            .app_users
+            .update_status(user.id, new_status)
+            .await?;
+        if matches!(new_status, AppUserStatus::Disabled) {
+            // Force-kick: drop every session for this AppUser. Re-enable
+            // does NOT auto-issue a session — they have to log back in.
+            state.db.app_sessions.delete_by_app_user(user.id).await?;
         }
     }
 
@@ -257,7 +258,10 @@ mod tests {
             validate_username("hi there"),
             Err(ApiError::InvalidUsernameFormat)
         ));
-        assert!(matches!(validate_username(""), Err(ApiError::InvalidUsernameFormat)));
+        assert!(matches!(
+            validate_username(""),
+            Err(ApiError::InvalidUsernameFormat)
+        ));
     }
 
     #[test]

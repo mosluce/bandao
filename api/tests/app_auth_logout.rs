@@ -6,21 +6,15 @@ use reqwest::StatusCode;
 async fn seed_with_two_sessions(app: &TestApp) -> (String, String, String, String) {
     let (admin, body) = app.register_admin("founder@example.com", "Acme").await;
     let org_code = body["current_org"]["code"].as_str().unwrap().to_string();
-    let create = app
-        .create_app_user(&admin, "alice", "Alice Chen")
-        .await;
+    let create = app.create_app_user(&admin, "alice", "Alice Chen").await;
     let initial_password = create["initial_password"].as_str().unwrap().to_string();
 
     // Phone session.
-    let (_phone, phone_body) = app
-        .app_login(&org_code, "alice", &initial_password)
-        .await;
+    let (_phone, phone_body) = app.app_login(&org_code, "alice", &initial_password).await;
     let phone_token = phone_body["token"].as_str().unwrap().to_string();
 
     // Tablet session — separate login, separate token row.
-    let (_tablet, tablet_body) = app
-        .app_login(&org_code, "alice", &initial_password)
-        .await;
+    let (_tablet, tablet_body) = app.app_login(&org_code, "alice", &initial_password).await;
     let tablet_token = tablet_body["token"].as_str().unwrap().to_string();
 
     (org_code, initial_password, phone_token, tablet_token)
@@ -67,13 +61,9 @@ async fn logout_works_while_needs_password_change_is_set() {
     let app = TestApp::spawn().await;
     let (admin, body) = app.register_admin("founder@example.com", "Acme").await;
     let org_code = body["current_org"]["code"].as_str().unwrap().to_string();
-    let create = app
-        .create_app_user(&admin, "alice", "Alice Chen")
-        .await;
+    let create = app.create_app_user(&admin, "alice", "Alice Chen").await;
     let initial_password = create["initial_password"].as_str().unwrap().to_string();
-    let (_client, login_body) = app
-        .app_login(&org_code, "alice", &initial_password)
-        .await;
+    let (_client, login_body) = app.app_login(&org_code, "alice", &initial_password).await;
     assert_eq!(login_body["needs_password_change"], true);
     let token = login_body["token"].as_str().unwrap().to_string();
 

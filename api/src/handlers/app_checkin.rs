@@ -104,10 +104,9 @@ pub async fn submit_event(
         .checkin_events
         .latest_for_app_user(ctx.app_user_id)
         .await?
+        && occurred_at_client.timestamp_millis() <= latest.occurred_at_client.timestamp_millis()
     {
-        if occurred_at_client.timestamp_millis() <= latest.occurred_at_client.timestamp_millis() {
-            return Err(ApiError::OutOfOrder);
-        }
+        return Err(ApiError::OutOfOrder);
     }
 
     // 6) Reverse-geocode synchronously (fail-soft).
@@ -216,7 +215,9 @@ pub async fn list_events(
         .checkin_events
         .list_by_app_user_paginated(ctx.app_user_id, before, limit)
         .await?;
-    Ok(Json(events.iter().map(CheckinEventDto::from_event).collect()))
+    Ok(Json(
+        events.iter().map(CheckinEventDto::from_event).collect(),
+    ))
 }
 
 /// Guarantee a `checkin_user_status` row exists for the AppUser. Brand-new
@@ -249,11 +250,8 @@ async fn ensure_status_row(
 pub(crate) fn parse_rfc3339(raw: &str) -> ApiResult<DateTime> {
     use ::time::OffsetDateTime;
     use ::time::format_description::well_known::Rfc3339;
-    let parsed = OffsetDateTime::parse(raw, &Rfc3339).map_err(|_| {
-        ApiError::Validation(format!(
-            "invalid RFC3339 timestamp: `{raw}`"
-        ))
-    })?;
+    let parsed = OffsetDateTime::parse(raw, &Rfc3339)
+        .map_err(|_| ApiError::Validation(format!("invalid RFC3339 timestamp: `{raw}`")))?;
     // OffsetDateTime → milliseconds-since-epoch. unix_timestamp_nanos returns
     // i128; convert to i64 millis. The cast saturates on overflow but
     // realistic inputs won't trip it.

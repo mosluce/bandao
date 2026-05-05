@@ -9,7 +9,6 @@ use common::ts;
 use reqwest::StatusCode;
 use serde_json::Value;
 
-
 #[tokio::test]
 async fn status_returns_only_callers_state() {
     let app = TestApp::spawn().await;
@@ -17,7 +16,14 @@ async fn status_returns_only_callers_state() {
         .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
         .await;
     let _ = app
-        .submit_checkin_event(&alice_client, &alice_token, "clock_in", 25.04, 121.56, &ts(0))
+        .submit_checkin_event(
+            &alice_client,
+            &alice_token,
+            "clock_in",
+            25.04,
+            121.56,
+            &ts(0),
+        )
         .await;
 
     // Create bob in the same org.

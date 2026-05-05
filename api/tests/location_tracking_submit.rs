@@ -7,11 +7,7 @@ use common::TestApp;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-async fn patch_settings(
-    app: &TestApp,
-    admin: &reqwest::Client,
-    body: Value,
-) -> reqwest::Response {
+async fn patch_settings(app: &TestApp, admin: &reqwest::Client, body: Value) -> reqwest::Response {
     admin
         .patch(app.url("/orgs/me/settings"))
         .json(&body)
@@ -27,8 +23,7 @@ fn now_iso() -> String {
 }
 
 fn iso_offset(seconds: i64) -> String {
-    let t = ::time::OffsetDateTime::now_utc()
-        + ::time::Duration::seconds(seconds);
+    let t = ::time::OffsetDateTime::now_utc() + ::time::Duration::seconds(seconds);
     t.format(&::time::format_description::well_known::Rfc3339)
         .unwrap()
 }
@@ -206,8 +201,7 @@ async fn old_timestamp_rejected_per_index() {
     enable_tracking(&app, &admin).await;
 
     // 31 days back
-    let very_old = ::time::OffsetDateTime::now_utc()
-        - ::time::Duration::days(31);
+    let very_old = ::time::OffsetDateTime::now_utc() - ::time::Duration::days(31);
     let very_old_iso = very_old
         .format(&::time::format_description::well_known::Rfc3339)
         .unwrap();

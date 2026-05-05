@@ -34,7 +34,10 @@ async fn expired_session_is_rejected_and_cookie_cleared() {
         .db
         .database
         .collection::<bson::Document>("dashboard_sessions")
-        .update_one(doc! { "_id": &token }, doc! { "$set": { "expires_at": past } })
+        .update_one(
+            doc! { "_id": &token },
+            doc! { "$set": { "expires_at": past } },
+        )
         .await
         .unwrap();
     assert_eq!(updated.matched_count, 1, "expected to find the session row");

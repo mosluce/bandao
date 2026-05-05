@@ -40,11 +40,7 @@ pub async fn me(State(state): State<AppState>, ctx: AuthContext) -> ApiResult<Js
         .await?
         .ok_or(ApiError::Unauthorized)?;
 
-    let memberships = state
-        .db
-        .dashboard_memberships
-        .list_by_user(user.id)
-        .await?;
+    let memberships = state.db.dashboard_memberships.list_by_user(user.id).await?;
     let pairs = load_membership_orgs(&state, memberships).await?;
 
     let current_org = match ctx.current_org_id {
@@ -101,11 +97,7 @@ pub async fn create_org(
         .update_current_org(&ctx.session_token, Some(org.id))
         .await?;
 
-    let memberships = state
-        .db
-        .dashboard_memberships
-        .list_by_user(user.id)
-        .await?;
+    let memberships = state.db.dashboard_memberships.list_by_user(user.id).await?;
     let pairs = load_membership_orgs(&state, memberships).await?;
     let current_org = pairs
         .iter()
@@ -152,11 +144,7 @@ pub async fn join_membership(
         .update_current_org(&ctx.session_token, Some(org.id))
         .await?;
 
-    let memberships = state
-        .db
-        .dashboard_memberships
-        .list_by_user(user.id)
-        .await?;
+    let memberships = state.db.dashboard_memberships.list_by_user(user.id).await?;
     let pairs = load_membership_orgs(&state, memberships).await?;
     let current_org = pairs
         .iter()
@@ -199,11 +187,7 @@ pub async fn switch_current_org(
         .update_current_org(&ctx.session_token, Some(target_id))
         .await?;
 
-    let memberships = state
-        .db
-        .dashboard_memberships
-        .list_by_user(user.id)
-        .await?;
+    let memberships = state.db.dashboard_memberships.list_by_user(user.id).await?;
     let pairs = load_membership_orgs(&state, memberships).await?;
     let current_org = pairs
         .iter()

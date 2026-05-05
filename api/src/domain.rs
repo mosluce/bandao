@@ -299,7 +299,10 @@ impl CheckinEventType {
     }
 
     pub fn is_transfer(self) -> bool {
-        matches!(self, CheckinEventType::TransferIn | CheckinEventType::TransferOut)
+        matches!(
+            self,
+            CheckinEventType::TransferIn | CheckinEventType::TransferOut
+        )
     }
 }
 

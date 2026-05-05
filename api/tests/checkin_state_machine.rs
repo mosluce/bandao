@@ -12,7 +12,6 @@ use serde_json::Value;
 /// Bump-by-1-minute helper: tests submit events in chronological order so
 /// `OUT_OF_ORDER` doesn't kick in. We start at a fixed past timestamp so
 /// the test stays deterministic regardless of wall clock.
-
 async fn submit(
     app: &TestApp,
     client: &reqwest::Client,

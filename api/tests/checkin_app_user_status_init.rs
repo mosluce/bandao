@@ -9,14 +9,12 @@ use common::TestApp;
 use common::ts;
 use reqwest::StatusCode;
 
-
 #[tokio::test]
 async fn newly_created_app_user_has_off_duty_status_row() {
     let app = TestApp::spawn().await;
     let (admin, _body) = app.register_admin("admin@example.com", "Acme").await;
     let create_body = app.create_app_user(&admin, "alice", "Alice Chen").await;
-    let app_user_id =
-        ObjectId::parse_str(create_body["user"]["id"].as_str().unwrap()).unwrap();
+    let app_user_id = ObjectId::parse_str(create_body["user"]["id"].as_str().unwrap()).unwrap();
 
     let row = app
         .db()
@@ -48,7 +46,10 @@ async fn newly_created_app_user_can_clock_in_immediately() {
     let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
     let org_code = body["current_org"]["code"].as_str().unwrap().to_string();
     let create_body = app.create_app_user(&admin, "alice", "Alice").await;
-    let initial = create_body["initial_password"].as_str().unwrap().to_string();
+    let initial = create_body["initial_password"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (app_client, login) = app.app_login(&org_code, "alice", &initial).await;
     let token = login["token"].as_str().unwrap().to_string();
 

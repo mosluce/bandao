@@ -50,19 +50,11 @@ async fn leave_only_kicks_sessions_pointing_at_left_org() {
     assert_eq!(leave.status(), StatusCode::NO_CONTENT);
 
     // visitor_a_session is now invalid.
-    let me_a = visitor_a_session
-        .get(app.url("/me"))
-        .send()
-        .await
-        .unwrap();
+    let me_a = visitor_a_session.get(app.url("/me")).send().await.unwrap();
     assert_eq!(me_a.status(), StatusCode::UNAUTHORIZED);
 
     // visitor_b_session — pointing at OrgB — is still alive.
-    let me_b = visitor_b_session
-        .get(app.url("/me"))
-        .send()
-        .await
-        .unwrap();
+    let me_b = visitor_b_session.get(app.url("/me")).send().await.unwrap();
     assert_eq!(me_b.status(), StatusCode::OK);
     let body: Value = me_b.json().await.unwrap();
     assert_eq!(body["current_org"]["id"], org_b_id);

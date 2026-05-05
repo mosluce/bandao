@@ -108,7 +108,10 @@ async fn timezone_change_does_not_touch_stored_timestamps() {
         .await
         .unwrap()
         .expect("org row");
-    assert_eq!(before.created_at.timestamp_millis(), after.created_at.timestamp_millis());
+    assert_eq!(
+        before.created_at.timestamp_millis(),
+        after.created_at.timestamp_millis()
+    );
     // updated_at SHOULD bump (it's part of the patch). But created_at must
     // NOT — that's the point of the assertion.
 }

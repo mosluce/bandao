@@ -99,7 +99,6 @@ pub async fn app_require_session(
 }
 
 async fn authenticate(state: &AppState, token: String) -> Result<AppAuthContext, AppAuthFail> {
-
     let session = match state.db.app_sessions.find_by_token(&token).await {
         Ok(Some(s)) => s,
         Ok(None) => return Err(AppAuthFail::Unauthorized),

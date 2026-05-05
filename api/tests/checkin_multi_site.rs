@@ -9,7 +9,6 @@ use common::ts;
 use reqwest::StatusCode;
 use serde_json::Value;
 
-
 #[tokio::test]
 async fn three_site_shift_cycles_through_legal_states() {
     let app = TestApp::spawn().await;

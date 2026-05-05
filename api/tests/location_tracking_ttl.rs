@@ -10,7 +10,11 @@ use common::TestApp;
 async fn ttl_index_present_with_90_day_expiry() {
     let app = TestApp::spawn().await;
 
-    let coll = app.state.db.database.collection::<bson::Document>("location_pings");
+    let coll = app
+        .state
+        .db
+        .database
+        .collection::<bson::Document>("location_pings");
     let mut cursor = coll.list_indexes().await.expect("list indexes");
 
     let mut found_ttl = false;
@@ -21,11 +25,7 @@ async fn ttl_index_present_with_90_day_expiry() {
         // indexes. Easiest is to roundtrip via bson.
         let bson_spec = bson::to_bson(&raw).expect("index to bson");
         let doc_spec = bson_spec.as_document().expect("index doc").clone();
-        if doc_spec
-            .get("name")
-            .and_then(|v| v.as_str())
-            == Some("location_pings_ttl")
-        {
+        if doc_spec.get("name").and_then(|v| v.as_str()) == Some("location_pings_ttl") {
             // Mongo stores expireAfterSeconds as i32 or i64 depending on
             // driver version — accept either.
             let expire_secs = doc_spec

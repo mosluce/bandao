@@ -69,10 +69,7 @@ impl TestApp {
             .await
             .expect("failed to start mongo container");
         let host = mongo.get_host().await.expect("mongo host");
-        let port = mongo
-            .get_host_port_ipv4(27017)
-            .await
-            .expect("mongo port");
+        let port = mongo.get_host_port_ipv4(27017).await.expect("mongo port");
         let mongo_uri = format!("mongodb://{host}:{port}");
         let mongo_db = format!("argus_test_{}", ObjectId::new().to_hex());
 
@@ -150,11 +147,7 @@ impl TestApp {
 
     /// Register the first identity in an Org via `mode=create`. Returns the
     /// authenticated client and the parsed `AuthResponse`-shaped body.
-    pub async fn register_admin(
-        &self,
-        email: &str,
-        org_name: &str,
-    ) -> (reqwest::Client, Value) {
+    pub async fn register_admin(&self, email: &str, org_name: &str) -> (reqwest::Client, Value) {
         let client = self.fresh_client();
         let resp = client
             .post(self.url("/auth/register"))
@@ -167,17 +160,17 @@ impl TestApp {
             .send()
             .await
             .expect("send register create");
-        assert_eq!(resp.status(), reqwest::StatusCode::OK, "register create failed");
+        assert_eq!(
+            resp.status(),
+            reqwest::StatusCode::OK,
+            "register create failed"
+        );
         let body: Value = resp.json().await.expect("register body json");
         (client, body)
     }
 
     /// Register a new identity that joins an existing Org via `mode=join`.
-    pub async fn register_member(
-        &self,
-        email: &str,
-        org_code: &str,
-    ) -> (reqwest::Client, Value) {
+    pub async fn register_member(&self, email: &str, org_code: &str) -> (reqwest::Client, Value) {
         let client = self.fresh_client();
         let resp = client
             .post(self.url("/auth/register"))
@@ -190,7 +183,11 @@ impl TestApp {
             .send()
             .await
             .expect("send register join");
-        assert_eq!(resp.status(), reqwest::StatusCode::OK, "register join failed");
+        assert_eq!(
+            resp.status(),
+            reqwest::StatusCode::OK,
+            "register join failed"
+        );
         let body: Value = resp.json().await.expect("register join body");
         (client, body)
     }
@@ -275,14 +272,24 @@ impl TestApp {
 
     /// Convenience: send an authenticated `GET /app/...` request, attaching
     /// `Authorization: Bearer <token>` from a previous `app_login` body.
-    pub fn app_get(&self, client: &reqwest::Client, token: &str, path: &str) -> reqwest::RequestBuilder {
+    pub fn app_get(
+        &self,
+        client: &reqwest::Client,
+        token: &str,
+        path: &str,
+    ) -> reqwest::RequestBuilder {
         client
             .get(self.url(path))
             .header("Authorization", format!("Bearer {token}"))
     }
 
     /// Convenience: send an authenticated `POST /app/...` request.
-    pub fn app_post(&self, client: &reqwest::Client, token: &str, path: &str) -> reqwest::RequestBuilder {
+    pub fn app_post(
+        &self,
+        client: &reqwest::Client,
+        token: &str,
+        path: &str,
+    ) -> reqwest::RequestBuilder {
         client
             .post(self.url(path))
             .header("Authorization", format!("Bearer {token}"))
@@ -371,7 +378,14 @@ impl TestApp {
             reqwest::StatusCode::NO_CONTENT,
             "change_password failed"
         );
-        (admin, org_code, app_user_id, app_client, token, new_password)
+        (
+            admin,
+            org_code,
+            app_user_id,
+            app_client,
+            token,
+            new_password,
+        )
     }
 }
 

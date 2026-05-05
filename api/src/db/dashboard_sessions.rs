@@ -96,8 +96,7 @@ impl DashboardSessionRepository {
     /// expiry would be earlier than the existing one (defensive no-op).
     pub async fn touch_expires(&self, token: &str, ttl: Duration) -> ApiResult<()> {
         let now = DateTime::now();
-        let new_expires =
-            DateTime::from_millis(now.timestamp_millis() + ttl.as_millis() as i64);
+        let new_expires = DateTime::from_millis(now.timestamp_millis() + ttl.as_millis() as i64);
         self.coll
             .update_one(
                 doc! { "_id": token },

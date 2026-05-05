@@ -8,7 +8,10 @@ use serde_json::{Value, json};
 async fn register_by_active_slug_joins_same_org() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let org_id = admin_body["current_org"]["id"].as_str().unwrap().to_string();
+    let org_id = admin_body["current_org"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let set_resp = admin
         .post(app.url("/orgs/me/slug"))

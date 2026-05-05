@@ -41,7 +41,9 @@ async fn admin_creates_app_user_returns_initial_password_once() {
     assert_eq!(user["display_name"], "Alice Chen");
     assert_eq!(user["status"], "active");
     assert_eq!(user["needs_password_change"], true);
-    assert!(user["last_login_at"].is_null() || !user.as_object().unwrap().contains_key("last_login_at"));
+    assert!(
+        user["last_login_at"].is_null() || !user.as_object().unwrap().contains_key("last_login_at")
+    );
 
     // The matching `checkin_user_status` row must exist with status=off_duty,
     // ready for the AppUser's first clock-in.

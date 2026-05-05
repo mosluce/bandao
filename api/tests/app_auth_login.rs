@@ -14,12 +14,20 @@ async fn seed_app_user(app: &TestApp) -> (reqwest::Client, String, String, Strin
     let (admin, body) = app.register_admin("founder@example.com", "Acme").await;
     let org_code = body["current_org"]["code"].as_str().unwrap().to_string();
     let org_id = body["current_org"]["id"].as_str().unwrap().to_string();
-    let create_body = app
-        .create_app_user(&admin, "alice", "Alice Chen")
-        .await;
+    let create_body = app.create_app_user(&admin, "alice", "Alice Chen").await;
     let app_user_id = create_body["user"]["id"].as_str().unwrap().to_string();
-    let initial_password = create_body["initial_password"].as_str().unwrap().to_string();
-    (admin, org_code, org_id, app_user_id, initial_password, "alice".to_string())
+    let initial_password = create_body["initial_password"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    (
+        admin,
+        org_code,
+        org_id,
+        app_user_id,
+        initial_password,
+        "alice".to_string(),
+    )
 }
 
 #[tokio::test]
@@ -46,7 +54,10 @@ async fn app_login_happy_path_issues_token_and_returns_context() {
         .await
         .unwrap()
         .expect("app user row");
-    assert!(user_row.last_login_at.is_some(), "last_login_at should be set");
+    assert!(
+        user_row.last_login_at.is_some(),
+        "last_login_at should be set"
+    );
 
     // app_sessions row exists for the issued token.
     let token = body["token"].as_str().unwrap();
@@ -158,8 +169,7 @@ async fn app_login_disabled_user_indistinguishable_from_wrong_password() {
 #[tokio::test]
 async fn app_login_username_lookup_is_case_insensitive() {
     let app = TestApp::spawn().await;
-    let (_admin, org_code, _org_id, _id, initial_password, _u) =
-        seed_app_user(&app).await;
+    let (_admin, org_code, _org_id, _id, initial_password, _u) = seed_app_user(&app).await;
 
     // AppUser was created with username="alice" → username_lower="alice".
     // Login with mixed-case "ALICE" must still match.
@@ -170,8 +180,7 @@ async fn app_login_username_lookup_is_case_insensitive() {
 #[tokio::test]
 async fn app_login_via_active_slug_succeeds() {
     let app = TestApp::spawn().await;
-    let (admin, _org_code, _org_id, _id, initial_password, username) =
-        seed_app_user(&app).await;
+    let (admin, _org_code, _org_id, _id, initial_password, username) = seed_app_user(&app).await;
 
     // Set a slug on the Org.
     let r = admin
@@ -189,8 +198,7 @@ async fn app_login_via_active_slug_succeeds() {
 #[tokio::test]
 async fn app_login_via_grace_slug_still_works() {
     let app = TestApp::spawn().await;
-    let (admin, _org_code, org_id, _id, initial_password, username) =
-        seed_app_user(&app).await;
+    let (admin, _org_code, org_id, _id, initial_password, username) = seed_app_user(&app).await;
 
     // First slug.
     let r = admin
@@ -203,8 +211,7 @@ async fn app_login_via_grace_slug_still_works() {
 
     // Backdate slug_changed_at so the second change is allowed.
     let oid = ObjectId::parse_str(&org_id).unwrap();
-    let backdated =
-        DateTime::from_millis(DateTime::now().timestamp_millis() - 35 * DAY_MS);
+    let backdated = DateTime::from_millis(DateTime::now().timestamp_millis() - 35 * DAY_MS);
     app.db()
         .database
         .collection::<bson::Document>("orgs")

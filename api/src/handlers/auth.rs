@@ -175,7 +175,14 @@ pub async fn register(
                 }
             };
 
-            issue_session(&state, &jar, user, vec![(membership, org.clone())], Some(org)).await
+            issue_session(
+                &state,
+                &jar,
+                user,
+                vec![(membership, org.clone())],
+                Some(org),
+            )
+            .await
         }
         RegisterRequest::Join {
             email,
@@ -227,7 +234,14 @@ pub async fn register(
                     return Err(ApiError::Db(err));
                 }
             };
-            issue_session(&state, &jar, user, vec![(membership, org.clone())], Some(org)).await
+            issue_session(
+                &state,
+                &jar,
+                user,
+                vec![(membership, org.clone())],
+                Some(org),
+            )
+            .await
         }
     }
 }
@@ -248,11 +262,7 @@ pub async fn login(
         return Err(ApiError::InvalidCredentials);
     }
 
-    let memberships = state
-        .db
-        .dashboard_memberships
-        .list_by_user(user.id)
-        .await?;
+    let memberships = state.db.dashboard_memberships.list_by_user(user.id).await?;
     let pairs = load_membership_orgs(&state, memberships).await?;
     let current_org = pick_default_org(user.id, &pairs);
 
@@ -352,9 +362,12 @@ pub(crate) fn build_auth_response(
     pairs: Vec<(Membership, Org)>,
     current_org: Option<Org>,
 ) -> AuthResponse {
-    let role = current_org
-        .as_ref()
-        .and_then(|co| pairs.iter().find(|(_, o)| o.id == co.id).map(|(m, _)| m.role));
+    let role = current_org.as_ref().and_then(|co| {
+        pairs
+            .iter()
+            .find(|(_, o)| o.id == co.id)
+            .map(|(m, _)| m.role)
+    });
 
     let memberships = pairs
         .into_iter()
@@ -438,7 +451,9 @@ pub(crate) fn validate_password(password: &str) -> ApiResult<()> {
 pub(crate) fn validate_org_name(name: &str) -> ApiResult<()> {
     let trimmed = name.trim();
     if trimmed.is_empty() || trimmed.chars().count() > 120 {
-        return Err(ApiError::Validation("org_name length must be 1..=120".into()));
+        return Err(ApiError::Validation(
+            "org_name length must be 1..=120".into(),
+        ));
     }
     Ok(())
 }

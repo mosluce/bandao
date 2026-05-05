@@ -18,9 +18,7 @@ async fn reset_returns_new_initial_password_kills_sessions_and_changes_hash() {
 
     // Change the password to clear `needs_password_change` so the reset
     // flow shows the flag is being deliberately re-set.
-    let (_client, login) = app
-        .app_login(&org_code, "alice", &original_password)
-        .await;
+    let (_client, login) = app.app_login(&org_code, "alice", &original_password).await;
     let token = login["token"].as_str().unwrap().to_string();
     let pw = app
         .fresh_client()

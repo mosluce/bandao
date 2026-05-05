@@ -8,7 +8,10 @@ use serde_json::{Value, json};
 async fn admin_promotes_member_to_admin() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (_member, member_body) = app.register_member("member@example.com", &code).await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
@@ -28,7 +31,10 @@ async fn admin_promotes_member_to_admin() {
 async fn member_cannot_change_roles() {
     let app = TestApp::spawn().await;
     let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (member, member_body) = app.register_member("member@example.com", &code).await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
@@ -81,7 +87,10 @@ async fn demoting_owner_is_rejected() {
 async fn demoting_non_owner_admin_succeeds() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (_member, member_body) = app.register_member("member@example.com", &code).await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 

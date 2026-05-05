@@ -43,7 +43,10 @@ async fn expire_reservation(app: &TestApp, slug: &str) {
 async fn join_works_during_grace_then_fails_after_expiry() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let org_id = admin_body["current_org"]["id"].as_str().unwrap().to_string();
+    let org_id = admin_body["current_org"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // First SET (no rate limit).
     let r = admin

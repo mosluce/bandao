@@ -44,9 +44,13 @@ impl Config {
             })?;
         let session_ttl = Duration::from_secs(session_ttl_secs);
 
-        let cookie_domain = std::env::var("ARGUS_COOKIE_DOMAIN").ok().filter(|v| !v.is_empty());
+        let cookie_domain = std::env::var("ARGUS_COOKIE_DOMAIN")
+            .ok()
+            .filter(|v| !v.is_empty());
         let cookie_secure = parse_bool_or("ARGUS_COOKIE_SECURE", false)?;
-        let allowed_origin = std::env::var("ARGUS_ALLOWED_ORIGIN").ok().filter(|v| !v.is_empty());
+        let allowed_origin = std::env::var("ARGUS_ALLOWED_ORIGIN")
+            .ok()
+            .filter(|v| !v.is_empty());
 
         Ok(Self {
             mongo_uri,

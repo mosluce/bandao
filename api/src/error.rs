@@ -151,12 +151,8 @@ impl ApiError {
             ApiError::InvalidTarget => (StatusCode::BAD_REQUEST, "INVALID_TARGET"),
             ApiError::SameOwner => (StatusCode::BAD_REQUEST, "SAME_OWNER"),
             ApiError::UsernameTaken => (StatusCode::CONFLICT, "USERNAME_TAKEN"),
-            ApiError::InvalidUsernameFormat => {
-                (StatusCode::BAD_REQUEST, "INVALID_USERNAME_FORMAT")
-            }
-            ApiError::NeedsPasswordChange => {
-                (StatusCode::LOCKED, "NEEDS_PASSWORD_CHANGE")
-            }
+            ApiError::InvalidUsernameFormat => (StatusCode::BAD_REQUEST, "INVALID_USERNAME_FORMAT"),
+            ApiError::NeedsPasswordChange => (StatusCode::LOCKED, "NEEDS_PASSWORD_CHANGE"),
             ApiError::InvalidTransition { .. } => {
                 (StatusCode::UNPROCESSABLE_ENTITY, "INVALID_TRANSITION")
             }

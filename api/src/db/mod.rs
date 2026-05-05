@@ -26,10 +26,10 @@ pub use app_sessions::AppSessionRepository;
 pub use app_users::{AppUserInsertError, AppUserRepository};
 pub use checkin_events::CheckinEventRepository;
 pub use checkin_user_status::{CheckinStatusInsertError, CheckinUserStatusRepository};
-pub use location_pings::{InsertManyOutcome, LOCATION_PING_BATCH_MAX, LocationPingRepository};
 pub use dashboard_memberships::{MembershipInsertError, MembershipRepository};
 pub use dashboard_sessions::DashboardSessionRepository;
 pub use dashboard_users::DashboardUserRepository;
+pub use location_pings::{InsertManyOutcome, LOCATION_PING_BATCH_MAX, LocationPingRepository};
 pub use orgs::OrgRepository;
 pub use removed_memberships::RemovedMembershipRepository;
 pub use slug_reservations::{OrgSlugReservationRepository, ReservationInsertError};
@@ -102,7 +102,12 @@ impl Db {
         orgs.create_index(
             IndexModel::builder()
                 .keys(doc! { "code": 1 })
-                .options(IndexOptions::builder().unique(true).name("orgs_code_unique".to_string()).build())
+                .options(
+                    IndexOptions::builder()
+                        .unique(true)
+                        .name("orgs_code_unique".to_string())
+                        .build(),
+                )
                 .build(),
         )
         .await?;
@@ -183,8 +188,7 @@ impl Db {
             tracing::debug!(?err, "dashboard_users_org_id drop_index ignored");
         }
 
-        let memberships: Collection<Membership> =
-            self.database.collection("dashboard_memberships");
+        let memberships: Collection<Membership> = self.database.collection("dashboard_memberships");
         memberships
             .create_index(
                 IndexModel::builder()
@@ -311,8 +315,7 @@ impl Db {
 
         // checkin_events: paginate per-AppUser by client time (mobile + admin
         // history) and per-Org by client time (future cross-Org reports).
-        let checkin_events: Collection<CheckinEvent> =
-            self.database.collection("checkin_events");
+        let checkin_events: Collection<CheckinEvent> = self.database.collection("checkin_events");
         checkin_events
             .create_index(
                 IndexModel::builder()
@@ -360,8 +363,7 @@ impl Db {
         // 90-day TTL keyed on `occurred_at_server` so client-clock drift can't
         // skew retention. Mongo's TTL monitor runs ~every 60s, so retention is
         // "90 days ± a minute".
-        let location_pings: Collection<LocationPing> =
-            self.database.collection("location_pings");
+        let location_pings: Collection<LocationPing> = self.database.collection("location_pings");
         location_pings
             .create_index(
                 IndexModel::builder()

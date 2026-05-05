@@ -87,9 +87,7 @@ async fn disable_kills_all_sessions_re_enable_preserves_password_and_flag() {
     assert_eq!(body["status"], "active");
     assert_eq!(body["needs_password_change"], true);
 
-    let (_client, login) = app
-        .app_login(&org_code, "alice", &initial_password)
-        .await;
+    let (_client, login) = app.app_login(&org_code, "alice", &initial_password).await;
     assert_eq!(login["needs_password_change"], true);
 }
 

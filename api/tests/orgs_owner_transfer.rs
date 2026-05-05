@@ -5,10 +5,15 @@ use reqwest::StatusCode;
 use serde_json::{Value, json};
 
 /// Build OrgA with two admins: founder (current owner) and second (admin).
-async fn setup_owner_and_admin(app: &TestApp) -> (reqwest::Client, String, reqwest::Client, String) {
+async fn setup_owner_and_admin(
+    app: &TestApp,
+) -> (reqwest::Client, String, reqwest::Client, String) {
     let (founder, founder_body) = app.register_admin("founder@example.com", "Acme").await;
     let founder_id = founder_body["user"]["id"].as_str().unwrap().to_string();
-    let code = founder_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = founder_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let (second, second_body) = app.register_member("second@example.com", &code).await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
@@ -115,7 +120,10 @@ async fn wrong_password_rejected() {
 async fn target_must_be_admin() {
     let app = TestApp::spawn().await;
     let (founder, founder_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = founder_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = founder_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (_member, member_body) = app.register_member("member@example.com", &code).await;
     let member_id = member_body["user"]["id"].as_str().unwrap().to_string();
 

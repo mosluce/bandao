@@ -8,7 +8,10 @@ use serde_json::{Value, json};
 async fn admin_can_rotate_org_code_and_old_code_no_longer_joins() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let original_code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let original_code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let rotate = admin
         .post(app.url("/orgs/me/code/rotate"))
@@ -46,7 +49,10 @@ async fn admin_can_rotate_org_code_and_old_code_no_longer_joins() {
 async fn member_cannot_rotate_org_code() {
     let app = TestApp::spawn().await;
     let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (member, _) = app.register_member("member@example.com", &code).await;
 
     let resp = member

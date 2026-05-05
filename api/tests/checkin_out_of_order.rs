@@ -7,7 +7,6 @@ use common::ts;
 use reqwest::StatusCode;
 use serde_json::Value;
 
-
 #[tokio::test]
 async fn earlier_than_last_event_rejected() {
     let app = TestApp::spawn().await;

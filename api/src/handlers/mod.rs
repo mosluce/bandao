@@ -43,10 +43,7 @@ pub fn router(state: AppState) -> Router {
         .route("/orgs/me/owner", post(orgs::transfer_owner))
         .route("/orgs/me/settings", patch(checkin::update_settings))
         .route("/dashboard-users", get(users::list_in_org))
-        .route(
-            "/dashboard-users/cooldowns",
-            get(users::list_cooldowns),
-        )
+        .route("/dashboard-users/cooldowns", get(users::list_cooldowns))
         .route(
             "/dashboard-users/cooldowns/{email}",
             delete(users::clear_cooldown),
@@ -56,10 +53,7 @@ pub fn router(state: AppState) -> Router {
         // `/app-users/*` lives in dashboard-tenancy world (cookie auth +
         // RequireAdmin). The route handlers themselves enforce admin role
         // and current-Org scoping.
-        .route(
-            "/app-users",
-            get(app_users::list).post(app_users::create),
-        )
+        .route("/app-users", get(app_users::list).post(app_users::create))
         .route("/app-users/{id}", patch(app_users::update))
         .route(
             "/app-users/{id}/password-reset",
@@ -69,10 +63,7 @@ pub fn router(state: AppState) -> Router {
         // three guard on RequireAdmin and scope to current_org inside the
         // handler.
         .route("/checkin/users", get(checkin::list_users))
-        .route(
-            "/checkin/users/{id}/events",
-            get(checkin::list_user_events),
-        )
+        .route("/checkin/users/{id}/events", get(checkin::list_user_events))
         .route(
             "/checkin/users/{id}/force-checkout",
             post(checkin::force_checkout),
@@ -96,7 +87,10 @@ pub fn router(state: AppState) -> Router {
         .route("/app/auth/logout", post(app_auth::logout))
         .route("/app/me", get(app_auth::me))
         .route("/app/me/password", post(app_auth::change_password))
-        .route("/app/checkin/events", post(app_checkin::submit_event).get(app_checkin::list_events))
+        .route(
+            "/app/checkin/events",
+            post(app_checkin::submit_event).get(app_checkin::list_events),
+        )
         .route("/app/checkin/status", get(app_checkin::status))
         .route(
             "/app/checkin/locations",
@@ -135,7 +129,11 @@ fn build_cors(state: &AppState) -> CorsLayer {
         match HeaderValue::from_str(origin) {
             Ok(v) => layer.allow_origin(v),
             Err(err) => {
-                tracing::warn!(?err, origin, "invalid ARGUS_ALLOWED_ORIGIN; falling back to no CORS");
+                tracing::warn!(
+                    ?err,
+                    origin,
+                    "invalid ARGUS_ALLOWED_ORIGIN; falling back to no CORS"
+                );
                 layer
             }
         }

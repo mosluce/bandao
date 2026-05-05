@@ -65,7 +65,8 @@ async fn stale_membership_session_returns_unauthorized_and_clears_cookie() {
     let app = TestApp::spawn().await;
     let (client, body) = app.register_admin("founder@example.com", "Acme").await;
     let user_id = bson::oid::ObjectId::parse_str(body["user"]["id"].as_str().unwrap()).unwrap();
-    let org_id = bson::oid::ObjectId::parse_str(body["current_org"]["id"].as_str().unwrap()).unwrap();
+    let org_id =
+        bson::oid::ObjectId::parse_str(body["current_org"]["id"].as_str().unwrap()).unwrap();
 
     // Force the membership row to vanish out from under the active session.
     // (Race / future-Org-delete simulation.)

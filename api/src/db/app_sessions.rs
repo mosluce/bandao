@@ -20,11 +20,7 @@ impl AppSessionRepository {
 
     /// Create a new AppSession for `app_user_id`. Token is opaque random
     /// base64 (≥256 bits), stored in `_id`.
-    pub async fn create(
-        &self,
-        app_user_id: ObjectId,
-        ttl: Duration,
-    ) -> ApiResult<AppSession> {
+    pub async fn create(&self, app_user_id: ObjectId, ttl: Duration) -> ApiResult<AppSession> {
         let now = DateTime::now();
         let expires_at = DateTime::from_millis(now.timestamp_millis() + ttl.as_millis() as i64);
         let session = AppSession {
@@ -59,8 +55,7 @@ impl AppSessionRepository {
     /// Sliding refresh: extend the session expiry to `now + ttl`.
     pub async fn touch_expires(&self, token: &str, ttl: Duration) -> ApiResult<()> {
         let now = DateTime::now();
-        let new_expires =
-            DateTime::from_millis(now.timestamp_millis() + ttl.as_millis() as i64);
+        let new_expires = DateTime::from_millis(now.timestamp_millis() + ttl.as_millis() as i64);
         self.coll
             .update_one(
                 doc! { "_id": token },

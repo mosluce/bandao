@@ -18,18 +18,12 @@ async fn enable_tracking(app: &TestApp, admin: &reqwest::Client) {
 }
 
 fn iso_offset(seconds: i64) -> String {
-    let t = ::time::OffsetDateTime::now_utc()
-        + ::time::Duration::seconds(seconds);
+    let t = ::time::OffsetDateTime::now_utc() + ::time::Duration::seconds(seconds);
     t.format(&::time::format_description::well_known::Rfc3339)
         .unwrap()
 }
 
-async fn seed_pings(
-    app: &TestApp,
-    app_client: &reqwest::Client,
-    token: &str,
-    count: usize,
-) {
+async fn seed_pings(app: &TestApp, app_client: &reqwest::Client, token: &str, count: usize) {
     let pings: Vec<Value> = (0..count)
         .map(|i| {
             json!({
@@ -88,18 +82,14 @@ async fn before_cursor_filters_results() {
     seed_pings(&app, &app_client, &token, 10).await;
 
     let r1 = admin
-        .get(app.url(&format!(
-            "/checkin/users/{app_user_id}/locations?limit=5"
-        )))
+        .get(app.url(&format!("/checkin/users/{app_user_id}/locations?limit=5")))
         .send()
         .await
         .unwrap();
     let body1: Value = r1.json().await.unwrap();
     let first_page = body1.as_array().unwrap();
     assert_eq!(first_page.len(), 5);
-    let oldest = first_page
-        .last()
-        .unwrap()["occurred_at_client"]
+    let oldest = first_page.last().unwrap()["occurred_at_client"]
         .as_str()
         .unwrap()
         .to_string();

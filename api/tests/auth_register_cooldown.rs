@@ -23,7 +23,10 @@ async fn delete_identity(app: &TestApp, email: &str) {
 async fn rejoin_during_cooldown_via_register_is_blocked() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Member joins, then admin removes them — marker is created.
     let (_member, join_body) = app.register_member("transient@example.com", &code).await;
@@ -63,7 +66,10 @@ async fn rejoin_during_cooldown_via_register_is_blocked() {
 async fn existing_identity_rejoin_via_register_is_email_taken() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let (_member, join_body) = app.register_member("transient@example.com", &code).await;
     let member_id = join_body["user"]["id"].as_str().unwrap().to_string();
@@ -131,7 +137,10 @@ async fn rejoin_to_different_org_during_cooldown_succeeds() {
 async fn rejoin_with_mixed_case_email_matches_lowercased_marker() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let (_member, join1) = app.register_member("transient@example.com", &code).await;
     let member_id = join1["user"]["id"].as_str().unwrap().to_string();
@@ -164,7 +173,10 @@ async fn rejoin_with_mixed_case_email_matches_lowercased_marker() {
 async fn rejoin_after_admin_clears_cooldown_succeeds() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let (_member, join1) = app.register_member("transient@example.com", &code).await;
     let member_id = join1["user"]["id"].as_str().unwrap().to_string();

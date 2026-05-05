@@ -104,7 +104,11 @@ pub async fn set_slug_atomic(
     now: DateTime,
     grace_ttl: Duration,
 ) -> ApiResult<Org> {
-    let inserted = match db.slug_reservations.try_insert_active(new_slug, org.id).await {
+    let inserted = match db
+        .slug_reservations
+        .try_insert_active(new_slug, org.id)
+        .await
+    {
         Ok(r) => r,
         Err(ReservationInsertError::Duplicate) => return Err(ApiError::SlugTaken),
         Err(ReservationInsertError::Db(err)) => return Err(ApiError::Db(err)),
@@ -183,7 +187,10 @@ pub async fn resolve_org_for_join(db: &Db, input: &str) -> ApiResult<Org> {
 }
 
 async fn resolve_by_id(db: &Db, org_id: ObjectId) -> ApiResult<Org> {
-    db.orgs.find_by_id(org_id).await?.ok_or(ApiError::InvalidOrgCode)
+    db.orgs
+        .find_by_id(org_id)
+        .await?
+        .ok_or(ApiError::InvalidOrgCode)
 }
 
 #[cfg(test)]
@@ -222,9 +229,18 @@ mod tests {
 
     #[test]
     fn validate_rejects_invalid_chars() {
-        assert_eq!(validate("acme-corp"), Err(SlugValidationError::InvalidFormat));
-        assert_eq!(validate("acme corp"), Err(SlugValidationError::InvalidFormat));
-        assert_eq!(validate("acme_corp"), Err(SlugValidationError::InvalidFormat));
+        assert_eq!(
+            validate("acme-corp"),
+            Err(SlugValidationError::InvalidFormat)
+        );
+        assert_eq!(
+            validate("acme corp"),
+            Err(SlugValidationError::InvalidFormat)
+        );
+        assert_eq!(
+            validate("acme_corp"),
+            Err(SlugValidationError::InvalidFormat)
+        );
         assert_eq!(validate("ACME"), Err(SlugValidationError::InvalidFormat));
     }
 

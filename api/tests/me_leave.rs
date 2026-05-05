@@ -9,7 +9,10 @@ use serde_json::Value;
 async fn non_owner_member_can_self_leave() {
     let app = TestApp::spawn().await;
     let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let org_id = ObjectId::parse_str(admin_body["current_org"]["id"].as_str().unwrap()).unwrap();
 
     let (member, member_body) = app.register_member("member@example.com", &code).await;
@@ -19,7 +22,12 @@ async fn non_owner_member_can_self_leave() {
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 
     // Identity SURVIVES — only the membership and current-org session are gone.
-    let user = app.db().dashboard_users.find_by_id(member_id).await.unwrap();
+    let user = app
+        .db()
+        .dashboard_users
+        .find_by_id(member_id)
+        .await
+        .unwrap();
     assert!(user.is_some(), "identity should survive self-leave");
 
     // Membership row gone.
@@ -65,7 +73,10 @@ async fn leave_without_active_org_is_no_active_org() {
     // ownership, then self-leave. The freshly issued login session has
     // current_org_id = null, so /me/leave must return NO_ACTIVE_ORG.
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (_, second_body) = app.register_member("second@example.com", &code).await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
     admin

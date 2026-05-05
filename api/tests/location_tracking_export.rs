@@ -18,8 +18,7 @@ async fn enable_tracking(app: &TestApp, admin: &reqwest::Client) {
 }
 
 fn iso_offset(seconds: i64) -> String {
-    let t = ::time::OffsetDateTime::now_utc()
-        + ::time::Duration::seconds(seconds);
+    let t = ::time::OffsetDateTime::now_utc() + ::time::Duration::seconds(seconds);
     t.format(&::time::format_description::well_known::Rfc3339)
         .unwrap()
 }
@@ -73,7 +72,10 @@ async fn export_happy_path_returns_xlsx() {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
-    assert!(cd.contains("attachment"), "expected attachment disposition: {cd}");
+    assert!(
+        cd.contains("attachment"),
+        "expected attachment disposition: {cd}"
+    );
     assert!(cd.contains(".xlsx"), "expected .xlsx filename: {cd}");
 
     // Body is a non-empty xlsx (zip header `PK`).

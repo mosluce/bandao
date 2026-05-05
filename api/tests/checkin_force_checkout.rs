@@ -10,7 +10,6 @@ use common::ts;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-
 #[tokio::test]
 async fn force_checkout_on_site_appuser_succeeds() {
     let app = TestApp::spawn().await;
@@ -104,7 +103,14 @@ async fn force_checkout_cross_org_returns_not_found() {
         .seed_app_user_ready_to_checkin("a-admin@example.com", "OrgA", "alice", "Alice")
         .await;
     let _ = app
-        .submit_checkin_event(&alice_client, &alice_token, "clock_in", 25.04, 121.56, &ts(0))
+        .submit_checkin_event(
+            &alice_client,
+            &alice_token,
+            "clock_in",
+            25.04,
+            121.56,
+            &ts(0),
+        )
         .await;
 
     // Org B admin tries to force-checkout Alice.
@@ -125,7 +131,14 @@ async fn force_checkout_member_rejected() {
         .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
         .await;
     let _ = app
-        .submit_checkin_event(&alice_client, &alice_token, "clock_in", 25.04, 121.56, &ts(0))
+        .submit_checkin_event(
+            &alice_client,
+            &alice_token,
+            "clock_in",
+            25.04,
+            121.56,
+            &ts(0),
+        )
         .await;
 
     // Add a member to the same Org and have them try.
@@ -150,7 +163,14 @@ async fn force_checkout_reason_too_long_validation() {
         .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
         .await;
     let _ = app
-        .submit_checkin_event(&alice_client, &alice_token, "clock_in", 25.04, 121.56, &ts(0))
+        .submit_checkin_event(
+            &alice_client,
+            &alice_token,
+            "clock_in",
+            25.04,
+            121.56,
+            &ts(0),
+        )
         .await;
 
     let r = admin

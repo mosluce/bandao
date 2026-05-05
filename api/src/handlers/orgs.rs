@@ -132,8 +132,8 @@ pub async fn transfer_owner(
         return Err(ApiError::Forbidden);
     }
 
-    let new_owner_id = ObjectId::parse_str(&req.new_owner_user_id)
-        .map_err(|_| ApiError::InvalidTarget)?;
+    let new_owner_id =
+        ObjectId::parse_str(&req.new_owner_user_id).map_err(|_| ApiError::InvalidTarget)?;
 
     if new_owner_id == active.ctx.user_id {
         return Err(ApiError::SameOwner);

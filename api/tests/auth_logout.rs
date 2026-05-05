@@ -15,11 +15,7 @@ async fn logout_invalidates_session_but_preserves_identity_and_membership() {
     let me = client.get(app.url("/me")).send().await.unwrap();
     assert_eq!(me.status(), StatusCode::OK);
 
-    let logout = client
-        .post(app.url("/auth/logout"))
-        .send()
-        .await
-        .unwrap();
+    let logout = client.post(app.url("/auth/logout")).send().await.unwrap();
     assert_eq!(logout.status(), StatusCode::NO_CONTENT);
 
     // Same client now /me → 401.

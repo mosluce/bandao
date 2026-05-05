@@ -22,8 +22,8 @@ use crate::domain::{
 };
 use crate::error::{ApiError, ApiResult};
 use crate::handlers::checkin_dto::{
-    BoardAppUserDto, CheckinEventDto, CheckinUserBoardRowDto, ForceCheckoutRequest,
-    OrgSettingsDto, UpdateOrgSettingsRequest,
+    BoardAppUserDto, CheckinEventDto, CheckinUserBoardRowDto, ForceCheckoutRequest, OrgSettingsDto,
+    UpdateOrgSettingsRequest,
 };
 use crate::state::AppState;
 
@@ -50,10 +50,8 @@ pub async fn list_users(
         .checkin_user_status
         .list_by_org(active.org_id)
         .await?;
-    let mut status_by_user: HashMap<ObjectId, CheckinUserStatus> = statuses
-        .into_iter()
-        .map(|s| (s.app_user_id, s))
-        .collect();
+    let mut status_by_user: HashMap<ObjectId, CheckinUserStatus> =
+        statuses.into_iter().map(|s| (s.app_user_id, s)).collect();
 
     let mut rows = Vec::with_capacity(users.len());
     for user in &users {
@@ -134,7 +132,9 @@ pub async fn list_user_events(
         .checkin_events
         .list_by_app_user_paginated(user.id, before, limit)
         .await?;
-    Ok(Json(events.iter().map(CheckinEventDto::from_event).collect()))
+    Ok(Json(
+        events.iter().map(CheckinEventDto::from_event).collect(),
+    ))
 }
 
 /// `POST /checkin/users/:id/force-checkout` — admin synthesises a
@@ -162,12 +162,12 @@ pub async fn force_checkout(
         .as_deref()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-    if let Some(r) = reason.as_deref() {
-        if r.chars().count() > REASON_MAX {
-            return Err(ApiError::Validation(format!(
-                "reason length must be <= {REASON_MAX}"
-            )));
-        }
+    if let Some(r) = reason.as_deref()
+        && r.chars().count() > REASON_MAX
+    {
+        return Err(ApiError::Validation(format!(
+            "reason length must be <= {REASON_MAX}"
+        )));
     }
 
     let status_row = state
@@ -210,12 +210,12 @@ pub async fn force_checkout(
 
     // The state machine still validates: in_transit and on_site both have
     // clock_out as a legal transition.
-    let new_status = CheckinEventType::ClockOut
-        .next_status(prior_status)
-        .ok_or(ApiError::InvalidTransition {
+    let new_status = CheckinEventType::ClockOut.next_status(prior_status).ok_or(
+        ApiError::InvalidTransition {
             from: prior_status,
             attempted: CheckinEventType::ClockOut,
-        })?;
+        },
+    )?;
 
     let event = state
         .db
@@ -255,10 +255,12 @@ pub async fn force_checkout(
         &updated_status,
         Some(&event),
     );
-    Ok(Json(crate::handlers::checkin_dto::SubmitCheckinEventResponse {
-        event: event_dto,
-        status: status_dto,
-    }))
+    Ok(Json(
+        crate::handlers::checkin_dto::SubmitCheckinEventResponse {
+            event: event_dto,
+            status: status_dto,
+        },
+    ))
 }
 
 /// `PATCH /orgs/me/settings` — admin updates `transfer_enabled` and/or

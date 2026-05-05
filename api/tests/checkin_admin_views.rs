@@ -8,7 +8,6 @@ use common::ts;
 use reqwest::StatusCode;
 use serde_json::Value;
 
-
 #[tokio::test]
 async fn admin_lists_current_org_app_users_with_status() {
     let app = TestApp::spawn().await;
@@ -16,14 +15,17 @@ async fn admin_lists_current_org_app_users_with_status() {
         .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
         .await;
     let _ = app
-        .submit_checkin_event(&alice_client, &alice_token, "clock_in", 25.04, 121.56, &ts(0))
+        .submit_checkin_event(
+            &alice_client,
+            &alice_token,
+            "clock_in",
+            25.04,
+            121.56,
+            &ts(0),
+        )
         .await;
 
-    let r = admin
-        .get(app.url("/checkin/users"))
-        .send()
-        .await
-        .unwrap();
+    let r = admin.get(app.url("/checkin/users")).send().await.unwrap();
     assert_eq!(r.status(), StatusCode::OK);
     let body: Vec<Value> = r.json().await.unwrap();
     assert_eq!(body.len(), 1);
@@ -43,11 +45,7 @@ async fn cross_org_app_users_excluded_from_board() {
         .seed_app_user_ready_to_checkin("b@example.com", "OrgB", "bob", "Bob")
         .await;
 
-    let r = b_admin
-        .get(app.url("/checkin/users"))
-        .send()
-        .await
-        .unwrap();
+    let r = b_admin.get(app.url("/checkin/users")).send().await.unwrap();
     assert_eq!(r.status(), StatusCode::OK);
     let body: Vec<Value> = r.json().await.unwrap();
     assert_eq!(body.len(), 1);
@@ -73,7 +71,14 @@ async fn admin_views_app_user_event_history() {
         .await;
     for (event_type, min) in [("clock_in", 0), ("clock_out", 30)] {
         let r = app
-            .submit_checkin_event(&alice_client, &alice_token, event_type, 25.04, 121.56, &ts(min))
+            .submit_checkin_event(
+                &alice_client,
+                &alice_token,
+                event_type,
+                25.04,
+                121.56,
+                &ts(min),
+            )
             .await;
         assert_eq!(r.status(), StatusCode::CREATED);
     }
@@ -97,7 +102,14 @@ async fn cross_org_event_history_returns_not_found() {
         .seed_app_user_ready_to_checkin("a@example.com", "OrgA", "alice", "Alice")
         .await;
     let _ = app
-        .submit_checkin_event(&alice_client, &alice_token, "clock_in", 25.04, 121.56, &ts(0))
+        .submit_checkin_event(
+            &alice_client,
+            &alice_token,
+            "clock_in",
+            25.04,
+            121.56,
+            &ts(0),
+        )
         .await;
 
     let (b_admin, _) = app.register_admin("b@example.com", "OrgB").await;
@@ -126,7 +138,14 @@ async fn cursor_pagination_walks_history() {
     ];
     for (event_type, min) in plan {
         let r = app
-            .submit_checkin_event(&alice_client, &alice_token, event_type, 25.04, 121.56, &ts(min))
+            .submit_checkin_event(
+                &alice_client,
+                &alice_token,
+                event_type,
+                25.04,
+                121.56,
+                &ts(min),
+            )
             .await;
         assert_eq!(r.status(), StatusCode::CREATED);
     }

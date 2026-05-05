@@ -28,13 +28,8 @@ impl AppUserDto {
             display_name: u.display_name.clone(),
             status: u.status,
             needs_password_change: u.needs_password_change,
-            last_login_at: u
-                .last_login_at
-                .and_then(|d| d.try_to_rfc3339_string().ok()),
-            created_at: u
-                .created_at
-                .try_to_rfc3339_string()
-                .unwrap_or_default(),
+            last_login_at: u.last_login_at.and_then(|d| d.try_to_rfc3339_string().ok()),
+            created_at: u.created_at.try_to_rfc3339_string().unwrap_or_default(),
         }
     }
 }

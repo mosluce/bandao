@@ -133,7 +133,10 @@ impl MembershipRepository {
     }
 
     pub async fn count_by_user(&self, user_id: ObjectId) -> ApiResult<u64> {
-        Ok(self.coll.count_documents(doc! { "user_id": user_id }).await?)
+        Ok(self
+            .coll
+            .count_documents(doc! { "user_id": user_id })
+            .await?)
     }
 }
 

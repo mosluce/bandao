@@ -9,7 +9,6 @@ use common::ts;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
 
-
 #[tokio::test]
 async fn transfer_enabled_patch_succeeds_when_all_off_duty() {
     let app = TestApp::spawn().await;

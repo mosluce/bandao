@@ -20,10 +20,7 @@ impl OrgRepository {
         // New Orgs default to transfer_enabled=true (the more permissive
         // option) and Asia/Taipei. Both can be flipped via PATCH /orgs/me/settings.
         let mut settings = bson::Document::new();
-        settings.insert(
-            "checkin",
-            doc! { "transfer_enabled": true },
-        );
+        settings.insert("checkin", doc! { "transfer_enabled": true });
         let org = Org {
             id: ObjectId::new(),
             name: name.to_string(),
@@ -83,7 +80,12 @@ impl OrgRepository {
         Ok(self.coll.find_one(doc! { "slug": slug }).await?)
     }
 
-    pub async fn set_slug(&self, id: ObjectId, slug: &str, slug_changed_at: DateTime) -> ApiResult<Org> {
+    pub async fn set_slug(
+        &self,
+        id: ObjectId,
+        slug: &str,
+        slug_changed_at: DateTime,
+    ) -> ApiResult<Org> {
         let result = self
             .coll
             .find_one_and_update(

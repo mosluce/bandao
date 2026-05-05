@@ -40,7 +40,11 @@ async fn clear_puts_slug_in_grace_and_locks_against_other_orgs() {
 
     backdate_slug_change(&app, &org_a_id, 35).await;
 
-    let r = admin_a.delete(app.url("/orgs/me/slug")).send().await.unwrap();
+    let r = admin_a
+        .delete(app.url("/orgs/me/slug"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(r.status(), StatusCode::NO_CONTENT);
 
     // OrgB cannot claim "shared" during grace period.

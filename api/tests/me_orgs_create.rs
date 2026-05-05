@@ -50,7 +50,10 @@ async fn zero_org_user_can_create_org_to_recover() {
 
     // Set the founder up, then offboard them entirely (transfer + leave).
     let (founder, founder_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = founder_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = founder_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (_second, second_body) = app.register_member("second@example.com", &code).await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
     founder

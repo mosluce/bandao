@@ -10,7 +10,10 @@ use serde_json::{Value, json};
 async fn build_zero_org_user(app: &TestApp) -> (reqwest::Client, String) {
     let (founder, founder_body) = app.register_admin("founder@example.com", "Acme").await;
     let founder_id = founder_body["user"]["id"].as_str().unwrap().to_string();
-    let code = founder_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = founder_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (_second, second_body) = app.register_member("second@example.com", &code).await;
     let second_id = second_body["user"]["id"].as_str().unwrap().to_string();
 

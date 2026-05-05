@@ -11,7 +11,9 @@ async fn list_cooldowns_returns_only_callers_org() {
     // OrgA: kick a member.
     let (admin_a, body_a) = app.register_admin("alpha-owner@example.com", "OrgA").await;
     let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
-    let (_m_a, member_a) = app.register_member("transient-a@example.com", &code_a).await;
+    let (_m_a, member_a) = app
+        .register_member("transient-a@example.com", &code_a)
+        .await;
     let id_a = member_a["user"]["id"].as_str().unwrap().to_string();
     admin_a
         .delete(app.url(&format!("/dashboard-users/{id_a}")))
@@ -22,7 +24,9 @@ async fn list_cooldowns_returns_only_callers_org() {
     // OrgB: kick a member.
     let (admin_b, body_b) = app.register_admin("beta-owner@example.com", "OrgB").await;
     let code_b = body_b["current_org"]["code"].as_str().unwrap().to_string();
-    let (_m_b, member_b) = app.register_member("transient-b@example.com", &code_b).await;
+    let (_m_b, member_b) = app
+        .register_member("transient-b@example.com", &code_b)
+        .await;
     let id_b = member_b["user"]["id"].as_str().unwrap().to_string();
     admin_b
         .delete(app.url(&format!("/dashboard-users/{id_b}")))
@@ -61,7 +65,10 @@ async fn clear_cooldown_for_missing_marker_returns_204() {
 async fn member_cannot_call_cooldown_endpoints() {
     let app = TestApp::spawn().await;
     let (_admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (member, _member_body) = app.register_member("member@example.com", &code).await;
 
     let list = member

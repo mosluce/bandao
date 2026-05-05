@@ -9,7 +9,10 @@ use serde_json::{Value, json};
 async fn admin_removes_member_succeeds_membership_only() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let org_id = ObjectId::parse_str(admin_body["current_org"]["id"].as_str().unwrap()).unwrap();
 
     let (member, member_body) = app.register_member("member@example.com", &code).await;
@@ -28,7 +31,12 @@ async fn admin_removes_member_succeeds_membership_only() {
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 
     // Identity SURVIVES — only the membership is gone.
-    let user = app.db().dashboard_users.find_by_id(member_id).await.unwrap();
+    let user = app
+        .db()
+        .dashboard_users
+        .find_by_id(member_id)
+        .await
+        .unwrap();
     assert!(user.is_some(), "identity should survive admin remove");
 
     let m = app
@@ -58,7 +66,10 @@ async fn admin_removes_member_succeeds_membership_only() {
 async fn admin_removes_non_owner_admin_succeeds() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (_member, member_body) = app.register_member("second@example.com", &code).await;
     let other_id = member_body["user"]["id"].as_str().unwrap().to_string();
 
@@ -85,7 +96,10 @@ async fn admin_cannot_remove_owner() {
     let app = TestApp::spawn().await;
     let (founder, founder_body) = app.register_admin("founder@example.com", "Acme").await;
     let owner_id = founder_body["user"]["id"].as_str().unwrap().to_string();
-    let code = founder_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = founder_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // A second admin (non-owner) tries to remove the owner.
     let (_second, second_body) = app.register_member("second@example.com", &code).await;
@@ -132,7 +146,10 @@ async fn member_cannot_remove_anyone() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
     let admin_id = admin_body["user"]["id"].as_str().unwrap().to_string();
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let (member, _member_body) = app.register_member("member@example.com", &code).await;
     let _ = admin;

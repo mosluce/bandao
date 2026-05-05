@@ -193,7 +193,11 @@ pub async fn submit_location_pings(
     let mut accepted_count: u32 = 0;
     if !valid.is_empty() {
         let pings: Vec<LocationPing> = valid.iter().map(|(_, p)| p.clone()).collect();
-        let outcome = state.db.location_pings.insert_many_unordered(&pings).await?;
+        let outcome = state
+            .db
+            .location_pings
+            .insert_many_unordered(&pings)
+            .await?;
         accepted_count = outcome.inserted_indices.len() as u32;
         for (sub_idx, code) in outcome.failed_indices {
             // sub_idx → original batch index via the (orig_idx, _) tuple
@@ -293,16 +297,17 @@ pub async fn list_locations(
         Some(raw) => Some(parse_rfc3339(raw)?),
         None => None,
     };
-    let limit = q.limit.unwrap_or(LIST_DEFAULT_LIMIT).clamp(1, LIST_MAX_LIMIT);
+    let limit = q
+        .limit
+        .unwrap_or(LIST_DEFAULT_LIMIT)
+        .clamp(1, LIST_MAX_LIMIT);
 
     let pings = state
         .db
         .location_pings
         .list_by_app_user_paginated(app_user_id, before, limit)
         .await?;
-    Ok(Json(
-        pings.iter().map(LocationPingDto::from_ping).collect(),
-    ))
+    Ok(Json(pings.iter().map(LocationPingDto::from_ping).collect()))
 }
 
 // --- GET /checkin/users/:id/locations/export ---
@@ -362,7 +367,7 @@ pub async fn export_locations(
         app_user.username, from_date, to_date
     );
 
-    Ok(Response::builder()
+    Response::builder()
         .status(StatusCode::OK)
         .header(
             CONTENT_TYPE,
@@ -376,7 +381,7 @@ pub async fn export_locations(
         .map_err(|err| {
             tracing::error!(?err, "xlsx response build failed");
             ApiError::Internal
-        })?)
+        })
 }
 
 fn build_xlsx(pings: &[LocationPing]) -> Result<Vec<u8>, rust_xlsxwriter::XlsxError> {

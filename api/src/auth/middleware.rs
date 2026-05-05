@@ -62,11 +62,7 @@ async fn authenticate(state: &AppState, jar: &CookieJar) -> Result<AuthContext, 
 
     let now_ms = bson::DateTime::now().timestamp_millis();
     if session.expires_at.timestamp_millis() < now_ms {
-        let _ = state
-            .db
-            .dashboard_sessions
-            .delete_by_token(&token)
-            .await;
+        let _ = state.db.dashboard_sessions.delete_by_token(&token).await;
         return Err(AuthFail::Stale);
     }
 

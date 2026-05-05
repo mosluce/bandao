@@ -211,7 +211,10 @@ async fn set_slug_after_30_days_succeeds() {
 async fn member_cannot_set_slug() {
     let app = TestApp::spawn().await;
     let (admin, admin_body) = app.register_admin("founder@example.com", "Acme").await;
-    let code = admin_body["current_org"]["code"].as_str().unwrap().to_string();
+    let code = admin_body["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let _ = admin;
     let (member, _) = app.register_member("member@example.com", &code).await;
 

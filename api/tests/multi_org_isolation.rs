@@ -38,7 +38,11 @@ async fn member_list_is_scoped_to_current_org() {
     assert_eq!(join.status(), StatusCode::OK);
 
     // OrgB list visible to visitor: owner_b + visitor.
-    let resp = visitor.get(app.url("/dashboard-users")).send().await.unwrap();
+    let resp = visitor
+        .get(app.url("/dashboard-users"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let list: Value = resp.json().await.unwrap();
     let arr = list.as_array().unwrap();
@@ -55,7 +59,11 @@ async fn member_list_is_scoped_to_current_org() {
         .send()
         .await
         .unwrap();
-    let resp = visitor.get(app.url("/dashboard-users")).send().await.unwrap();
+    let resp = visitor
+        .get(app.url("/dashboard-users"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let list: Value = resp.json().await.unwrap();
     let arr = list.as_array().unwrap();

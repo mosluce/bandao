@@ -151,7 +151,13 @@ async fn repair_one(
             };
             let _ = db
                 .checkin_user_status
-                .update_to(app_user_id, AppUserCheckinStatus::OffDuty, implied, started_at, latest.id)
+                .update_to(
+                    app_user_id,
+                    AppUserCheckinStatus::OffDuty,
+                    implied,
+                    started_at,
+                    latest.id,
+                )
                 .await;
             Ok(RepairOutcome::Fixed)
         }
@@ -161,10 +167,7 @@ async fn repair_one(
             if matches!(status_row.status, AppUserCheckinStatus::OffDuty) {
                 Ok(RepairOutcome::Ok)
             } else {
-                let _ = db
-                    .checkin_user_status
-                    .delete_by_app_user(app_user_id)
-                    .await;
+                let _ = db.checkin_user_status.delete_by_app_user(app_user_id).await;
                 let _ = db
                     .checkin_user_status
                     .init_off_duty(app_user_id, org_id)
@@ -174,19 +177,14 @@ async fn repair_one(
         }
         (Some(status_row), Some(latest)) => {
             let implied = imply_status(&latest);
-            if status_row.status == implied
-                && status_row.last_event_id == Some(latest.id)
-            {
+            if status_row.status == implied && status_row.last_event_id == Some(latest.id) {
                 return Ok(RepairOutcome::Ok);
             }
             // Drift detected. Re-seat by deleting the row and re-inserting
             // off_duty, then transition to the implied state. This is more
             // robust than trying to find_one_and_update from the wrong
             // prior — the conditional would just fail.
-            let _ = db
-                .checkin_user_status
-                .delete_by_app_user(app_user_id)
-                .await;
+            let _ = db.checkin_user_status.delete_by_app_user(app_user_id).await;
             let _ = db
                 .checkin_user_status
                 .init_off_duty(app_user_id, org_id)
@@ -201,7 +199,13 @@ async fn repair_one(
             };
             let _ = db
                 .checkin_user_status
-                .update_to(app_user_id, AppUserCheckinStatus::OffDuty, implied, started_at, latest.id)
+                .update_to(
+                    app_user_id,
+                    AppUserCheckinStatus::OffDuty,
+                    implied,
+                    started_at,
+                    latest.id,
+                )
                 .await;
             Ok(RepairOutcome::Fixed)
         }
@@ -224,9 +228,7 @@ fn imply_status(latest: &CheckinEvent) -> AppUserCheckinStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{
-        EventInitiatorKind, EventLocation, EventSource, GeoPoint,
-    };
+    use crate::domain::{EventInitiatorKind, EventLocation, EventSource, GeoPoint};
     use bson::DateTime;
 
     fn fake_event(event_type: CheckinEventType) -> CheckinEvent {

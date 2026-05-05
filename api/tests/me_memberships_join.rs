@@ -14,7 +14,9 @@ async fn logged_in_user_joins_via_org_code() {
     let org_a_id = body_a["current_org"]["id"].as_str().unwrap().to_string();
 
     // Visitor builds their own first org so their identity exists.
-    let (visitor, visitor_body) = app.register_admin("visitor@example.com", "VisitorOrg").await;
+    let (visitor, visitor_body) = app
+        .register_admin("visitor@example.com", "VisitorOrg")
+        .await;
     let visitor_id = ObjectId::parse_str(visitor_body["user"]["id"].as_str().unwrap()).unwrap();
 
     let resp = visitor
@@ -133,7 +135,9 @@ async fn duplicate_membership_is_rejected() {
 #[tokio::test]
 async fn invalid_identifier_rejected_without_lookup() {
     let app = TestApp::spawn().await;
-    let (visitor, _) = app.register_admin("visitor@example.com", "VisitorOrg").await;
+    let (visitor, _) = app
+        .register_admin("visitor@example.com", "VisitorOrg")
+        .await;
 
     for bad in ["!!!", "AcMe", "acme-corp", "x"] {
         let resp = visitor
