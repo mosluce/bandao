@@ -29,6 +29,7 @@ argus 是一個全端服務，由三個應用 + 一個資料層組成：
 3. **explore**（選用） — `/opsx:explore` 在 propose 前釐清模糊需求。
 4. **apply** — `/opsx:apply` 依 tasks 逐步實作，每完成一項就更新 task 狀態。
 5. **archive** — `/opsx:archive` 完成後封存到 `openspec/changes/archive/`，並把對應 spec 寫入 `openspec/specs/`。
+6. **commit**（archive 後自動執行）— archive 完成後立即把 working tree commit 掉（`chore(openspec): archive <change-name> and sync specs`，如果同步了 spec 才加 `and sync specs`）。**不要**累積多個 archive 才一起 commit，會混進不同 change 的 code，diff 變得難審。掃過 staged paths 確認沒有 secrets（`.env`、credential、private key）再 commit。
 
 每次開始新的工作前，先查 `openspec/changes/` 是否已有進行中的 change；有就接手，沒有才新建。當使用者丟出新想法時，先判斷是「現在要做」還是「先記下來」— 若是後者，加進 `ROADMAP.md` 而不是立刻產 change。
 
