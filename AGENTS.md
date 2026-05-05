@@ -77,3 +77,4 @@ argus 是一個全端服務，由三個應用 + 一個資料層組成：
 - 大規模搜尋與探索優先用 agent / subagent，避免主對話塞滿無關內容。
 - UI / 前端改動完成前要實際跑起來驗證；型別檢查通過不等於功能正確。
 - 不要繞過 hook、不要 `--no-verify`、不要 `git push --force` 到主幹。
+- **`/opsx:apply` 要連續跑、不要逐項問 yes/no**：tasks.md 上的步驟（codegen、檔案編輯、`flutter test` / `cargo test`、analyze、build_runner、commit 範圍內的 git 動作、updating tasks.md checkbox）都自己決定執行，跑完再回報結果。**只在這些情況停下來**：(a) 實機 smoke / 需要使用者操作裝置或外部系統；(b) 任務描述語意不清、需要設計決策；(c) 任務揭露原 design 的盲點、需要更新 artifacts；(d) 系統 prompt 規定的危險操作（destructive git、push to shared、modifying CI / shared infra）。連續跑期間每個 task 完成就更新 tasks.md，不用每步都同步給使用者「我要開始 X 了」。
