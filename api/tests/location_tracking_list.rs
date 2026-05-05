@@ -130,6 +130,180 @@ async fn cross_org_app_user_id_returns_404() {
 }
 
 #[tokio::test]
+async fn from_to_filters_to_range() {
+    let app = TestApp::spawn().await;
+    let (admin, _code, app_user_id, app_client, token, _pw) = app
+        .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
+        .await;
+    enable_tracking(&app, &admin).await;
+
+    // Seed 5 pings with timestamps -50, -40, -30, -20, -10 seconds.
+    seed_pings(&app, &app_client, &token, 5).await;
+
+    // Range covering only the middle 3 (offsets -40 .. -20 inclusive).
+    let from = iso_offset(-45);
+    let to = iso_offset(-15);
+
+    let r = admin
+        .get(app.url(&format!(
+            "/checkin/users/{app_user_id}/locations?from={from}&to={to}"
+        )))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+    let body: Value = r.json().await.unwrap();
+    let arr = body.as_array().unwrap();
+    assert_eq!(arr.len(), 3, "expected 3 pings inside the range");
+
+    // All in newest-first order, all within [from, to).
+    let mut prev: Option<String> = None;
+    for p in arr {
+        let t = p["occurred_at_client"].as_str().unwrap().to_string();
+        assert!(t >= from);
+        assert!(t < to);
+        if let Some(prev_t) = prev {
+            assert!(t < prev_t);
+        }
+        prev = Some(t);
+    }
+}
+
+#[tokio::test]
+async fn from_only_lower_bound() {
+    let app = TestApp::spawn().await;
+    let (admin, _code, app_user_id, app_client, token, _pw) = app
+        .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
+        .await;
+    enable_tracking(&app, &admin).await;
+    seed_pings(&app, &app_client, &token, 5).await;
+
+    // from at -25s → 2 pings expected (-20, -10).
+    let from = iso_offset(-25);
+    let r = admin
+        .get(app.url(&format!(
+            "/checkin/users/{app_user_id}/locations?from={from}"
+        )))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+    let body: Value = r.json().await.unwrap();
+    let arr = body.as_array().unwrap();
+    assert_eq!(arr.len(), 2);
+}
+
+#[tokio::test]
+async fn to_only_upper_bound() {
+    let app = TestApp::spawn().await;
+    let (admin, _code, app_user_id, app_client, token, _pw) = app
+        .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
+        .await;
+    enable_tracking(&app, &admin).await;
+    seed_pings(&app, &app_client, &token, 5).await;
+
+    // to at -25s → 3 pings expected (-50, -40, -30).
+    let to = iso_offset(-25);
+    let r = admin
+        .get(app.url(&format!("/checkin/users/{app_user_id}/locations?to={to}")))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+    let body: Value = r.json().await.unwrap();
+    let arr = body.as_array().unwrap();
+    assert_eq!(arr.len(), 3);
+}
+
+#[tokio::test]
+async fn invalid_range_to_before_from() {
+    let app = TestApp::spawn().await;
+    let (admin, _code, app_user_id, _app_client, _token, _pw) = app
+        .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
+        .await;
+    enable_tracking(&app, &admin).await;
+
+    let from = iso_offset(0);
+    let to = iso_offset(-3600);
+    let r = admin
+        .get(app.url(&format!(
+            "/checkin/users/{app_user_id}/locations?from={from}&to={to}"
+        )))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+    let body: Value = r.json().await.unwrap();
+    assert_eq!(body["error"]["code"].as_str().unwrap(), "INVALID_RANGE");
+}
+
+#[tokio::test]
+async fn invalid_range_span_too_large() {
+    let app = TestApp::spawn().await;
+    let (admin, _code, app_user_id, _app_client, _token, _pw) = app
+        .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
+        .await;
+    enable_tracking(&app, &admin).await;
+
+    // 91 days span.
+    let from = iso_offset(-91 * 24 * 3600);
+    let to = iso_offset(0);
+    let r = admin
+        .get(app.url(&format!(
+            "/checkin/users/{app_user_id}/locations?from={from}&to={to}"
+        )))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+    let body: Value = r.json().await.unwrap();
+    assert_eq!(body["error"]["code"].as_str().unwrap(), "INVALID_RANGE");
+}
+
+#[tokio::test]
+async fn invalid_range_from_older_than_90_days() {
+    let app = TestApp::spawn().await;
+    let (admin, _code, app_user_id, _app_client, _token, _pw) = app
+        .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
+        .await;
+    enable_tracking(&app, &admin).await;
+
+    // from 91 days ago, to a recent point — span fits but `from` is too old.
+    let from = iso_offset(-91 * 24 * 3600);
+    let to = iso_offset(-30 * 24 * 3600);
+    let r = admin
+        .get(app.url(&format!(
+            "/checkin/users/{app_user_id}/locations?from={from}&to={to}"
+        )))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+    let body: Value = r.json().await.unwrap();
+    assert_eq!(body["error"]["code"].as_str().unwrap(), "INVALID_RANGE");
+}
+
+#[tokio::test]
+async fn invalid_range_parse_failure() {
+    let app = TestApp::spawn().await;
+    let (admin, _code, app_user_id, _app_client, _token, _pw) = app
+        .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
+        .await;
+    enable_tracking(&app, &admin).await;
+
+    let r = admin
+        .get(app.url(&format!(
+            "/checkin/users/{app_user_id}/locations?from=not-a-date"
+        )))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+    let body: Value = r.json().await.unwrap();
+    assert_eq!(body["error"]["code"].as_str().unwrap(), "INVALID_RANGE");
+}
+
+#[tokio::test]
 async fn member_role_blocked() {
     let app = TestApp::spawn().await;
     let (admin, code, app_user_id, _app_client, _token, _pw) = app

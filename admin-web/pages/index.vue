@@ -167,6 +167,9 @@ const transferToggleSaving = ref(false)
 const transferToggleError = ref('')
 const stateLockedCount = ref<number | null>(null)
 
+const locationTrackingToggleSaving = ref(false)
+const locationTrackingToggleError = ref('')
+
 async function toggleTransfer() {
   if (!auth.currentOrg.value) return
   transferToggleError.value = ''
@@ -191,6 +194,31 @@ async function toggleTransfer() {
   }
   finally {
     transferToggleSaving.value = false
+  }
+}
+
+async function toggleLocationTracking() {
+  if (!auth.currentOrg.value) return
+  locationTrackingToggleError.value = ''
+  locationTrackingToggleSaving.value = true
+  const target = !auth.currentOrg.value.checkin.location_tracking_enabled
+  try {
+    await orgSettings.update({ location_tracking_enabled: target })
+    await auth.refresh()
+  }
+  catch (err) {
+    if (err instanceof ApiError && err.code === 'STATE_LOCKED') {
+      locationTrackingToggleError.value = '目前有 App 使用者在班，需先全部下班才能調整此設定'
+    }
+    else if (err instanceof ApiError) {
+      locationTrackingToggleError.value = err.code === 'FORBIDDEN' ? '只有管理員可以調整此設定' : err.message
+    }
+    else {
+      locationTrackingToggleError.value = err instanceof Error ? err.message : '操作失敗'
+    }
+  }
+  finally {
+    locationTrackingToggleSaving.value = false
   }
 }
 
@@ -583,6 +611,35 @@ async function confirmLeave() {
             class="ml-[6.5rem] text-xs text-red-600"
           >
             {{ transferToggleError }}
+          </div>
+
+          <div class="flex flex-wrap items-baseline gap-3">
+            <dt class="w-24 text-slate-500">
+              定位追蹤
+            </dt>
+            <dd class="flex flex-wrap items-center gap-2">
+              <label class="inline-flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  :checked="auth.currentOrg.value.checkin.location_tracking_enabled"
+                  :disabled="locationTrackingToggleSaving"
+                  class="h-4 w-4 rounded border-slate-300 text-slate-900"
+                  @change="toggleLocationTracking"
+                >
+                <span class="text-slate-700">
+                  {{ auth.currentOrg.value.checkin.location_tracking_enabled ? '啟用' : '停用' }}
+                </span>
+              </label>
+              <span class="text-xs text-slate-500">
+                關閉後，App 端不再蒐集工作期間定位軌跡。已存在的軌跡資料不受影響。
+              </span>
+            </dd>
+          </div>
+          <div
+            v-if="locationTrackingToggleError"
+            class="ml-[6.5rem] text-xs text-red-600"
+          >
+            {{ locationTrackingToggleError }}
           </div>
 
           <div class="flex flex-wrap items-baseline gap-3">

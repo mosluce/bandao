@@ -94,9 +94,11 @@ assets/css/   # Tailwind entry
 
 ## 打卡看板與設定
 
-`pages/checkin/index.vue` 是 admin-only 即時看板，依狀態（在班 / 移動中 / 下班）分組列出 AppUser、最後事件、shift duration、skew warning，每 30 秒自動 refresh，可直接觸發強制收班（含選填 reason）。`pages/checkin/[appUserId].vue` 是單人事件歷史，cursor 分頁、`載入更多`、每筆顯示事件類型 / Org TZ 時間 / 地點 / source badge / reason。
+`pages/checkin/index.vue` 是 admin-only 即時看板，依狀態（在班 / 移動中 / 下班）分組列出 AppUser、最後事件、shift duration、skew warning，每 30 秒自動 refresh，可直接觸發強制收班（含選填 reason）。`pages/checkin/[appUserId]/index.vue` 是單人事件歷史，cursor 分頁、`載入更多`、每筆顯示事件類型 / Org TZ 時間 / 地點 / source badge / reason。
 
-`pages/index.vue` 在「打卡設定」段落讓 admin 切換 `transfer_enabled`（有人在班時 server 會回 `STATE_LOCKED`，UI 顯示「目前有 App 使用者在班，需先全部下班才能調整此設定」）與 `timezone`（下拉選單列常見 IANA + 自訂輸入；不合法值回 `INVALID_TIMEZONE`）。
+`pages/checkin/[appUserId]/trajectory.vue` 是單人單日的軌跡視覺化（依賴 Org `location_tracking_enabled` 開啟）：URL `?date=YYYY-MM-DD` 對應 Org 時區的當日；client 把 date 換成 RFC3339 區間打 `GET /checkin/users/:id/locations?from=&to=`，用 Leaflet + CartoDB Positron tiles 畫 polyline，事件 (clock_in / out / transfer_in / out) 用顏色不同的 circle marker 疊上去，地圖 fitBounds 自動覆蓋。該日無 ping 顯示「該日無軌跡資料」**不顯示地圖**。右上角「匯出 xlsx」按鈕開 modal 選 from/to（client 端先擋 `to < from` / span > 90 天），通過後直接 `<a href download>` 走 cookie session 觸發 `GET /checkin/users/:id/locations/export?from=&to=`。
+
+`pages/index.vue` 在「打卡設定」段落讓 admin 切換 `transfer_enabled` 與 `location_tracking_enabled`（兩者都 state-locked — 有人在班時 server 回 `STATE_LOCKED`，UI 顯示「目前有 App 使用者在班，需先全部下班才能調整此設定」），以及 `timezone`（下拉選單列常見 IANA + 自訂輸入；不合法值回 `INVALID_TIMEZONE`）。
 
 時間 render 用 `useOrgTime.formatInOrgTz(iso, org.timezone)`；missing TZ 時 fallback 到瀏覽器 locale。`shiftDuration(iso)` 算上班至今的時數 / 分鐘給看板用。
 

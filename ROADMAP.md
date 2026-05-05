@@ -21,7 +21,6 @@
 
 ### 下一批 changes（已規劃）
 
-- **[admin-web]** `add-location-tracking-dashboard`：admin-web 軌跡視覺化 + Org settings UI。`/checkin/users/:id/trajectory?date=YYYY-MM-DD` + Leaflet + OSM tiles + polyline + 事件 markers + 自動 fit bounds。Org settings page 加 `location_tracking_enabled` toggle（state-locked，跟 transfer 同位置）。匯出按鈕（時間範圍 + CSV download）。依賴：`add-location-tracking-server` + `add-location-tracking-app`（皆已完成）。
 
 ### Side ideas（尚未排程）
 

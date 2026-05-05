@@ -108,6 +108,10 @@ pub struct LocationListQuery {
     pub before: Option<String>,
     #[serde(default)]
     pub limit: Option<i64>,
+    #[serde(default)]
+    pub from: Option<String>,
+    #[serde(default)]
+    pub to: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -297,6 +301,17 @@ pub async fn list_locations(
         Some(raw) => Some(parse_rfc3339(raw)?),
         None => None,
     };
+    let from = match q.from.as_deref() {
+        Some(raw) => Some(parse_rfc3339(raw).map_err(|_| ApiError::InvalidRange)?),
+        None => None,
+    };
+    let to = match q.to.as_deref() {
+        Some(raw) => Some(parse_rfc3339(raw).map_err(|_| ApiError::InvalidRange)?),
+        None => None,
+    };
+    if from.is_some() || to.is_some() {
+        validate_range(from, to)?;
+    }
     let limit = q
         .limit
         .unwrap_or(LIST_DEFAULT_LIMIT)
@@ -305,9 +320,30 @@ pub async fn list_locations(
     let pings = state
         .db
         .location_pings
-        .list_by_app_user_paginated(app_user_id, before, limit)
+        .list_by_app_user_paginated(app_user_id, before, from, to, limit)
         .await?;
     Ok(Json(pings.iter().map(LocationPingDto::from_ping).collect()))
+}
+
+/// Shared range validator used by list + export. Each absent side is a
+/// no-op for its corresponding check (single-sided ranges are allowed).
+fn validate_range(from: Option<DateTime>, to: Option<DateTime>) -> ApiResult<()> {
+    let span_max_millis = EXPORT_RANGE_MAX_DAYS * MILLIS_PER_DAY;
+    let now_millis = DateTime::now().timestamp_millis();
+    if let (Some(f), Some(t)) = (from, to) {
+        let from_ms = f.timestamp_millis();
+        let to_ms = t.timestamp_millis();
+        if to_ms < from_ms || to_ms - from_ms > span_max_millis {
+            return Err(ApiError::InvalidRange);
+        }
+    }
+    if let Some(f) = from {
+        let from_ms = f.timestamp_millis();
+        if now_millis - from_ms > span_max_millis {
+            return Err(ApiError::InvalidRange);
+        }
+    }
+    Ok(())
 }
 
 // --- GET /checkin/users/:id/locations/export ---
@@ -330,24 +366,13 @@ pub async fn export_locations(
         return Err(ApiError::NotFound);
     }
 
-    // Range validation. All four rules surface as INVALID_RANGE; the message
-    // distinguishes them in tracing output but the wire-level code is one.
+    // Export requires both sides; reuse the shared validator that the list
+    // endpoint also runs.
     let from_raw = q.from.as_deref().ok_or(ApiError::InvalidRange)?;
     let to_raw = q.to.as_deref().ok_or(ApiError::InvalidRange)?;
     let from = parse_rfc3339(from_raw).map_err(|_| ApiError::InvalidRange)?;
     let to = parse_rfc3339(to_raw).map_err(|_| ApiError::InvalidRange)?;
-
-    let from_millis = from.timestamp_millis();
-    let to_millis = to.timestamp_millis();
-    let now_millis = DateTime::now().timestamp_millis();
-    let span_max_millis = EXPORT_RANGE_MAX_DAYS * MILLIS_PER_DAY;
-
-    if to_millis < from_millis
-        || to_millis - from_millis > span_max_millis
-        || now_millis - from_millis > span_max_millis
-    {
-        return Err(ApiError::InvalidRange);
-    }
+    validate_range(Some(from), Some(to))?;
 
     let pings = state
         .db

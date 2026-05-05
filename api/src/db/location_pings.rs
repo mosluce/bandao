@@ -93,16 +93,34 @@ impl LocationPingRepository {
 
     /// Cursor pagination, newest-first by `occurred_at_client`. `before` is
     /// the boundary timestamp (exclusive) supplied by the client; the
-    /// `_id` desc tie-break keeps duplicate client times stable.
+    /// `_id` desc tie-break keeps duplicate client times stable. `from` and
+    /// `to` are optional inclusive-from / exclusive-to range bounds and
+    /// compose with `before` via AND.
     pub async fn list_by_app_user_paginated(
         &self,
         app_user_id: ObjectId,
         before: Option<DateTime>,
+        from: Option<DateTime>,
+        to: Option<DateTime>,
         limit: i64,
     ) -> ApiResult<Vec<LocationPing>> {
         let mut filter = doc! { "app_user_id": app_user_id };
-        if let Some(t) = before {
-            filter.insert("occurred_at_client", doc! { "$lt": t });
+        // `before` (cursor) and `to` (range) both express "<", combine to the
+        // tighter of the two so mongo gets a single $lt clause.
+        let upper = match (before, to) {
+            (Some(a), Some(b)) => Some(if a < b { a } else { b }),
+            (Some(a), None) | (None, Some(a)) => Some(a),
+            (None, None) => None,
+        };
+        let mut occurred_clauses = doc! {};
+        if let Some(t) = upper {
+            occurred_clauses.insert("$lt", t);
+        }
+        if let Some(t) = from {
+            occurred_clauses.insert("$gte", t);
+        }
+        if !occurred_clauses.is_empty() {
+            filter.insert("occurred_at_client", occurred_clauses);
         }
         let opts = FindOptions::builder()
             .sort(doc! { "occurred_at_client": -1, "_id": -1 })

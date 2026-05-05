@@ -13,7 +13,7 @@ export interface OrgDto {
   code: string
   owner_id: string
   timezone: string
-  checkin: { transfer_enabled: boolean }
+  checkin: { transfer_enabled: boolean, location_tracking_enabled: boolean }
   slug?: string
   slug_changed_at?: string
 }
@@ -173,16 +173,35 @@ export interface ForceCheckoutRequest {
 
 export interface UpdateOrgSettingsRequest {
   transfer_enabled?: boolean
+  location_tracking_enabled?: boolean
   timezone?: string
 }
 
 export interface OrgCheckinSettings {
   transfer_enabled: boolean
+  location_tracking_enabled: boolean
 }
 
 export interface OrgSettingsDto {
   timezone: string
   checkin: OrgCheckinSettings
+}
+
+export interface LocationPingDto {
+  id: string
+  app_user_id: string
+  lat: number
+  lng: number
+  accuracy_meters?: number
+  occurred_at_client: string
+  occurred_at_server: string
+}
+
+export interface LocationListParams {
+  before?: string
+  limit?: number
+  from?: string
+  to?: string
 }
 
 export interface ApiErrorBody {

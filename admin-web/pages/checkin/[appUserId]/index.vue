@@ -102,6 +102,13 @@ else {
         </div>
         <div class="flex shrink-0 items-center gap-2">
           <OrgSwitcher />
+          <NuxtLink
+            v-if="auth.currentOrg.value?.checkin.location_tracking_enabled"
+            :to="`/checkin/${appUserId}/trajectory`"
+            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            查看軌跡
+          </NuxtLink>
           <button
             type="button"
             class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
