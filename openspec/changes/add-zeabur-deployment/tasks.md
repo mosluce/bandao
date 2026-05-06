@@ -47,15 +47,15 @@
 - [ ] 6.1 Create a Zeabur project named `bandao`; connect it to the GitHub repo `mosluce/bandao` with permissions for `main` only.
 - [ ] 6.2 Add the `api` service: source path `api/`, build via Dockerfile; set env vars per `DEPLOY.md` matrix: `BANDAO_LISTEN_ADDR=0.0.0.0:8080`, `BANDAO_MONGO_URI=mongodb://bandao:<pass>@<mongo-host>.<tailnet>.ts.net:27017/bandao?authSource=admin`, `BANDAO_MONGO_DB=bandao`, `BANDAO_COOKIE_SECURE=true`, `BANDAO_ALLOWED_ORIGIN=https://bandao-admin.ccmos.tw`, `BANDAO_SESSION_TTL_SECONDS=1209600`, `TS_AUTHKEY=<auth key from 1.2>`. Leave `BANDAO_COOKIE_DOMAIN` unset (host-only).
 - [ ] 6.3 Add the `admin-web` service: source path `admin-web/`, build via Nuxt auto-detect (or the Dockerfile from 3.3); set build-time env: `NUXT_PUBLIC_API_BASE_URL=https://bandao-api.ccmos.tw`.
-- [ ] 6.4 Configure Zeabur health check on the `api` service: `GET /healthz` expecting `200`, with sane interval/timeout (e.g. 15s / 5s).
+- [x] 6.4 Configure Zeabur health check on the `api` service: `GET /healthz` expecting `200`, with sane interval/timeout (e.g. 15s / 5s).
 - [ ] 6.5 Trigger the first deploy of both services; observe build logs; confirm api comes up and `/healthz` returns 200; confirm admin-web's index document loads.
 
 ## 7. DNS + TLS
 
-- [ ] 7.1 In the `ccmos.tw` registrar / DNS provider, add a CNAME record for `bandao-api.ccmos.tw` pointing at the Zeabur target host shown on the api service.
-- [ ] 7.2 Add a CNAME record for `bandao-admin.ccmos.tw` pointing at the Zeabur target for admin-web.
-- [ ] 7.3 In Zeabur, attach both custom domains to their respective services; wait for the automated TLS issuance to complete; verify both hostnames serve a valid public-CA certificate via `curl -vI https://bandao-api.ccmos.tw/healthz` and `curl -vI https://bandao-admin.ccmos.tw/`.
-- [ ] 7.4 Verify HTTP requests to either hostname are upgraded or refused (e.g. `curl -I http://bandao-api.ccmos.tw/healthz` returns a 301/308 to https or fails the connection).
+- [x] 7.1 In the `ccmos.tw` registrar / DNS provider, add a CNAME record for `bandao-api.ccmos.tw` pointing at the Zeabur target host shown on the api service.
+- [x] 7.2 Add a CNAME record for `bandao-admin.ccmos.tw` pointing at the Zeabur target for admin-web.
+- [x] 7.3 In Zeabur, attach both custom domains to their respective services; wait for the automated TLS issuance to complete; verify both hostnames serve a valid public-CA certificate via `curl -vI https://bandao-api.ccmos.tw/healthz` and `curl -vI https://bandao-admin.ccmos.tw/`.
+- [x] 7.4 Verify HTTP requests to either hostname are upgraded or refused (e.g. `curl -I http://bandao-api.ccmos.tw/healthz` returns a 301/308 to https or fails the connection).
 
 ## 8. GitHub branch protection
 
