@@ -11,9 +11,11 @@ pub mod me;
 pub mod orgs;
 pub mod users;
 
+use axum::Json;
 use axum::Router;
 use axum::middleware as axum_middleware;
 use axum::routing::{delete, get, patch, post};
+use serde_json::{Value, json};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
@@ -25,6 +27,7 @@ pub fn router(state: AppState) -> Router {
     let cors = build_cors(&state);
 
     let public = Router::new()
+        .route("/healthz", get(healthz))
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
         .route("/app/auth/login", post(app_auth::login));
@@ -123,6 +126,10 @@ pub fn router(state: AppState) -> Router {
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state)
+}
+
+async fn healthz() -> Json<Value> {
+    Json(json!({ "status": "ok" }))
 }
 
 fn build_cors(state: &AppState) -> CorsLayer {

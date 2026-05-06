@@ -1,0 +1,18 @@
+[Unit]
+Description=bandao Mongo backup to S3
+After=network-online.target mongod.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/bandao-backup.env
+ExecStart=/usr/local/bin/bandao-backup.sh
+# Pipe stdout+stderr to journald in addition to logger() inside the script.
+StandardOutput=journal
+StandardError=journal
+# Hardening — backup process needs read on Mongo wire + outbound HTTPS.
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+ReadWritePaths=/tmp

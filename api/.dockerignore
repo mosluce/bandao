@@ -1,0 +1,6 @@
+target/
+tests/snapshots/
+*.iml
+.idea/
+.vscode/
+.DS_Store

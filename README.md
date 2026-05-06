@@ -2,7 +2,7 @@
 
 多租戶簽到系統。包含後端 API、管理後台、終端使用者 App，以及共用的 MongoDB 資料層。
 
-> 系統設計與規範請看 [`AGENTS.md`](./AGENTS.md)；尚未排程的點子記在 [`ROADMAP.md`](./ROADMAP.md)；變更流程使用 [OpenSpec / opsx](./openspec/)。
+> 系統設計與規範請看 [`AGENTS.md`](./AGENTS.md)；尚未排程的點子記在 [`ROADMAP.md`](./ROADMAP.md)；變更流程使用 [OpenSpec / opsx](./openspec/)；正式環境部署 / 維運 runbook 看 [`DEPLOY.md`](./DEPLOY.md)。
 
 ## 模組
 
