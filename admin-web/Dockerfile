@@ -19,6 +19,11 @@ COPY . .
 ARG NUXT_PUBLIC_API_BASE_URL
 ENV NUXT_PUBLIC_API_BASE_URL=${NUXT_PUBLIC_API_BASE_URL}
 
+# Force the static SPA preset — Zeabur's build env otherwise auto-detects
+# preset=zeabur and emits .zeabur/output/functions/, which this Dockerfile
+# does not consume.
+ENV NITRO_PRESET=static
+
 RUN pnpm build
 
 # ── runtime ──────────────────────────────────────────────────────────────
