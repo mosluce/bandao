@@ -58,3 +58,7 @@ desktop.ini
 coverage/
 *.lcov
 .nyc_output/
+
+# --- Claude Code (project-local; commands/ and skills/ stay tracked) ---
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
