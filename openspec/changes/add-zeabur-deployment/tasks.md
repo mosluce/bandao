@@ -59,10 +59,10 @@
 
 ## 8. GitHub branch protection
 
-- [ ] 8.1 In repo settings, add a branch protection rule for `main`: require pull request before merging; require approvals = 1 (or 0 if a solo project, operator's call but document the choice).
-- [ ] 8.2 Require the following status checks to pass: `api / fmt + clippy + test`, `admin-web / typecheck + test + build`, `app / <existing job name>`.
-- [ ] 8.3 Require linear history; block force pushes; block branch deletions.
-- [ ] 8.4 Verify by opening a draft PR with a deliberately failing test and confirming the merge button is disabled.
+- [x] 8.1 In repo settings, add a branch protection rule for `main`: require pull request before merging; require approvals = 1 (or 0 if a solo project, operator's call but document the choice).
+- [x] 8.2 Require the following status checks to pass: `api / fmt + clippy + test`, `admin-web / typecheck + test + build`, `app / analyze + test`.
+- [x] 8.3 Require linear history; block force pushes; block branch deletions.
+- [x] 8.4 Verify by opening a draft PR with a deliberately failing test and confirming the merge button is disabled.
 
 ## 9. End-to-end smoke
 
