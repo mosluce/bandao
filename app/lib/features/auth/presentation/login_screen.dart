@@ -220,10 +220,14 @@ class _BandaoLogoState extends State<_BandaoLogo> {
       child: Center(
         child: Column(
           children: <Widget>[
-            Icon(
-              Icons.shield_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.asset(
+                'assets/icon/icon.png',
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
