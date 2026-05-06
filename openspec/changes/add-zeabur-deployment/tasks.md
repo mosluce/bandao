@@ -1,11 +1,11 @@
 ## 1. Pre-flight (operator-only, off-repo)
 
-- [ ] 1.1 Create / pick the Mongo host (VPS or NAS the operator can root-SSH into); record its public IP and OS version.
-- [ ] 1.2 Sign up for Tailscale with the operator's Google/GitHub identity; create a tailnet ACL tag `tag:bandao-api` and `tag:bandao-mongo`; mint a reusable, non-ephemeral auth key tagged `tag:bandao-api` for the api container.
-- [ ] 1.3 Create an AWS S3 bucket dedicated to backups (e.g. `bandao-mongo-backups-<region>`); create an IAM user with a policy scoped to `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` on that bucket only; capture access/secret keys.
-- [ ] 1.4 Configure the S3 bucket lifecycle rules: keep daily prefix for 30 days, weekly for 12 weeks, monthly for 12 months; enable versioning and default encryption (SSE-S3).
-- [ ] 1.5 Generate a backup encryption keypair (recommend `age` — `age-keygen`); store private key off-host in the operator's password manager; the public key goes on the Mongo host for encryption.
-- [ ] 1.6 Decide AWS region (default `ap-northeast-1`) and write decisions to the runbook draft.
+- [x] 1.1 Create / pick the Mongo host (VPS or NAS the operator can root-SSH into); record its public IP and OS version.
+- [x] 1.2 Sign up for Tailscale with the operator's Google/GitHub identity; create a tailnet ACL tag `tag:bandao-api` and `tag:bandao-mongo`; mint a reusable, non-ephemeral auth key tagged `tag:bandao-api` for the api container.
+- [x] 1.3 Create an AWS S3 bucket dedicated to backups (e.g. `bandao-mongo-backups-<region>`); create an IAM user with a policy scoped to `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` on that bucket only; capture access/secret keys.
+- [x] 1.4 Configure the S3 bucket lifecycle rules: keep daily prefix for 30 days, weekly for 12 weeks, monthly for 12 months; enable versioning and default encryption (SSE-S3).
+- [x] 1.5 Generate a backup encryption keypair (recommend `age` — `age-keygen`); store private key off-host in the operator's password manager; the public key goes on the Mongo host for encryption.
+- [x] 1.6 Decide AWS region (default `ap-northeast-1`) and write decisions to the runbook draft.
 
 ## 2. api repo work — Dockerfile + healthz
 
@@ -25,22 +25,22 @@
 
 ## 4. Mongo host — base setup
 
-- [ ] 4.1 Install MongoDB 7.x from the official MongoDB apt repo following MongoDB's docs for the host's OS.
-- [ ] 4.2 Create a strong admin user and a dedicated `bandao` database user with only `readWrite` on the `bandao` database (avoid root for the app's connection).
-- [ ] 4.3 Configure `/etc/mongod.conf` `net.bindIp` to bind only to `127.0.0.1` and the tailnet interface (e.g. `tailscale0`); restart and verify `ss -lntp` shows no `0.0.0.0:27017`.
-- [ ] 4.4 Install Tailscale on the Mongo host; bring it up with a tag of `tag:bandao-mongo`; verify the host is visible in the tailnet admin UI.
-- [ ] 4.5 In the Tailscale admin ACL, restrict `tag:bandao-api` to reach `tag:bandao-mongo` only on TCP/27017; deny everything else.
-- [ ] 4.6 From a separate tailnet device, run `mongosh "mongodb://bandao:<pass>@<mongo-host>.<tailnet>.ts.net:27017/bandao"` and confirm a successful connection.
+- [x] 4.1 Install MongoDB 7.x from the official MongoDB apt repo following MongoDB's docs for the host's OS.
+- [x] 4.2 Create a strong admin user and a dedicated `bandao` database user with only `readWrite` on the `bandao` database (avoid root for the app's connection).
+- [x] 4.3 Configure `/etc/mongod.conf` `net.bindIp` to bind only to `127.0.0.1` and the tailnet interface (e.g. `tailscale0`); restart and verify `ss -lntp` shows no `0.0.0.0:27017`.
+- [x] 4.4 Install Tailscale on the Mongo host; bring it up with a tag of `tag:bandao-mongo`; verify the host is visible in the tailnet admin UI.
+- [x] 4.5 In the Tailscale admin ACL, restrict `tag:bandao-api` to reach `tag:bandao-mongo` only on TCP/27017; deny everything else.
+- [x] 4.6 From a separate tailnet device, run `mongosh "mongodb://bandao:<pass>@<mongo-host>.<tailnet>.ts.net:27017/bandao"` and confirm a successful connection.
 
 ## 5. Mongo host — backup pipeline
 
-- [ ] 5.1 Install `awscli` v2 (or `rclone`) and `age` on the Mongo host.
-- [ ] 5.2 Create `/etc/bandao-backup.env` (mode `0600`, owned by root) holding `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_REGION`, and the `age` recipient public key.
+- [x] 5.1 Install `awscli` v2 (or `rclone`) and `age` on the Mongo host.
+- [x] 5.2 Create `/etc/bandao-backup.env` (mode `0600`, owned by root) holding `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_REGION`, and the `age` recipient public key.
 - [x] 5.3 Write a backup script (e.g. `/usr/local/bin/bandao-backup.sh`) that: sources the env file, runs `mongodump --gzip --archive=- | age -r <recipient> | aws s3 cp - s3://$S3_BUCKET/daily/$(date +%Y-%m-%d).age`, exits non-zero on any pipeline failure (`set -euo pipefail` and `pipefail`), and logs to syslog.
-- [ ] 5.4 Add a systemd timer (or cron) to run the backup script daily at a low-traffic local time.
-- [ ] 5.5 Trigger the backup script manually once; verify the encrypted archive lands in S3 under `daily/<date>.age` and is non-empty.
+- [x] 5.4 Add a systemd timer (or cron) to run the backup script daily at a low-traffic local time.
+- [x] 5.5 Trigger the backup script manually once; verify the encrypted archive lands in S3 under `daily/<date>.age` and is non-empty.
 - [x] 5.6 Write a restore-drill script (`/usr/local/bin/bandao-restore-drill.sh`) that: pulls the latest `daily/*.age` from S3, decrypts with the operator's private key (provided interactively or via SOPS / SSH-agent — never stored on the host), pipes to `mongorestore` into a scratch DB, runs `db.<known-collection>.countDocuments()` and asserts it exceeds a baseline, then drops the scratch DB.
-- [ ] 5.7 Run the restore drill manually; confirm pass; document the procedure for the monthly cadence (operator's calendar).
+- [x] 5.7 Run the restore drill manually; confirm pass; document the procedure for the monthly cadence (operator's calendar).
 
 ## 6. Zeabur project setup
 

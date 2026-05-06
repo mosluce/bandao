@@ -7,9 +7,6 @@ on:
       - 'api/**'
       - '.github/workflows/api.yml'
   pull_request:
-    paths:
-      - 'api/**'
-      - '.github/workflows/api.yml'
 
 env:
   CARGO_TERM_COLOR: always
