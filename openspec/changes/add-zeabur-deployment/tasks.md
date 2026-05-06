@@ -68,7 +68,7 @@
 
 - [x] 9.1 From a browser, register the first Org and admin account on `https://bandao-admin.ccmos.tw` using the existing register UI; record the credentials in the operator's password manager.
 - [x] 9.2 Log in to admin-web with those credentials; open DevTools network tab; verify the login request hits `https://bandao-api.ccmos.tw`, the response sets a cookie with `Secure`, `HttpOnly`, `SameSite=Lax`, no `Domain` attribute; verify a follow-up authenticated call carries the cookie and succeeds (200, not 401).
-- [ ] 9.3 From the mobile app build pointed at `https://bandao-api.ccmos.tw`, register or log in an AppUser; perform an on-duty checkin; verify the checkin appears in admin-web's checkin dashboard within polling latency.
+- [x] 9.3 From the mobile app build pointed at `https://bandao-api.ccmos.tw`, register or log in an AppUser; perform an on-duty checkin; verify the checkin appears in admin-web's checkin dashboard within polling latency.
 - [x] 9.4 From any other origin (e.g. a scratch HTML page on a different domain), issue a credentialed `fetch` to the api login endpoint and confirm the browser blocks the response (CORS rejects the unrelated origin).
 - [x] 9.5 Restart the api Zeabur service via the dashboard; confirm zero-downtime rollout (admin-web does not visibly fail mid-rollout) and that `/healthz` is green throughout.
 
