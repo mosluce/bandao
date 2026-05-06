@@ -80,6 +80,6 @@
 
 ## 11. Hand-off
 
-- [ ] 11.1 Run `openspec validate add-zeabur-deployment` to confirm the change passes structural checks before merging.
-- [ ] 11.2 Open a single PR titled `chore(infra): add zeabur deployment` containing the api Dockerfile, optional admin-web Dockerfile, healthz handler + test, and `DEPLOY.md`; link the OpenSpec change in the PR body.
-- [ ] 11.3 After merge + first successful production deploy + green smoke (section 9), run `/opsx:archive add-zeabur-deployment` to archive the change and sync specs.
+- [x] 11.1 Run `openspec validate add-zeabur-deployment` to confirm the change passes structural checks before merging.
+- [x] 11.2 Open a single PR titled `chore(infra): add zeabur deployment` containing the api Dockerfile, optional admin-web Dockerfile, healthz handler + test, and `DEPLOY.md`; link the OpenSpec change in the PR body. (Operator chose to ship as N small PRs #1–#5 instead of one big PR; same artifacts landed on `main`.)
+- [x] 11.3 After merge + first successful production deploy + green smoke (section 9), run `/opsx:archive add-zeabur-deployment` to archive the change and sync specs.
