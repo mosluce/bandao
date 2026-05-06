@@ -44,33 +44,33 @@
 
 ## 6. Zeabur project setup
 
-- [ ] 6.1 Create a Zeabur project named `bandao`; connect it to the GitHub repo `mosluce/bandao` with permissions for `main` only.
-- [ ] 6.2 Add the `api` service: source path `api/`, build via Dockerfile; set env vars per `DEPLOY.md` matrix: `BANDAO_LISTEN_ADDR=0.0.0.0:8080`, `BANDAO_MONGO_URI=mongodb://bandao:<pass>@<mongo-host>.<tailnet>.ts.net:27017/bandao?authSource=admin`, `BANDAO_MONGO_DB=bandao`, `BANDAO_COOKIE_SECURE=true`, `BANDAO_ALLOWED_ORIGIN=https://bandao-admin.ccmos.tw`, `BANDAO_SESSION_TTL_SECONDS=1209600`, `TS_AUTHKEY=<auth key from 1.2>`. Leave `BANDAO_COOKIE_DOMAIN` unset (host-only).
-- [ ] 6.3 Add the `admin-web` service: source path `admin-web/`, build via Nuxt auto-detect (or the Dockerfile from 3.3); set build-time env: `NUXT_PUBLIC_API_BASE_URL=https://bandao-api.ccmos.tw`.
-- [ ] 6.4 Configure Zeabur health check on the `api` service: `GET /healthz` expecting `200`, with sane interval/timeout (e.g. 15s / 5s).
-- [ ] 6.5 Trigger the first deploy of both services; observe build logs; confirm api comes up and `/healthz` returns 200; confirm admin-web's index document loads.
+- [x] 6.1 Create a Zeabur project named `bandao`; connect it to the GitHub repo `mosluce/bandao` with permissions for `main` only.
+- [x] 6.2 Add the `api` service: source path `api/`, build via Dockerfile; set env vars per `DEPLOY.md` matrix: `BANDAO_LISTEN_ADDR=0.0.0.0:8080`, `BANDAO_MONGO_URI=mongodb://bandao:<pass>@<mongo-host>.<tailnet>.ts.net:27017/bandao?authSource=admin`, `BANDAO_MONGO_DB=bandao`, `BANDAO_COOKIE_SECURE=true`, `BANDAO_ALLOWED_ORIGIN=https://bandao-admin.ccmos.tw`, `BANDAO_SESSION_TTL_SECONDS=1209600`, `TS_AUTHKEY=<auth key from 1.2>`. Leave `BANDAO_COOKIE_DOMAIN` unset (host-only).
+- [x] 6.3 Add the `admin-web` service: source path `admin-web/`, build via Nuxt auto-detect (or the Dockerfile from 3.3); set build-time env: `NUXT_PUBLIC_API_BASE_URL=https://bandao-api.ccmos.tw`.
+- [x] 6.4 Configure Zeabur health check on the `api` service: `GET /healthz` expecting `200`, with sane interval/timeout (e.g. 15s / 5s).
+- [x] 6.5 Trigger the first deploy of both services; observe build logs; confirm api comes up and `/healthz` returns 200; confirm admin-web's index document loads.
 
 ## 7. DNS + TLS
 
-- [ ] 7.1 In the `ccmos.tw` registrar / DNS provider, add a CNAME record for `bandao-api.ccmos.tw` pointing at the Zeabur target host shown on the api service.
-- [ ] 7.2 Add a CNAME record for `bandao-admin.ccmos.tw` pointing at the Zeabur target for admin-web.
-- [ ] 7.3 In Zeabur, attach both custom domains to their respective services; wait for the automated TLS issuance to complete; verify both hostnames serve a valid public-CA certificate via `curl -vI https://bandao-api.ccmos.tw/healthz` and `curl -vI https://bandao-admin.ccmos.tw/`.
-- [ ] 7.4 Verify HTTP requests to either hostname are upgraded or refused (e.g. `curl -I http://bandao-api.ccmos.tw/healthz` returns a 301/308 to https or fails the connection).
+- [x] 7.1 In the `ccmos.tw` registrar / DNS provider, add a CNAME record for `bandao-api.ccmos.tw` pointing at the Zeabur target host shown on the api service.
+- [x] 7.2 Add a CNAME record for `bandao-admin.ccmos.tw` pointing at the Zeabur target for admin-web.
+- [x] 7.3 In Zeabur, attach both custom domains to their respective services; wait for the automated TLS issuance to complete; verify both hostnames serve a valid public-CA certificate via `curl -vI https://bandao-api.ccmos.tw/healthz` and `curl -vI https://bandao-admin.ccmos.tw/`.
+- [x] 7.4 Verify HTTP requests to either hostname are upgraded or refused (e.g. `curl -I http://bandao-api.ccmos.tw/healthz` returns a 301/308 to https or fails the connection).
 
 ## 8. GitHub branch protection
 
-- [ ] 8.1 In repo settings, add a branch protection rule for `main`: require pull request before merging; require approvals = 1 (or 0 if a solo project, operator's call but document the choice).
-- [ ] 8.2 Require the following status checks to pass: `api / fmt + clippy + test`, `admin-web / typecheck + test + build`, `app / <existing job name>`.
-- [ ] 8.3 Require linear history; block force pushes; block branch deletions.
-- [ ] 8.4 Verify by opening a draft PR with a deliberately failing test and confirming the merge button is disabled.
+- [x] 8.1 In repo settings, add a branch protection rule for `main`: require pull request before merging; require approvals = 1 (or 0 if a solo project, operator's call but document the choice).
+- [x] 8.2 Require the following status checks to pass: `api / fmt + clippy + test`, `admin-web / typecheck + test + build`, `app / analyze + test`.
+- [x] 8.3 Require linear history; block force pushes; block branch deletions.
+- [x] 8.4 Verify by opening a draft PR with a deliberately failing test and confirming the merge button is disabled.
 
 ## 9. End-to-end smoke
 
-- [ ] 9.1 From a browser, register the first Org and admin account on `https://bandao-admin.ccmos.tw` using the existing register UI; record the credentials in the operator's password manager.
-- [ ] 9.2 Log in to admin-web with those credentials; open DevTools network tab; verify the login request hits `https://bandao-api.ccmos.tw`, the response sets a cookie with `Secure`, `HttpOnly`, `SameSite=Lax`, no `Domain` attribute; verify a follow-up authenticated call carries the cookie and succeeds (200, not 401).
-- [ ] 9.3 From the mobile app build pointed at `https://bandao-api.ccmos.tw`, register or log in an AppUser; perform an on-duty checkin; verify the checkin appears in admin-web's checkin dashboard within polling latency.
-- [ ] 9.4 From any other origin (e.g. a scratch HTML page on a different domain), issue a credentialed `fetch` to the api login endpoint and confirm the browser blocks the response (CORS rejects the unrelated origin).
-- [ ] 9.5 Restart the api Zeabur service via the dashboard; confirm zero-downtime rollout (admin-web does not visibly fail mid-rollout) and that `/healthz` is green throughout.
+- [x] 9.1 From a browser, register the first Org and admin account on `https://bandao-admin.ccmos.tw` using the existing register UI; record the credentials in the operator's password manager.
+- [x] 9.2 Log in to admin-web with those credentials; open DevTools network tab; verify the login request hits `https://bandao-api.ccmos.tw`, the response sets a cookie with `Secure`, `HttpOnly`, `SameSite=Lax`, no `Domain` attribute; verify a follow-up authenticated call carries the cookie and succeeds (200, not 401).
+- [x] 9.3 From the mobile app build pointed at `https://bandao-api.ccmos.tw`, register or log in an AppUser; perform an on-duty checkin; verify the checkin appears in admin-web's checkin dashboard within polling latency.
+- [x] 9.4 From any other origin (e.g. a scratch HTML page on a different domain), issue a credentialed `fetch` to the api login endpoint and confirm the browser blocks the response (CORS rejects the unrelated origin).
+- [x] 9.5 Restart the api Zeabur service via the dashboard; confirm zero-downtime rollout (admin-web does not visibly fail mid-rollout) and that `/healthz` is green throughout.
 
 ## 10. Documentation
 
