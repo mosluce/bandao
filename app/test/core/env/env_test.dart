@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/core/env/env.dart';
+import 'package:bandao_app/core/env/env.dart';
 
 void main() {
   tearDown(Env.resetForTest);
@@ -20,6 +20,6 @@ void main() {
   });
 
   test('appId is the locked bundle id', () {
-    expect(Env.appId, 'tw.ccmos.app.argus');
+    expect(Env.appId, 'tw.ccmos.app.bandao');
   });
 }

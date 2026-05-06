@@ -28,7 +28,7 @@ class AppLocalizations {
   ];
 
   // Login screen
-  String get appTitle => 'Argus';
+  String get appTitle => '班到';
   String get loginTitle =>
       _isZh ? '登入' : 'Sign in';
   String get loginOrgCodeLabel =>
@@ -149,10 +149,10 @@ class AppLocalizations {
   String get backgroundTipTitle =>
       _isZh ? '背景同步說明' : 'Background sync note';
   String get backgroundTipBody => _isZh
-      ? 'iOS 會自行決定何時執行背景同步，請勿強制關閉 Argus，'
+      ? 'iOS 會自行決定何時執行背景同步，請勿強制關閉「班到」，'
           '以免待送的打卡事件延遲上傳。'
       : 'iOS schedules background sync at its discretion. '
-          'Do not force-quit Argus while events are queued.';
+          'Do not force-quit Bandao while events are queued.';
   String get backgroundTipDismiss => _isZh ? '了解' : 'Got it';
 
   // History

@@ -5,7 +5,7 @@ TBD - created by archiving change add-app-shell. Update Purpose after archive.
 ## Requirements
 ### Requirement: Flutter project lives at app/ with locked tech stack and platform identity
 
-The repo SHALL contain a Flutter project at `app/` with `pubspec.yaml` declaring `name: argus_app`, `version: 0.1.0+1`, Flutter SDK constraint `>= 3.24.0`, and Dart SDK constraint `>= 3.5.0 < 4.0.0`. The project SHALL declare these runtime dependencies and no others for v1: `flutter_riverpod`, `riverpod_annotation`, `go_router`, `dio`, `flutter_secure_storage`, `freezed_annotation`, `json_annotation`, `logger`, `flutter_localizations` (sdk). It SHALL declare these dev dependencies: `build_runner`, `riverpod_generator`, `freezed`, `json_serializable`, `flutter_lints`. The iOS bundle identifier and Android `applicationId` SHALL be `tw.ccmos.app.argus`. The display name on iOS (`CFBundleDisplayName`) and Android (`app_name` string resource) SHALL be `Argus`. The minimum supported iOS version SHALL be 13.0; the minimum supported Android API level SHALL be 24 (Android 7.0).
+The repo SHALL contain a Flutter project at `app/` with `pubspec.yaml` declaring `name: bandao_app`, `version: 0.1.0+1`, Flutter SDK constraint `>= 3.24.0`, and Dart SDK constraint `>= 3.5.0 < 4.0.0`. The project SHALL declare these runtime dependencies and no others for v1: `flutter_riverpod`, `riverpod_annotation`, `go_router`, `dio`, `flutter_secure_storage`, `freezed_annotation`, `json_annotation`, `logger`, `flutter_localizations` (sdk). It SHALL declare these dev dependencies: `build_runner`, `riverpod_generator`, `freezed`, `json_serializable`, `flutter_lints`. The iOS bundle identifier and Android `applicationId` SHALL be `tw.ccmos.app.bandao`. The display name on iOS (`CFBundleDisplayName`) and Android (`app_name` string resource) SHALL be `班到`. The minimum supported iOS version SHALL be 13.0; the minimum supported Android API level SHALL be 24 (Android 7.0).
 
 #### Scenario: Project metadata is correct
 
@@ -16,13 +16,13 @@ The repo SHALL contain a Flutter project at `app/` with `pubspec.yaml` declaring
 #### Scenario: Bundle identifiers match the spec on both platforms
 
 - **WHEN** the iOS project's `Runner.xcodeproj` is inspected
-- **THEN** `PRODUCT_BUNDLE_IDENTIFIER` for the `Runner` target equals `tw.ccmos.app.argus`
-- **AND** the Android `app/build.gradle` `applicationId` equals `tw.ccmos.app.argus`
+- **THEN** `PRODUCT_BUNDLE_IDENTIFIER` for the `Runner` target equals `tw.ccmos.app.bandao`
+- **AND** the Android `app/build.gradle` `applicationId` equals `tw.ccmos.app.bandao`
 
-#### Scenario: Display name renders as "Argus"
+#### Scenario: Display name renders as "班到"
 
 - **WHEN** the app is installed on iOS Simulator or Android Emulator
-- **THEN** the home-screen icon label reads `Argus`
+- **THEN** the home-screen icon label reads `班到`
 
 ### Requirement: API base URL resolves via dart-define with platform-aware default
 
@@ -227,12 +227,12 @@ The system SHALL provide a `/` route that displays the authenticated AppUser's `
 
 ### Requirement: Debug-only dev menu allows runtime API URL override
 
-The system SHALL, in debug builds only, expose a hidden "Server" configuration screen reachable by tapping the "Argus" logo on the login screen 5 times within 3 seconds. The screen SHALL display the current effective base URL, allow the user to enter a new base URL, and provide "儲存" and "清除" actions. Saved values SHALL persist in secure storage at `dev.api_base_url_override` and take precedence over `Env.compileTimeDefault()` for all subsequent requests. Cleared values SHALL revert to the compile-time default. Release builds SHALL exclude this screen entirely.
+The system SHALL, in debug builds only, expose a hidden "Server" configuration screen reachable by tapping the "Bandao" logo on the login screen 5 times within 3 seconds. The screen SHALL display the current effective base URL, allow the user to enter a new base URL, and provide "儲存" and "清除" actions. Saved values SHALL persist in secure storage at `dev.api_base_url_override` and take precedence over `Env.compileTimeDefault()` for all subsequent requests. Cleared values SHALL revert to the compile-time default. Release builds SHALL exclude this screen entirely.
 
 #### Scenario: Hidden gesture opens the dev menu in debug
 
 - **WHEN** the app is running in debug mode on the login screen
-- **AND** the user taps the "Argus" logo 5 times within 3 seconds
+- **AND** the user taps the "Bandao" logo 5 times within 3 seconds
 - **THEN** the dev server config screen opens
 
 #### Scenario: Saved override is applied immediately
@@ -250,7 +250,7 @@ The system SHALL, in debug builds only, expose a hidden "Server" configuration s
 #### Scenario: Hidden gesture is inert in release
 
 - **WHEN** the app is running in release mode on the login screen
-- **AND** the user taps the "Argus" logo 5 times within 3 seconds
+- **AND** the user taps the "Bandao" logo 5 times within 3 seconds
 - **THEN** nothing happens (the dev menu is excluded from compilation)
 
 ### Requirement: app/ has its own README and CI workflow

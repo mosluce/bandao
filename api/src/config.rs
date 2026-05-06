@@ -23,32 +23,32 @@ pub enum ConfigError {
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
         let mongo_uri = env_or_default(
-            "ARGUS_MONGO_URI",
-            "mongodb://argus:argus@localhost:27017/argus?authSource=admin",
+            "BANDAO_MONGO_URI",
+            "mongodb://bandao:bandao@localhost:27017/bandao?authSource=admin",
         );
-        let mongo_db = env_or_default("ARGUS_MONGO_DB", "argus");
-        let listen_addr_raw = env_or_default("ARGUS_LISTEN_ADDR", "127.0.0.1:8080");
+        let mongo_db = env_or_default("BANDAO_MONGO_DB", "bandao");
+        let listen_addr_raw = env_or_default("BANDAO_LISTEN_ADDR", "127.0.0.1:8080");
         let listen_addr =
             listen_addr_raw
                 .parse::<SocketAddr>()
                 .map_err(|e| ConfigError::Invalid {
-                    var: "ARGUS_LISTEN_ADDR",
+                    var: "BANDAO_LISTEN_ADDR",
                     message: e.to_string(),
                 })?;
 
-        let session_ttl_secs = env_or_default("ARGUS_SESSION_TTL_SECONDS", "1209600")
+        let session_ttl_secs = env_or_default("BANDAO_SESSION_TTL_SECONDS", "1209600")
             .parse::<u64>()
             .map_err(|e| ConfigError::Invalid {
-                var: "ARGUS_SESSION_TTL_SECONDS",
+                var: "BANDAO_SESSION_TTL_SECONDS",
                 message: e.to_string(),
             })?;
         let session_ttl = Duration::from_secs(session_ttl_secs);
 
-        let cookie_domain = std::env::var("ARGUS_COOKIE_DOMAIN")
+        let cookie_domain = std::env::var("BANDAO_COOKIE_DOMAIN")
             .ok()
             .filter(|v| !v.is_empty());
-        let cookie_secure = parse_bool_or("ARGUS_COOKIE_SECURE", false)?;
-        let allowed_origin = std::env::var("ARGUS_ALLOWED_ORIGIN")
+        let cookie_secure = parse_bool_or("BANDAO_COOKIE_SECURE", false)?;
+        let allowed_origin = std::env::var("BANDAO_ALLOWED_ORIGIN")
             .ok()
             .filter(|v| !v.is_empty());
 

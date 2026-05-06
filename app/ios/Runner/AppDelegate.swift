@@ -12,7 +12,7 @@ import workmanager
     // GeneratedPluginRegistrant runs and BEFORE super.application — otherwise
     // any later `BGTaskScheduler.submitTaskRequest` for this id crashes the
     // app at native level.
-    WorkmanagerPlugin.registerTask(withIdentifier: "tw.ccmos.app.argus.queue-drain")
+    WorkmanagerPlugin.registerTask(withIdentifier: "tw.ccmos.app.bandao.queue-drain")
 
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

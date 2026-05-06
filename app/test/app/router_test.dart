@@ -3,17 +3,17 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/app/router.dart';
-import 'package:argus_app/core/api/models/app_user.dart';
-import 'package:argus_app/core/api/models/org.dart';
-import 'package:argus_app/core/storage/secure_storage.dart';
-import 'package:argus_app/features/auth/presentation/dev_server_config_screen.dart';
-import 'package:argus_app/features/auth/presentation/force_password_change_screen.dart';
-import 'package:argus_app/features/auth/presentation/home_screen.dart';
-import 'package:argus_app/features/auth/presentation/login_screen.dart';
-import 'package:argus_app/features/auth/state/auth_provider.dart';
-import 'package:argus_app/features/auth/state/auth_state.dart';
-import 'package:argus_app/l10n/app_localizations.dart';
+import 'package:bandao_app/app/router.dart';
+import 'package:bandao_app/core/api/models/app_user.dart';
+import 'package:bandao_app/core/api/models/org.dart';
+import 'package:bandao_app/core/storage/secure_storage.dart';
+import 'package:bandao_app/features/auth/presentation/dev_server_config_screen.dart';
+import 'package:bandao_app/features/auth/presentation/force_password_change_screen.dart';
+import 'package:bandao_app/features/auth/presentation/home_screen.dart';
+import 'package:bandao_app/features/auth/presentation/login_screen.dart';
+import 'package:bandao_app/features/auth/state/auth_provider.dart';
+import 'package:bandao_app/features/auth/state/auth_state.dart';
+import 'package:bandao_app/l10n/app_localizations.dart';
 
 import '../helpers/fake_auth_notifier.dart';
 import '../helpers/fake_secure_storage.dart';

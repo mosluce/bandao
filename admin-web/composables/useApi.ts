@@ -2,7 +2,7 @@ import type { FetchOptions } from 'ofetch'
 import { ApiError, type ApiErrorBody } from '~/types/api'
 
 /**
- * Returns a $fetch instance preconfigured for the argus API: base URL from
+ * Returns a $fetch instance preconfigured for the bandao API: base URL from
  * runtime config, credentials always included so the session cookie travels,
  * and JSON errors normalized into ApiError.
  */

@@ -255,7 +255,7 @@ class CheckinQueueDb extends _$CheckinQueueDb {
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dir = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dir.path, 'argus_checkin_queue.sqlite'));
+    final file = File(p.join(dir.path, 'bandao_checkin_queue.sqlite'));
     return NativeDatabase.createInBackground(file);
   });
 }

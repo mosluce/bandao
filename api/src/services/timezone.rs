@@ -4,7 +4,7 @@
 //!
 //! The `chrono-tz` crate is the canonical Rust IANA validator, but pulling
 //! it in just for `tz.parse::<Tz>().is_ok()` adds ~1 MB of static data
-//! (the full tzdata) and a build-script step. Argus only needs the
+//! (the full tzdata) and a build-script step. Bandao only needs the
 //! "is this string a valid IANA name" question answered cheaply on
 //! `PATCH /orgs/me/settings`.
 //!

@@ -6,9 +6,9 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
-import 'package:argus_app/core/storage/privacy_url.dart';
-import 'package:argus_app/features/checkin/presentation/location_consent_dialog.dart';
-import 'package:argus_app/l10n/app_localizations.dart';
+import 'package:bandao_app/core/storage/privacy_url.dart';
+import 'package:bandao_app/features/checkin/presentation/location_consent_dialog.dart';
+import 'package:bandao_app/l10n/app_localizations.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

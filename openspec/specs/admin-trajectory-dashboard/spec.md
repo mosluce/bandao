@@ -80,7 +80,7 @@ The trajectory page SHALL include an export action that opens a date-range selec
 
 - **WHEN** an admin enters a valid `from` / `to` range and confirms
 - **THEN** the browser navigates to the export URL with the cookie session
-- **AND** the response downloads as `argus-locations-<username>-<from>-<to>.xlsx`
+- **AND** the response downloads as `bandao-locations-<username>-<from>-<to>.xlsx`
 
 #### Scenario: Span > 90 days rejected client-side
 

@@ -1,16 +1,16 @@
 services:
   mongodb:
     image: mongo:7
-    container_name: argus-mongodb
+    container_name: bandao-mongodb
     restart: unless-stopped
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: argus
-      MONGO_INITDB_ROOT_PASSWORD: argus
-      MONGO_INITDB_DATABASE: argus
+      MONGO_INITDB_ROOT_USERNAME: bandao
+      MONGO_INITDB_ROOT_PASSWORD: bandao
+      MONGO_INITDB_DATABASE: bandao
     volumes:
-      - argus_mongodb_data:/data/db
+      - bandao_mongodb_data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
@@ -19,5 +19,5 @@ services:
       start_period: 20s
 
 volumes:
-  argus_mongodb_data:
-    name: argus_mongodb_data
+  bandao_mongodb_data:
+    name: bandao_mongodb_data

@@ -1,4 +1,4 @@
-# Lints for argus_app.
+# Lints for bandao_app.
 #
 # Why these knobs:
 # - prefer_relative_imports: keep imports inside the package consistent (no

@@ -1,4 +1,4 @@
-# argus admin-web
+# 班到 admin-web (bandao)
 
 Nuxt 3 + TypeScript + Tailwind CSS。給 Org admin / member 用的管理後台，純 SPA（`ssr: false`），靠 cookie session 跟 `api/` 通訊。
 
@@ -68,7 +68,7 @@ assets/css/   # Tailwind entry
 ## Multi-org 流程
 
 - `useAuth()` 暴露 `user` / `memberships` / `currentOrg` / `role`，以及 `createOrg` / `joinOrg` / `switchOrg` / `leaveOrg` / `transferOwnership` 行為。
-- localStorage `argus.lastSelectedOrgId` 記住最後選的 Org；下次登入會自動 `switchOrg` 對齊 server。
+- localStorage `bandao.lastSelectedOrgId` 記住最後選的 Org；下次登入會自動 `switchOrg` 對齊 server。
 - 沒有任何 membership 的使用者會被 middleware 導去 `/no-org`，那邊有併排的「建立新組織」與「加入既有組織」表單。
 - `OrgSwitcher` 在每個 page header 都看得到（`pages/index.vue`、`members.vue`、`cooldowns.vue`），分組顯示「我擁有的」「我加入的」+「+ 建立新組織」「+ 用 org code 加入」入口。
 - 切換 Org 後，依賴 server 資料的 page（members / cooldowns）會 watch `currentOrg.value?.id` 自動重打 API。

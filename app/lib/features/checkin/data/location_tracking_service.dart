@@ -144,7 +144,7 @@ class GeolocatorTrackingService implements LocationTrackingService {
         accuracy: LocationAccuracy.high,
         distanceFilter: 100,
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'Argus',
+          notificationTitle: '班到',
           notificationText: '工作期間定位追蹤中',
           enableWakeLock: true,
           setOngoing: true,

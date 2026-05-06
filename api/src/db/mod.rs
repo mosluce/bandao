@@ -56,7 +56,7 @@ pub struct Db {
 impl Db {
     pub async fn connect(uri: &str, db_name: &str) -> ApiResult<Self> {
         let mut options = ClientOptions::parse(uri).await?;
-        options.app_name = Some("argus-api".to_string());
+        options.app_name = Some("bandao-api".to_string());
         let client = Client::with_options(options)?;
 
         // Eager ping so misconfiguration fails at boot, not on first request.

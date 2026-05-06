@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "tw.ccmos.app.argus"
+    namespace = "tw.ccmos.app.bandao"
     compileSdk = flutter.compileSdkVersion
     // flutter_secure_storage and path_provider_android require >= 27.0.12077973;
     // pin explicitly so plugin upgrades don't surprise local builds.
@@ -22,7 +22,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "tw.ccmos.app.argus"
+        applicationId = "tw.ccmos.app.bandao"
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

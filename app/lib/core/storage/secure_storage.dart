@@ -12,13 +12,13 @@ class SecureStorageKeys {
   static const String apiBaseUrlOverride = 'dev.api_base_url_override';
   static const String backgroundSyncTipSeen = 'home.background_sync_tip_seen';
   static const String locationTrackingLastCleanStop =
-      'argus.location_tracking.last_clean_stop';
+      'bandao.location_tracking.last_clean_stop';
   static const String privacyUrlOverride = 'dev.privacy_url_override';
 
   /// Per-AppUser consent flag — formatted as
-  /// `argus.location_tracking.consent.<app_user_id>`.
+  /// `bandao.location_tracking.consent.<app_user_id>`.
   static String locationTrackingConsentKey(String appUserId) =>
-      'argus.location_tracking.consent.$appUserId';
+      'bandao.location_tracking.consent.$appUserId';
 }
 
 /// Thin typed wrapper around `flutter_secure_storage`. The wrapper exists so

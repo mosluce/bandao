@@ -18,7 +18,7 @@ interface AuthState {
   data: AuthResponse | null
 }
 
-const LAST_ORG_KEY = 'argus.lastSelectedOrgId'
+const LAST_ORG_KEY = 'bandao.lastSelectedOrgId'
 
 function readLastOrg(): string | null {
   if (typeof localStorage === 'undefined') return null
@@ -33,7 +33,7 @@ function writeLastOrg(orgId: string | null) {
 
 export function useAuth() {
   const api = useApi()
-  const state = useState<AuthState>('argus.auth', () => ({
+  const state = useState<AuthState>('bandao.auth', () => ({
     loaded: false,
     data: null,
   }))

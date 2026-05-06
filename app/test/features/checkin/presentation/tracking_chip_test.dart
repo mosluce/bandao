@@ -5,10 +5,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/features/checkin/data/location_tracking_service.dart';
-import 'package:argus_app/features/checkin/presentation/tracking_chip.dart';
-import 'package:argus_app/features/checkin/state/location_tracking_controller.dart';
-import 'package:argus_app/l10n/app_localizations.dart';
+import 'package:bandao_app/features/checkin/data/location_tracking_service.dart';
+import 'package:bandao_app/features/checkin/presentation/tracking_chip.dart';
+import 'package:bandao_app/features/checkin/state/location_tracking_controller.dart';
+import 'package:bandao_app/l10n/app_localizations.dart';
 
 void main() {
   group('TrackingChip', () {

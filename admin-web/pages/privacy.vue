@@ -19,7 +19,7 @@ const PLATFORM_CONTACT_EMAIL = 'noreply@example.com'
           隱私政策
         </h1>
         <p class="mt-1 text-sm text-slate-500">
-          Argus 平台關於資料蒐集、使用與保留的說明。
+          班到平台關於資料蒐集、使用與保留的說明。
         </p>
       </header>
 
@@ -28,7 +28,7 @@ const PLATFORM_CONTACT_EMAIL = 'noreply@example.com'
           1. 適用範圍
         </h2>
         <p class="text-sm text-slate-700">
-          本政策說明 Argus 平台（以下稱「本平台」）以及您所屬組織（以下稱「Org」）使用 Argus 服務時的資料處理方式。組織管理員可能依其內部流程訂定額外的資料蒐集與使用規則，請另向您的 Org 確認。
+          本政策說明 班到平台（以下稱「本平台」）以及您所屬組織（以下稱「Org」）使用 班到服務時的資料處理方式。組織管理員可能依其內部流程訂定額外的資料蒐集與使用規則，請另向您的 Org 確認。
         </p>
       </section>
 
@@ -41,7 +41,7 @@ const PLATFORM_CONTACT_EMAIL = 'noreply@example.com'
             <span class="font-medium">帳號識別資料</span>：您建立帳號時提供的 email、使用者名稱、顯示名稱，以及經雜湊（hash）後的密碼。我們不會以明文儲存您的密碼。
           </li>
           <li>
-            <span class="font-medium">出勤事件</span>：您於 Argus App 提交的打卡事件（上班、下班、轉出、轉入），含按下按鈕當下的座標、可選的 GPS 精度，以及由本平台自動執行的反向地理編碼結果（如「信義區 · 忠孝東路五段」這類包含區域與街道的名稱）。本平台僅收集到街道層級，不包含巷弄與門牌號碼。
+            <span class="font-medium">出勤事件</span>：您於 班到 App 提交的打卡事件（上班、下班、轉出、轉入），含按下按鈕當下的座標、可選的 GPS 精度，以及由本平台自動執行的反向地理編碼結果（如「信義區 · 忠孝東路五段」這類包含區域與街道的名稱）。本平台僅收集到街道層級，不包含巷弄與門牌號碼。
           </li>
           <li>
             <span class="font-medium">位置軌跡</span>：若您所屬組織開啟「定位追蹤」功能，工作期間您的裝置會每分鐘記錄一次位置（同時須移動超過 100 公尺才會儲存），用以協助雇主了解現場狀況。下班後不再記錄。
@@ -89,7 +89,7 @@ const PLATFORM_CONTACT_EMAIL = 'noreply@example.com'
         </h2>
         <ul class="list-disc list-outside pl-6 space-y-2 text-sm text-slate-700">
           <li>您所屬組織的 admin 與 owner（依組織內角色分工存取）。</li>
-          <li>Argus 平台的維運人員，僅在系統管理、故障排除、安全事件處理等必要範圍內存取。</li>
+          <li>班到平台的維運人員，僅在系統管理、故障排除、安全事件處理等必要範圍內存取。</li>
           <li>除上述情形外，本平台不會將您的個人資料提供予任何第三方，亦不會用於行銷目的。</li>
         </ul>
       </section>
@@ -129,7 +129,7 @@ const PLATFORM_CONTACT_EMAIL = 'noreply@example.com'
           有關您所屬組織內部的資料處理疑義，請逕洽該組織的 admin 或 owner。
         </p>
         <p class="text-sm text-slate-700">
-          有關 Argus 平台層級的疑義，請聯絡：
+          有關 班到平台層級的疑義，請聯絡：
           <code class="rounded bg-slate-100 px-2 py-1 font-mono text-slate-900">{{ PLATFORM_CONTACT_EMAIL }}</code>
           <span class="text-xs text-slate-500">（placeholder — 待平台運營更新）</span>
         </p>

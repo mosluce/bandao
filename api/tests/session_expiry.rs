@@ -45,18 +45,18 @@ async fn expired_session_is_rejected_and_cookie_cleared() {
     let me = client.get(app.url("/me")).send().await.unwrap();
     assert_eq!(me.status(), StatusCode::UNAUTHORIZED);
 
-    // Middleware should emit a Set-Cookie clearing argus_session.
+    // Middleware should emit a Set-Cookie clearing bandao_session.
     let cleared = me
         .headers()
         .get_all(reqwest::header::SET_COOKIE)
         .iter()
         .any(|v| {
             let s = v.to_str().unwrap_or("");
-            s.starts_with("argus_session=") && (s.contains("Max-Age=0") || s.contains("max-age=0"))
+            s.starts_with("bandao_session=") && (s.contains("Max-Age=0") || s.contains("max-age=0"))
         });
     assert!(
         cleared,
-        "expected clearing Set-Cookie for argus_session, got headers: {:?}",
+        "expected clearing Set-Cookie for bandao_session, got headers: {:?}",
         me.headers().get_all(reqwest::header::SET_COOKIE)
     );
 }

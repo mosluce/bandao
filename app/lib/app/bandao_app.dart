@@ -13,14 +13,14 @@ import 'router.dart';
 
 /// Root widget. The locale is hard-coded to zh-TW for v1; ARB infrastructure
 /// is in place when more locales arrive.
-class ArgusApp extends ConsumerWidget {
-  const ArgusApp({super.key});
+class BandaoApp extends ConsumerWidget {
+  const BandaoApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Start the foreground queue runner. Kept-alive so it lives for the
     // whole app session. Tests that pump MaterialApp.router directly (rather
-    // than ArgusApp) avoid spinning up the timer.
+    // than BandaoApp) avoid spinning up the timer.
     ref.watch(queueProcessorRunnerProvider);
     // Same shape for the location-pings batch processor.
     ref.watch(locationPingProcessorRunnerProvider);
@@ -48,7 +48,7 @@ class ArgusApp extends ConsumerWidget {
 
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
-      title: 'Argus',
+      title: '班到',
       theme: AppTheme.light(),
       debugShowCheckedModeBanner: false,
       locale: const Locale('zh', 'TW'),

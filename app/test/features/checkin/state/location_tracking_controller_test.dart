@@ -1,15 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/core/api/models/app_user.dart';
-import 'package:argus_app/core/api/models/checkin_status.dart';
-import 'package:argus_app/core/api/models/org.dart';
-import 'package:argus_app/features/auth/state/auth_provider.dart';
-import 'package:argus_app/features/auth/state/auth_state.dart';
-import 'package:argus_app/features/checkin/data/location_tracking_service.dart';
-import 'package:argus_app/features/checkin/state/checkin_status_provider.dart';
-import 'package:argus_app/features/checkin/state/effective_status_provider.dart';
-import 'package:argus_app/features/checkin/state/location_tracking_controller.dart';
+import 'package:bandao_app/core/api/models/app_user.dart';
+import 'package:bandao_app/core/api/models/checkin_status.dart';
+import 'package:bandao_app/core/api/models/org.dart';
+import 'package:bandao_app/features/auth/state/auth_provider.dart';
+import 'package:bandao_app/features/auth/state/auth_state.dart';
+import 'package:bandao_app/features/checkin/data/location_tracking_service.dart';
+import 'package:bandao_app/features/checkin/state/checkin_status_provider.dart';
+import 'package:bandao_app/features/checkin/state/effective_status_provider.dart';
+import 'package:bandao_app/features/checkin/state/location_tracking_controller.dart';
 
 import '../../../helpers/fake_auth_notifier.dart';
 

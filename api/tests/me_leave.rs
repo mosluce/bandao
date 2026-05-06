@@ -49,7 +49,7 @@ async fn non_owner_member_can_self_leave() {
         .await
         .unwrap()
         .expect("marker should exist");
-    use argus_api::domain::RemovalKind;
+    use bandao_api::domain::RemovalKind;
     assert!(matches!(marker.removal_kind, RemovalKind::Left));
 
     // Subsequent /me with the same client returns 401 (cookie cleared / session deleted).

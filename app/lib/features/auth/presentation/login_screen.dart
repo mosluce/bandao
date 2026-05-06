@@ -101,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const SizedBox(height: 24),
-              _ArgusLogo(onSecretTapped: _onLogoTapped),
+              _BandaoLogo(onSecretTapped: _onLogoTapped),
               const SizedBox(height: 8),
               Text(
                 l10n.loginTitle,
@@ -183,18 +183,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-/// "Argus" logo + title. Tapped 5 times within 3 seconds opens the dev menu
+/// "Bandao" (班到) logo + title. Tapped 5 times within 3 seconds opens the dev menu
 /// in debug builds; release builds inert (the page itself is gated too).
-class _ArgusLogo extends StatefulWidget {
-  const _ArgusLogo({required this.onSecretTapped});
+class _BandaoLogo extends StatefulWidget {
+  const _BandaoLogo({required this.onSecretTapped});
 
   final VoidCallback onSecretTapped;
 
   @override
-  State<_ArgusLogo> createState() => _ArgusLogoState();
+  State<_BandaoLogo> createState() => _BandaoLogoState();
 }
 
-class _ArgusLogoState extends State<_ArgusLogo> {
+class _BandaoLogoState extends State<_BandaoLogo> {
   static const int _tapsRequired = 5;
   static const Duration _window = Duration(seconds: 3);
 
@@ -227,7 +227,7 @@ class _ArgusLogoState extends State<_ArgusLogo> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Argus',
+              '班到',
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ],

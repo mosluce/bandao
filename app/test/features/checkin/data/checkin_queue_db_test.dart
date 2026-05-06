@@ -2,7 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/features/checkin/data/checkin_queue_db.dart';
+import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
 
 void main() {
   late CheckinQueueDb db;

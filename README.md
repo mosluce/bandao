@@ -1,4 +1,4 @@
-# argus
+# 班到 (bandao)
 
 多租戶簽到系統。包含後端 API、管理後台、終端使用者 App，以及共用的 MongoDB 資料層。
 
@@ -43,13 +43,13 @@ pnpm dev
 
 ```bash
 # api
-ARGUS_LISTEN_ADDR=127.0.0.1:9090 ARGUS_ALLOWED_ORIGIN=http://localhost:3000 cargo run
+BANDAO_LISTEN_ADDR=127.0.0.1:9090 BANDAO_ALLOWED_ORIGIN=http://localhost:3000 cargo run
 
 # admin-web .env
 NUXT_PUBLIC_API_BASE_URL=http://localhost:9090
 ```
 
-預設 Mongo 連線字串：`mongodb://argus:argus@localhost:27017/argus?authSource=admin`
+預設 Mongo 連線字串：`mongodb://bandao:bandao@localhost:27017/bandao?authSource=admin`
 
 App 端（Flutter）開發另開：
 
@@ -71,7 +71,7 @@ flutter run                # 自動跑當前 simulator / device
 
 ## 變更工作流程
 
-argus 採 **spec-driven** 開發，所有非瑣碎的變更都先走 OpenSpec / opsx：
+班到 採 **spec-driven** 開發，所有非瑣碎的變更都先走 OpenSpec / opsx：
 
 1. 點子先進 [`ROADMAP.md`](./ROADMAP.md)（不立刻動工）
 2. 要做時 `/opsx:propose` 產出 proposal + design + specs + tasks

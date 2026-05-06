@@ -4,20 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:argus_app/core/api/models/app_user.dart';
-import 'package:argus_app/core/api/models/checkin_event.dart';
-import 'package:argus_app/core/api/models/checkin_status.dart';
-import 'package:argus_app/core/api/models/org.dart';
-import 'package:argus_app/core/api/models/submit_checkin_event.dart';
-import 'package:argus_app/features/auth/state/auth_provider.dart';
-import 'package:argus_app/features/auth/state/auth_state.dart';
-import 'package:argus_app/features/checkin/data/checkin_queue_db.dart';
-import 'package:argus_app/features/checkin/data/checkin_repository.dart';
-import 'package:argus_app/features/checkin/presentation/history_screen.dart';
-import 'package:argus_app/features/checkin/state/checkin_queue_provider.dart';
-import 'package:argus_app/features/checkin/state/checkin_status_provider.dart';
-import 'package:argus_app/features/checkin/state/recently_synced_events_provider.dart';
-import 'package:argus_app/l10n/app_localizations.dart';
+import 'package:bandao_app/core/api/models/app_user.dart';
+import 'package:bandao_app/core/api/models/checkin_event.dart';
+import 'package:bandao_app/core/api/models/checkin_status.dart';
+import 'package:bandao_app/core/api/models/org.dart';
+import 'package:bandao_app/core/api/models/submit_checkin_event.dart';
+import 'package:bandao_app/features/auth/state/auth_provider.dart';
+import 'package:bandao_app/features/auth/state/auth_state.dart';
+import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
+import 'package:bandao_app/features/checkin/data/checkin_repository.dart';
+import 'package:bandao_app/features/checkin/presentation/history_screen.dart';
+import 'package:bandao_app/features/checkin/state/checkin_queue_provider.dart';
+import 'package:bandao_app/features/checkin/state/checkin_status_provider.dart';
+import 'package:bandao_app/features/checkin/state/recently_synced_events_provider.dart';
+import 'package:bandao_app/l10n/app_localizations.dart';
 
 import '../../../helpers/fake_auth_notifier.dart';
 

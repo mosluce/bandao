@@ -25,8 +25,8 @@ async fn register_create_mode_happy_path() {
     assert_eq!(resp.status(), StatusCode::OK);
     let cookies: Vec<_> = resp.cookies().collect();
     assert!(
-        cookies.iter().any(|c| c.name() == "argus_session"),
-        "expected argus_session cookie, got {cookies:?}"
+        cookies.iter().any(|c| c.name() == "bandao_session"),
+        "expected bandao_session cookie, got {cookies:?}"
     );
 
     let body: Value = resp.json().await.expect("json body");
@@ -58,7 +58,7 @@ async fn register_create_mode_happy_path() {
         .await
         .unwrap()
         .expect("membership row");
-    assert!(matches!(m.role, argus_api::domain::Role::Admin));
+    assert!(matches!(m.role, bandao_api::domain::Role::Admin));
 
     // /me returns the same shape.
     let me_resp = app

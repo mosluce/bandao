@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 
-import 'package:argus_app/core/api/models/checkin_event.dart';
-import 'package:argus_app/features/checkin/data/geolocation_service.dart';
-import 'package:argus_app/features/checkin/presentation/location_permission_blocker.dart';
-import 'package:argus_app/features/checkin/state/location_permission_provider.dart';
-import 'package:argus_app/l10n/app_localizations.dart';
+import 'package:bandao_app/core/api/models/checkin_event.dart';
+import 'package:bandao_app/features/checkin/data/geolocation_service.dart';
+import 'package:bandao_app/features/checkin/presentation/location_permission_blocker.dart';
+import 'package:bandao_app/features/checkin/state/location_permission_provider.dart';
+import 'package:bandao_app/l10n/app_localizations.dart';
 
 void main() {
   group('LocationPermissionBlocker', () {

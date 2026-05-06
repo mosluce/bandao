@@ -388,7 +388,7 @@ pub async fn export_locations(
     let from_date = from_raw.split('T').next().unwrap_or("from");
     let to_date = to_raw.split('T').next().unwrap_or("to");
     let filename = format!(
-        "argus-locations-{}-{}-{}.xlsx",
+        "bandao-locations-{}-{}-{}.xlsx",
         app_user.username, from_date, to_date
     );
 

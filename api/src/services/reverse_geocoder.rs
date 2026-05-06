@@ -20,8 +20,8 @@ use serde::Deserialize;
 pub const NOMINATIM_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Default User-Agent. Nominatim's usage policy requires a unique UA — this
-/// one is identifiable as argus.
-pub const NOMINATIM_USER_AGENT: &str = "argus-api/0.1.0 (https://github.com/mosluce/argus)";
+/// one is identifiable as bandao.
+pub const NOMINATIM_USER_AGENT: &str = "bandao-api/0.1.0 (https://github.com/mosluce/bandao)";
 
 /// Default Accept-Language preference. Tests / runtime can override.
 pub const NOMINATIM_ACCEPT_LANGUAGE: &str = "zh-TW,en";

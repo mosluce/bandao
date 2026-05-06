@@ -183,7 +183,7 @@ The system SHALL signal the queue processor to wake on every successful enqueue 
 
 ### Requirement: Background sync via workmanager
 
-The system SHALL use the `workmanager` package to schedule background sync of the queue. On Android the system SHALL register a `OneTimeWorkRequest` with `Constraints(networkType: connected)` whenever a row is enqueued. On iOS the system SHALL register a `BGProcessingTask` once on app start with identifier `tw.ccmos.app.argus.queue-drain`. The background callback SHALL run the same processor logic as the foreground tick. The system SHALL document in `app/README.md` and a one-shot in-app onboarding tip that iOS background scheduling is best-effort and the OS may delay execution.
+The system SHALL use the `workmanager` package to schedule background sync of the queue. On Android the system SHALL register a `OneTimeWorkRequest` with `Constraints(networkType: connected)` whenever a row is enqueued. On iOS the system SHALL register a `BGProcessingTask` once on app start with identifier `tw.ccmos.app.bandao.queue-drain`. The background callback SHALL run the same processor logic as the foreground tick. The system SHALL document in `app/README.md` and a one-shot in-app onboarding tip that iOS background scheduling is best-effort and the OS may delay execution.
 
 #### Scenario: Android enqueues a OneTimeWorkRequest on enqueue
 
@@ -194,7 +194,7 @@ The system SHALL use the `workmanager` package to schedule background sync of th
 #### Scenario: iOS registers BGProcessingTask once on app start
 
 - **WHEN** the app launches on iOS
-- **THEN** workmanager registers a `BGProcessingTask` with identifier `tw.ccmos.app.argus.queue-drain`
+- **THEN** workmanager registers a `BGProcessingTask` with identifier `tw.ccmos.app.bandao.queue-drain`
 - **AND** the task descriptor declares it requires network connectivity
 
 #### Scenario: Onboarding tip explains iOS background limits
@@ -412,7 +412,7 @@ The system SHALL, on `AppLifecycleState.resumed` while the home screen is mounte
 
 The system SHALL, when an AppUser taps `[上班]` and `Org.checkin
 .location_tracking_enabled == true` and the secure-storage flag
-`argus.location_tracking.consent.<app_user_id>` is absent, surface a
+`bandao.location_tracking.consent.<app_user_id>` is absent, surface a
 modal dialog before invoking the existing `enqueueEvent(clockIn)`
 flow. The dialog SHALL include text describing the sampling cadence
 ("約每分鐘記錄一次，移動超過 100 公尺才記錄"), the 90-day retention,
@@ -444,7 +444,7 @@ guarantees workers are off-duty during such flips).
 
 - **WHEN** the consent dialog is visible and the user taps `[同意並上班]`
 - **THEN** secure storage gains an entry at
-  `argus.location_tracking.consent.<app_user_id>`
+  `bandao.location_tracking.consent.<app_user_id>`
 - **AND** the existing `enqueueEvent(clockIn)` flow runs, inserting a
   `pending_events` row
 
@@ -665,7 +665,7 @@ tracker.
 ### Requirement: Force-quit recovery surfaces a one-shot banner
 
 The system SHALL set a secure-storage key
-`argus.location_tracking.last_clean_stop` to the current ISO8601
+`bandao.location_tracking.last_clean_stop` to the current ISO8601
 timestamp whenever the tracker stops cleanly (clock_out flow, app
 disposal). The system SHALL clear this key whenever the tracker
 starts. On every app cold-start, the system SHALL evaluate whether a
@@ -683,15 +683,15 @@ seconds). The system SHALL automatically invoke
 
 - **GIVEN** the tracker is active
 - **WHEN** the AppUser taps `[下班]` and the clock_out flow runs
-- **THEN** secure storage's `argus.location_tracking.last_clean_stop`
+- **THEN** secure storage's `bandao.location_tracking.last_clean_stop`
   is set to the current ISO8601 timestamp
 - **AND** the tracker is stopped
 
 #### Scenario: Force-quit during shift surfaces the banner on next launch
 
-- **GIVEN** the tracker was active and the user force-quit Argus from
+- **GIVEN** the tracker was active and the user force-quit 班到 from
   the multitasking switcher (no clean shutdown, no flag write)
-- **WHEN** the user re-opens Argus and the home screen finishes its
+- **WHEN** the user re-opens 班到 and the home screen finishes its
   initial frame
 - **THEN** the recovery banner is visible
 - **AND** the tracker has been started
@@ -699,14 +699,14 @@ seconds). The system SHALL automatically invoke
 #### Scenario: Banner does not appear when status is off_duty
 
 - **GIVEN** the AppUser is `off_duty` (no shift in progress)
-- **WHEN** the user opens Argus
+- **WHEN** the user opens 班到
 - **THEN** no recovery banner appears (no shift to recover)
 
 #### Scenario: Banner does not appear after a clean stop
 
 - **GIVEN** the tracker stopped cleanly during the previous app
   session (flag is fresh)
-- **WHEN** the user re-opens Argus
+- **WHEN** the user re-opens 班到
 - **THEN** no recovery banner appears
 
 ### Requirement: Home shows a tracking chip while the tracker is active

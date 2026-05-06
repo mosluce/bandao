@@ -342,7 +342,7 @@ class _HistoryRow extends ConsumerWidget {
     final accuracy =
         row.accuracy == null ? '' : ' (±${row.accuracy!.toStringAsFixed(0)}m)';
     return [
-      'Argus checkin event report',
+      'Bandao checkin event report',
       'event_id: queue#${row.id}',
       'event_type: ${row.eventType}',
       'occurred_at_client: ${row.occurredAtClient}',

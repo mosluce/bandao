@@ -71,7 +71,7 @@ The system SHALL allow each Org to optionally hold a `slug` distinct from the ra
 
 #### Scenario: Slug is in reserved list
 
-- **WHEN** an authenticated admin sends `POST /orgs/me/slug` with a slug from the reserved list (e.g. `"admin"`, `"api"`, `"argus"`)
+- **WHEN** an authenticated admin sends `POST /orgs/me/slug` with a slug from the reserved list (e.g. `"admin"`, `"api"`, `"bandao"`)
 - **THEN** the request is rejected with `SLUG_RESERVED`
 - **AND** the Org record is unchanged
 
@@ -156,7 +156,7 @@ The system SHALL allow an Org's first slug set to proceed without rate limit, bu
 
 ### Requirement: Slug reserved word list
 
-The system SHALL maintain a reserved word list and SHALL reject any slug that exactly matches a reserved word (after lowercase normalization). The reserved list SHALL include all first-level API path segments, common system identifiers (e.g. `admin`, `api`, `app`, `www`, `dashboard`, `login`, `register`, `logout`, `support`, `help`, `status`, `billing`, `settings`, `new`, `create`, `join`, `root`, `signup`, `signin`, `oauth`, `callback`), and the project name `argus`. The reserved list SHALL be a static, code-level constant maintained alongside the API; runtime modification is not supported.
+The system SHALL maintain a reserved word list and SHALL reject any slug that exactly matches a reserved word (after lowercase normalization). The reserved list SHALL include all first-level API path segments, common system identifiers (e.g. `admin`, `api`, `app`, `www`, `dashboard`, `login`, `register`, `logout`, `support`, `help`, `status`, `billing`, `settings`, `new`, `create`, `join`, `root`, `signup`, `signin`, `oauth`, `callback`), and the project name `bandao`. The reserved list SHALL be a static, code-level constant maintained alongside the API; runtime modification is not supported.
 
 #### Scenario: Reserved system word rejected
 
@@ -165,7 +165,7 @@ The system SHALL maintain a reserved word list and SHALL reject any slug that ex
 
 #### Scenario: Project name reserved
 
-- **WHEN** an admin sends `POST /orgs/me/slug` with `{ "slug": "argus" }`
+- **WHEN** an admin sends `POST /orgs/me/slug` with `{ "slug": "bandao" }`
 - **THEN** the request is rejected with `SLUG_RESERVED`
 
 #### Scenario: API path segment reserved

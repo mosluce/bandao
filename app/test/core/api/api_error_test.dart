@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/core/api/api_error.dart';
-import 'package:argus_app/core/api/error_interceptor.dart';
+import 'package:bandao_app/core/api/api_error.dart';
+import 'package:bandao_app/core/api/error_interceptor.dart';
 
 void main() {
   group('ErrorInterceptor parses envelope', () {

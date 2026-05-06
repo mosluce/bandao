@@ -4,8 +4,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use argus_api::services::reverse_geocoder::ReverseGeocoder;
-use argus_api::{AppState, Config, Db, handlers};
+use bandao_api::services::reverse_geocoder::ReverseGeocoder;
+use bandao_api::{AppState, Config, Db, handlers};
 use bson::oid::ObjectId;
 use reqwest::redirect::Policy;
 use serde_json::{Value, json};
@@ -33,7 +33,7 @@ impl TestApp {
     }
 
     /// Spawn with a custom geocoder. Use the `StaticReverseGeocoder` from
-    /// `argus_api::services::reverse_geocoder` to control whether events
+    /// `bandao_api::services::reverse_geocoder` to control whether events
     /// record `region_name` or store `null`.
     pub async fn spawn_with_geocoder<G>(geocoder: G) -> Self
     where
@@ -71,7 +71,7 @@ impl TestApp {
         let host = mongo.get_host().await.expect("mongo host");
         let port = mongo.get_host_port_ipv4(27017).await.expect("mongo port");
         let mongo_uri = format!("mongodb://{host}:{port}");
-        let mongo_db = format!("argus_test_{}", ObjectId::new().to_hex());
+        let mongo_db = format!("bandao_test_{}", ObjectId::new().to_hex());
 
         let mut config = Config {
             mongo_uri: mongo_uri.clone(),
@@ -131,7 +131,7 @@ impl TestApp {
     }
 
     /// Borrow the inner DB handle for direct fixture manipulation.
-    pub fn db(&self) -> Arc<argus_api::Db> {
+    pub fn db(&self) -> Arc<bandao_api::Db> {
         self.state.db.clone()
     }
 

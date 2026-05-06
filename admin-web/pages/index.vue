@@ -339,7 +339,7 @@ async function confirmLeave() {
       <header class="flex items-center justify-between gap-3">
         <div class="min-w-0">
           <h1 class="text-2xl font-semibold text-slate-900">
-            argus admin
+            班到 admin
           </h1>
           <p
             v-if="auth.user.value"

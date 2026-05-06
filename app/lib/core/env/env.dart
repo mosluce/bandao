@@ -13,13 +13,13 @@ class Env {
 
   /// Provisional bundle id / app id. Mirrored from
   /// `ios/Runner.xcodeproj` and `android/app/build.gradle.kts`.
-  static const String appId = 'tw.ccmos.app.argus';
+  static const String appId = 'tw.ccmos.app.bandao';
 
   static const String _dartDefine =
       String.fromEnvironment('API_BASE_URL');
 
   /// Compile-time privacy policy URL (admin-web `/privacy`). Override at
-  /// build with `--dart-define=PRIVACY_URL=https://argus.example.com/privacy`.
+  /// build with `--dart-define=PRIVACY_URL=https://bandao.example.com/privacy`.
   /// At runtime the dev menu can override via secure storage; production
   /// builds rely on this constant.
   static const String _privacyUrlDartDefine =

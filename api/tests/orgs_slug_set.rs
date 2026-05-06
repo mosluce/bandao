@@ -78,7 +78,7 @@ async fn set_slug_rejects_reserved() {
     let app = TestApp::spawn().await;
     let (admin, _) = app.register_admin("founder@example.com", "Acme").await;
 
-    for reserved in ["admin", "argus", "auth"] {
+    for reserved in ["admin", "bandao", "auth"] {
         let r = admin
             .post(app.url("/orgs/me/slug"))
             .json(&json!({ "slug": reserved }))

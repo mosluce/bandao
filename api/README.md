@@ -1,4 +1,4 @@
-# argus-api
+# bandao-api
 
 Rust + axum + MongoDB。multi-tenant 簽到系統的後端，dashboard 與 app 共用。
 
@@ -15,11 +15,11 @@ cd api
 cargo run
 ```
 
-預設監聽 `127.0.0.1:8080`，連 `mongodb://argus:argus@localhost:27017/argus`。本地若 8080 被佔（macOS 常見），改 port：
+預設監聽 `127.0.0.1:8080`，連 `mongodb://bandao:bandao@localhost:27017/bandao`。本地若 8080 被佔（macOS 常見），改 port：
 
 ```bash
-ARGUS_LISTEN_ADDR=127.0.0.1:9090 \
-ARGUS_ALLOWED_ORIGIN=http://localhost:3000 \
+BANDAO_LISTEN_ADDR=127.0.0.1:9090 \
+BANDAO_ALLOWED_ORIGIN=http://localhost:3000 \
 cargo run
 ```
 
@@ -47,14 +47,14 @@ done
 
 | 變數 | 預設 | 說明 |
 | --- | --- | --- |
-| `ARGUS_MONGO_URI` | `mongodb://argus:argus@localhost:27017/argus?authSource=admin` | MongoDB 連線字串 |
-| `ARGUS_MONGO_DB` | `argus` | 資料庫名稱 |
-| `ARGUS_LISTEN_ADDR` | `127.0.0.1:8080` | API listen address |
-| `ARGUS_SESSION_TTL_SECONDS` | `1209600`（14 天）| Dashboard session 存活時間 |
-| `ARGUS_COOKIE_DOMAIN` | _(不設)_ | Cookie domain；跨子網域時設定 |
-| `ARGUS_COOKIE_SECURE` | `false` | Production 必須設 `true`（要求 HTTPS）|
-| `ARGUS_ALLOWED_ORIGIN` | _(不設)_ | CORS `Access-Control-Allow-Origin`；用 cookie auth 時必填具體 origin（不能用 `*`） |
-| `ARGUS_LOG` | `info,argus_api=debug` | `tracing_subscriber` EnvFilter 格式 |
+| `BANDAO_MONGO_URI` | `mongodb://bandao:bandao@localhost:27017/bandao?authSource=admin` | MongoDB 連線字串 |
+| `BANDAO_MONGO_DB` | `bandao` | 資料庫名稱 |
+| `BANDAO_LISTEN_ADDR` | `127.0.0.1:8080` | API listen address |
+| `BANDAO_SESSION_TTL_SECONDS` | `1209600`（14 天）| Dashboard session 存活時間 |
+| `BANDAO_COOKIE_DOMAIN` | _(不設)_ | Cookie domain；跨子網域時設定 |
+| `BANDAO_COOKIE_SECURE` | `false` | Production 必須設 `true`（要求 HTTPS）|
+| `BANDAO_ALLOWED_ORIGIN` | _(不設)_ | CORS `Access-Control-Allow-Origin`；用 cookie auth 時必填具體 origin（不能用 `*`） |
+| `BANDAO_LOG` | `info,bandao_api=debug` | `tracing_subscriber` EnvFilter 格式 |
 
 `.env` 也會被 `dotenvy` 載入。
 
@@ -81,7 +81,7 @@ done
 | Code | HTTP | 說明 |
 | --- | --- | --- |
 | `INVALID_SLUG_FORMAT` | 400 | 不符 `^[a-z0-9]{2,24}$` |
-| `SLUG_RESERVED` | 400 | 命中保留字（API 路徑根、系統識別字、`argus`，列表在 `auth::slug::RESERVED_SLUGS`） |
+| `SLUG_RESERVED` | 400 | 命中保留字（API 路徑根、系統識別字、`bandao`，列表在 `auth::slug::RESERVED_SLUGS`） |
 | `SLUG_TAKEN` | 409 | 已被其他 Org active 持有，或仍在 30 天 grace 期間 |
 | `SLUG_CHANGE_TOO_SOON` | 429 | 距離上次變更未滿 30 天；body 含 `retry_after`（ISO-8601）|
 
@@ -239,7 +239,7 @@ status: off_duty | on_site | in_transit
 
 每筆事件成功收下後，server 同步呼叫 `ReverseGeocoder::lookup(lat, lng)` 補上 `region_name`。預設實作 `NominatimGeocoder` 串接 [Nominatim](https://nominatim.openstreetmap.org/)：
 
-- User-Agent: `argus-api/<version>`，符合 [Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/) 要求
+- User-Agent: `bandao-api/<version>`，符合 [Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/) 要求
 - 2 秒 timeout
 - `zoom=17, addressdetails=1` — 可拿到 `road` 欄位，組合成 `"{district} · {road}"`（例：`"信義區 · 忠孝東路五段"`、`"Cupertino · Stevens Creek Boulevard"`）。缺其中一個就降為單側；兩個都缺 fallback 到 `display_name` 或 `null`。隱私邊界停在路名，不收巷弄與門牌。
 - 任何失敗（timeout / non-2xx / parse error）→ `region_name = null`，事件照常記錄（fail-soft）

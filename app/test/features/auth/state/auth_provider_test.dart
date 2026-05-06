@@ -2,15 +2,15 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/core/api/api_error.dart';
-import 'package:argus_app/core/api/models/app_user.dart';
-import 'package:argus_app/core/api/models/auth_responses.dart';
-import 'package:argus_app/core/api/models/org.dart';
-import 'package:argus_app/core/storage/secure_storage.dart';
-import 'package:argus_app/features/auth/data/auth_repository.dart';
-import 'package:argus_app/features/auth/state/auth_provider.dart';
-import 'package:argus_app/features/auth/state/auth_state.dart';
-import 'package:argus_app/features/checkin/data/checkin_queue_db.dart';
+import 'package:bandao_app/core/api/api_error.dart';
+import 'package:bandao_app/core/api/models/app_user.dart';
+import 'package:bandao_app/core/api/models/auth_responses.dart';
+import 'package:bandao_app/core/api/models/org.dart';
+import 'package:bandao_app/core/storage/secure_storage.dart';
+import 'package:bandao_app/features/auth/data/auth_repository.dart';
+import 'package:bandao_app/features/auth/state/auth_provider.dart';
+import 'package:bandao_app/features/auth/state/auth_state.dart';
+import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
 
 void main() {
   group('AuthNotifier auto-login', () {

@@ -1,6 +1,6 @@
 use std::process::ExitCode;
 
-use argus_api::{AppState, Config, Db, handlers, startup};
+use bandao_api::{AppState, Config, Db, handlers, startup};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -45,7 +45,7 @@ async fn main() -> ExitCode {
         }
     };
 
-    tracing::info!(%listen_addr, "argus-api listening");
+    tracing::info!(%listen_addr, "bandao-api listening");
 
     let serve = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal());
     if let Err(err) = serve.await {
@@ -56,8 +56,8 @@ async fn main() -> ExitCode {
 }
 
 fn init_tracing() {
-    let filter = EnvFilter::try_from_env("ARGUS_LOG")
-        .or_else(|_| EnvFilter::try_new("info,argus_api=debug"))
+    let filter = EnvFilter::try_from_env("BANDAO_LOG")
+        .or_else(|_| EnvFilter::try_new("info,bandao_api=debug"))
         .unwrap_or_else(|_| EnvFilter::new("info"));
     let _ = tracing_subscriber::fmt()
         .with_env_filter(filter)

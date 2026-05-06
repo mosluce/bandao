@@ -5,12 +5,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/core/api/models/checkin_status.dart';
-import 'package:argus_app/core/storage/secure_storage.dart';
-import 'package:argus_app/features/checkin/data/checkin_queue_db.dart';
-import 'package:argus_app/features/checkin/presentation/tracking_recovery_banner.dart';
-import 'package:argus_app/features/checkin/state/checkin_status_provider.dart';
-import 'package:argus_app/l10n/app_localizations.dart';
+import 'package:bandao_app/core/api/models/checkin_status.dart';
+import 'package:bandao_app/core/storage/secure_storage.dart';
+import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
+import 'package:bandao_app/features/checkin/presentation/tracking_recovery_banner.dart';
+import 'package:bandao_app/features/checkin/state/checkin_status_provider.dart';
+import 'package:bandao_app/l10n/app_localizations.dart';
 
 import '../../../helpers/fake_secure_storage.dart';
 

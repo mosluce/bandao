@@ -2,8 +2,8 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 
-import 'package:argus_app/features/checkin/data/checkin_queue_db.dart';
-import 'package:argus_app/features/checkin/data/location_tracking_service.dart';
+import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
+import 'package:bandao_app/features/checkin/data/location_tracking_service.dart';
 
 import '../../../helpers/fake_secure_storage.dart';
 

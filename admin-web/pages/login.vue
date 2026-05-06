@@ -37,7 +37,7 @@ async function onSubmit() {
   <main class="min-h-screen flex items-center justify-center px-4">
     <div class="w-full max-w-md bg-white border border-slate-200 rounded-xl shadow-sm p-8">
       <h1 class="text-2xl font-semibold text-slate-900 mb-1">
-        登入 argus
+        登入班到
       </h1>
       <p class="text-sm text-slate-500 mb-6">
         使用 dashboard 帳號登入

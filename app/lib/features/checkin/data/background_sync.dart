@@ -13,7 +13,7 @@ import '../../../core/storage/secure_storage.dart';
 import 'checkin_queue_db.dart';
 import 'checkin_repository.dart';
 
-const String kQueueDrainTaskName = 'tw.ccmos.app.argus.queue-drain';
+const String kQueueDrainTaskName = 'tw.ccmos.app.bandao.queue-drain';
 
 /// Total budget for one background invocation. iOS gives ~25s for a
 /// `BGProcessingTask`; we keep some margin.

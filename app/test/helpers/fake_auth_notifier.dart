@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:argus_app/features/auth/state/auth_provider.dart';
-import 'package:argus_app/features/auth/state/auth_state.dart';
+import 'package:bandao_app/features/auth/state/auth_provider.dart';
+import 'package:bandao_app/features/auth/state/auth_state.dart';
 
 /// Test double for `AuthNotifier`. Skips the bootstrap call entirely so
 /// widget tests can pin the auth state to whatever they need.

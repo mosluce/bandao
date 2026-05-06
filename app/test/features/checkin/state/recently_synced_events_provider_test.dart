@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/core/api/models/checkin_event.dart';
-import 'package:argus_app/features/checkin/state/recently_synced_events_provider.dart';
+import 'package:bandao_app/core/api/models/checkin_event.dart';
+import 'package:bandao_app/features/checkin/state/recently_synced_events_provider.dart';
 
 void main() {
   ProviderContainer makeContainer() {

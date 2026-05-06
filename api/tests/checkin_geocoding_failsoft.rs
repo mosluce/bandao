@@ -6,7 +6,7 @@
 
 mod common;
 
-use argus_api::services::reverse_geocoder::StaticReverseGeocoder;
+use bandao_api::services::reverse_geocoder::StaticReverseGeocoder;
 use common::TestApp;
 use common::ts;
 use reqwest::StatusCode;

@@ -90,11 +90,11 @@ async fn stale_membership_session_returns_unauthorized_and_clears_cookie() {
         .iter()
         .any(|v| {
             let s = v.to_str().unwrap_or("");
-            s.starts_with("argus_session=") && (s.contains("Max-Age=0") || s.contains("max-age=0"))
+            s.starts_with("bandao_session=") && (s.contains("Max-Age=0") || s.contains("max-age=0"))
         });
     assert!(
         cleared,
-        "expected clearing Set-Cookie for argus_session, got headers: {:?}",
+        "expected clearing Set-Cookie for bandao_session, got headers: {:?}",
         me.headers().get_all(reqwest::header::SET_COOKIE)
     );
 }

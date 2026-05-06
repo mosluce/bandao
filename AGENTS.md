@@ -1,10 +1,10 @@
 # AGENTS.md
 
-此檔為 argus 專案中所有 AI coding agent（Claude Code、GitHub Copilot、OpenCode、Codex、Cursor 等）的共通指引。各家工具的私有設定（slash command、skill、prompt）放在 `.claude/`、`.github/`、`.opencode/`，本檔只放跨工具一致的規範。
+此檔為 班到 (bandao) 專案中所有 AI coding agent（Claude Code、GitHub Copilot、OpenCode、Codex、Cursor 等）的共通指引。各家工具的私有設定（slash command、skill、prompt）放在 `.claude/`、`.github/`、`.opencode/`，本檔只放跨工具一致的規範。
 
 ## 專案概觀
 
-argus 是一個全端服務，由三個應用 + 一個資料層組成：
+班到 (bandao) 是一個全端服務，由三個應用 + 一個資料層組成：
 
 | 模組 | 技術 | 角色 |
 | --- | --- | --- |

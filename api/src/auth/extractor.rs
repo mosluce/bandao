@@ -6,7 +6,7 @@ use bson::oid::ObjectId;
 use crate::domain::Role;
 use crate::error::ApiError;
 
-pub const SESSION_COOKIE: &str = "argus_session";
+pub const SESSION_COOKIE: &str = "bandao_session";
 
 /// Build a clearing cookie that matches the path the live cookie was set with.
 /// Browsers only clear an existing cookie when name+path+domain match, so the

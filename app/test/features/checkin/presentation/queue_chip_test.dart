@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:argus_app/features/checkin/data/checkin_queue_db.dart';
-import 'package:argus_app/features/checkin/presentation/queue_chip.dart';
-import 'package:argus_app/features/checkin/state/checkin_queue_provider.dart';
-import 'package:argus_app/l10n/app_localizations.dart';
+import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
+import 'package:bandao_app/features/checkin/presentation/queue_chip.dart';
+import 'package:bandao_app/features/checkin/state/checkin_queue_provider.dart';
+import 'package:bandao_app/l10n/app_localizations.dart';
 
 void main() {
   group('QueueChip', () {

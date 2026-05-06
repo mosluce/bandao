@@ -2,11 +2,11 @@ import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/core/api/api_error.dart';
-import 'package:argus_app/core/api/models/location_ping.dart';
-import 'package:argus_app/features/checkin/data/checkin_queue_db.dart';
-import 'package:argus_app/features/checkin/data/location_ping_processor.dart';
-import 'package:argus_app/features/checkin/data/location_repository.dart';
+import 'package:bandao_app/core/api/api_error.dart';
+import 'package:bandao_app/core/api/models/location_ping.dart';
+import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
+import 'package:bandao_app/features/checkin/data/location_ping_processor.dart';
+import 'package:bandao_app/features/checkin/data/location_repository.dart';
 
 void main() {
   group('LocationPingProcessor', () {

@@ -3,13 +3,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/core/api/api_error.dart';
-import 'package:argus_app/core/api/models/app_user.dart';
-import 'package:argus_app/core/api/models/org.dart';
-import 'package:argus_app/features/auth/presentation/force_password_change_screen.dart';
-import 'package:argus_app/features/auth/state/auth_provider.dart';
-import 'package:argus_app/features/auth/state/auth_state.dart';
-import 'package:argus_app/l10n/app_localizations.dart';
+import 'package:bandao_app/core/api/api_error.dart';
+import 'package:bandao_app/core/api/models/app_user.dart';
+import 'package:bandao_app/core/api/models/org.dart';
+import 'package:bandao_app/features/auth/presentation/force_password_change_screen.dart';
+import 'package:bandao_app/features/auth/state/auth_provider.dart';
+import 'package:bandao_app/features/auth/state/auth_state.dart';
+import 'package:bandao_app/l10n/app_localizations.dart';
 
 import '../../../helpers/fake_auth_notifier.dart';
 

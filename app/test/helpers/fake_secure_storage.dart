@@ -1,4 +1,4 @@
-import 'package:argus_app/core/storage/secure_storage.dart';
+import 'package:bandao_app/core/storage/secure_storage.dart';
 
 /// In-memory SecureStorage stand-in for widget tests. Keeps the surface
 /// `implements`-only so we don't drag in flutter_secure_storage's plugin

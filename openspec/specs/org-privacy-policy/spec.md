@@ -20,7 +20,7 @@ cookie. The system SHALL NOT redirect any class of caller away from
 
 #### Scenario: Authenticated visitor reaches the page
 
-- **WHEN** a visitor with a valid Argus session cookie navigates to `/privacy`
+- **WHEN** a visitor with a valid bandao session cookie navigates to `/privacy`
 - **THEN** the page renders successfully
 - **AND** no redirect away from `/privacy` occurs
 
@@ -36,7 +36,7 @@ cookie. The system SHALL NOT redirect any class of caller away from
 The page SHALL render nine sections in the following order, each as a
 heading-and-body pair, covering at minimum the listed subject matter:
 
-1. **適用範圍** — scope: Argus platform plus the user's Org services.
+1. **適用範圍** — scope: bandao platform plus the user's Org services.
 2. **我們蒐集的資料** — data collected: account credentials, checkin
    events with coordinates, location tracking pings (conditional on the
    user's Org enabling that feature).
@@ -45,7 +45,7 @@ heading-and-body pair, covering at minimum the listed subject matter:
 4. **保留期** — retention: checkin events 5 years (per 勞基法 §30 V),
    location tracking pings 90 days, account identity for the lifetime of
    the account.
-5. **誰能存取** — access: Org admin/owner, Argus platform operations.
+5. **誰能存取** — access: Org admin/owner, bandao platform operations.
 6. **您的權利** — data subject rights: 個資法 §3 §10 §11 (access,
    correction, deletion, withdrawal of consent); exercise via the user's
    Org admin.
@@ -142,6 +142,6 @@ acceptance criteria.
 #### Scenario: Placeholder address is rendered
 
 - **WHEN** section 8 (聯絡方式) is read
-- **THEN** `noreply@example.com` appears as the Argus platform contact
+- **THEN** `noreply@example.com` appears as the bandao platform contact
 - **AND** the surrounding copy or context makes it visually clear that
   this is a placeholder

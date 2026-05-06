@@ -1,4 +1,4 @@
-package tw.ccmos.app.argus
+package tw.ccmos.app.bandao
 
 import io.flutter.embedding.android.FlutterActivity
 

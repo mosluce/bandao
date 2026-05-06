@@ -1,5 +1,5 @@
-name: argus_app
-description: "Argus mobile app for AppUsers."
+name: bandao_app
+description: "Bandao (班到) mobile app for AppUsers."
 publish_to: 'none'
 
 version: 0.3.0+3

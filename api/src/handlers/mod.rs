@@ -147,7 +147,7 @@ fn build_cors(state: &AppState) -> CorsLayer {
                 tracing::warn!(
                     ?err,
                     origin,
-                    "invalid ARGUS_ALLOWED_ORIGIN; falling back to no CORS"
+                    "invalid BANDAO_ALLOWED_ORIGIN; falling back to no CORS"
                 );
                 layer
             }

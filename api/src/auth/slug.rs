@@ -30,7 +30,7 @@ pub const RESERVED_SLUGS: &[&str] = &[
     "callback",
     "users",
     // Project name
-    "argus",
+    "bandao",
 ];
 
 #[derive(Debug, PartialEq, Eq)]
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn validate_rejects_reserved() {
         assert_eq!(validate("admin"), Err(SlugValidationError::Reserved));
-        assert_eq!(validate("argus"), Err(SlugValidationError::Reserved));
+        assert_eq!(validate("bandao"), Err(SlugValidationError::Reserved));
         assert_eq!(validate("auth"), Err(SlugValidationError::Reserved));
         assert_eq!(validate("api"), Err(SlugValidationError::Reserved));
     }

@@ -2,13 +2,13 @@ import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:argus_app/core/api/api_error.dart';
-import 'package:argus_app/core/api/models/checkin_event.dart';
-import 'package:argus_app/core/api/models/checkin_status.dart';
-import 'package:argus_app/core/api/models/submit_checkin_event.dart';
-import 'package:argus_app/features/checkin/data/checkin_queue_db.dart';
-import 'package:argus_app/features/checkin/data/checkin_repository.dart';
-import 'package:argus_app/features/checkin/data/queue_processor.dart';
+import 'package:bandao_app/core/api/api_error.dart';
+import 'package:bandao_app/core/api/models/checkin_event.dart';
+import 'package:bandao_app/core/api/models/checkin_status.dart';
+import 'package:bandao_app/core/api/models/submit_checkin_event.dart';
+import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
+import 'package:bandao_app/features/checkin/data/checkin_repository.dart';
+import 'package:bandao_app/features/checkin/data/queue_processor.dart';
 
 void main() {
   group('QueueProcessor.nextDelay', () {

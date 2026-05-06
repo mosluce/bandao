@@ -73,38 +73,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argus-api"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "async-trait",
- "axum",
- "axum-extra",
- "base64 0.22.1",
- "bson",
- "dotenvy",
- "hyper",
- "lru",
- "mongodb",
- "nanoid",
- "rand 0.8.6",
- "reqwest",
- "rust_xlsxwriter",
- "serde",
- "serde_json",
- "testcontainers",
- "testcontainers-modules",
- "thiserror",
- "time",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -212,6 +180,38 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "bandao-api"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "async-trait",
+ "axum",
+ "axum-extra",
+ "base64 0.22.1",
+ "bson",
+ "dotenvy",
+ "hyper",
+ "lru",
+ "mongodb",
+ "nanoid",
+ "rand 0.8.6",
+ "reqwest",
+ "rust_xlsxwriter",
+ "serde",
+ "serde_json",
+ "testcontainers",
+ "testcontainers-modules",
+ "thiserror",
+ "time",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
