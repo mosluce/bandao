@@ -63,6 +63,11 @@
 - Collection / 索引 / migration 變更都要在 OpenSpec change 裡留紀錄。
 - 不要在前端或 App 直接連線；不要把 ObjectId 直接吐到對外 API（用 string id）。
 
+### 正式環境（production）
+
+- 部署拓樸、env 變數矩陣、第一次上線流程、rollback、Tailscale auth-key 輪換、Mongo backup / restore drill 全部在 [`DEPLOY.md`](./DEPLOY.md)。動到 prod 前先讀。
+- Mongo host 上要的 backup / restore 腳本與 systemd unit 在 [`infra/mongo-host/`](./infra/mongo-host/)。
+
 ## 通用規範
 
 - **commit / PR 風格**：Conventional Commits（`feat:`、`fix:`、`refactor:`…）。一個 PR 對應一個 OpenSpec change。

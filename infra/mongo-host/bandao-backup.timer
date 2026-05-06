@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily bandao Mongo backup
+Requires=bandao-backup.service
+
+[Timer]
+# Run daily at 03:30 local time. Adjust to whatever is the lowest-traffic
+# window for the production database.
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

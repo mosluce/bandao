@@ -35,3 +35,7 @@
 - **[cross]** `delete-org`：owner 可解散整個 Org，cascade 刪除該 Org 的 memberships / sessions / slug 預留 / cooldown markers / AppUser / 打卡事件與狀態；user identity 不刪（它在多對多模型下可能還是其他 Org 的成員）。動機：當 owner 想離開但組織也不再需要時的終極脫身路徑（與 owner transfer 互補）。需考慮：是否走 soft delete + 寬限期、確認流程、跨 collection 一致性。
 - **[cross]** 即時看板 push：admin-web `/checkin` 目前是 30 秒輪詢。可考慮 SSE / WebSocket 真即時更新。觸發：admin 抱怨延遲或人多時 polling 太重。
 - **[cross]** 多裝置 session 管理 UI：AppUser 可能在多裝置登入；目前沒地方看「我有哪些在線 session」也沒地方一鍵下線他裝置。`app_sessions` 已支援多筆，缺 UI / endpoint。
+- **[infra]** `/readyz` deep health：目前 `/healthz` 只報 process 起來、不打 Mongo。等有監控之後加 `/readyz`，會 ping Mongo + 確認 tailscale 上線；給 SLO / 告警系統用，不影響 deploy 流。
+- **[infra]** Staging 環境：MVP 只開 prod，靠 `git revert` 回滾。哪天人多 / risky 變動多，再開 `staging` 分支 + 第二個 Zeabur project。
+- **[infra]** Backup 升級：daily/ 升級成 daily/ + weekly/ + monthly/ 三層保留，需要 S3 replication 規則或 host 上的 cron 把週末 / 月初的 dump 複製到 weekly/ / monthly/ prefix；目前先只留 30 天 daily。
+- **[infra]** 監控與告警：Loki / Grafana / Sentry 任一接 api + Mongo host 的 log 與錯誤；restore drill 失敗自動 page 操作者。動的時候要考慮 secrets 管理跟成本。
