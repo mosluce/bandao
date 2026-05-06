@@ -64,5 +64,24 @@ dev_dependencies:
   plugin_platform_interface: ^2.1.8
   url_launcher_platform_interface: ^2.3.2
 
+  # App icon + splash generation
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.3
+
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#DBB683"
+  image: assets/icon/icon.png
+  android: true
+  ios: true
+  android_12:
+    color: "#DBB683"
+    image: assets/icon/icon.png
