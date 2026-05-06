@@ -61,7 +61,7 @@ trap 'mongosh "$MONGO_URI" --quiet --eval "db.getSiblingDB(\"$scratch_db\").drop
 
 aws s3 cp --no-progress "s3://$S3_BUCKET/$latest" - \
   | age -d -i "$AGE_IDENTITY_FILE" \
-  | mongorestore --uri="$MONGO_URI" --gzip --archive --nsFrom="*.*" --nsTo="${scratch_db}.*"
+  | mongorestore --uri="$MONGO_URI" --gzip --archive --nsFrom="${MONGO_DB}.*" --nsTo="${scratch_db}.*"
 
 count=$(mongosh "$MONGO_URI" --quiet --eval \
   "print(db.getSiblingDB('$scratch_db').getCollection('$ASSERT_COLLECTION').countDocuments({}))")
