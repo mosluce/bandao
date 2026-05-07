@@ -1,9 +1,9 @@
 ## 0. Operator pre-flight (off-repo)
 
 - [x] 0.1 Generate Android upload keystore via `keytool -genkey -v -keystore ~/.bandao/keystores/bandao-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`; record store password / key password / alias.
-- [ ] 0.2 Store the keystore file + all passwords in the operator's password manager (any of 1Password, Bitwarden Premium, self-hosted Vaultwarden, or equivalent that supports binary attachments) as a single item titled "Bandao Android Upload Keystore" (attach .jks + password / alias fields). Verify retrieval works on a second device.
+- [x] 0.2 Store the keystore file + all passwords in the operator's password manager (any of 1Password, Bitwarden Premium, self-hosted Vaultwarden, or equivalent that supports binary attachments) as a single item titled "Bandao Android Upload Keystore" (attach .jks + password / alias fields). Verify retrieval works on a second device.
 - [x] 0.3 Configure the `ccmos.tw` mail provider with alias `support@ccmos.tw → mosluce@no8.io`; send a test email and confirm it arrives.
-- [ ] 0.4 Open Firebase Console; create the `Bandao` project; add iOS app (`tw.ccmos.app.bandao`) and Android app (`tw.ccmos.app.bandao`); enable Crashlytics for both; download `GoogleService-Info.plist` and `google-services.json` and stage them locally for §1 / §2 placement.
+- [x] 0.4 Open Firebase Console; create the `Bandao` project; add iOS app (`tw.ccmos.app.bandao`) and Android app (`tw.ccmos.app.bandao`); enable Crashlytics for both; download `GoogleService-Info.plist` and `google-services.json` and stage them locally for §1 / §2 placement.
 - [ ] 0.5 App Store Connect: register Bundle ID `tw.ccmos.app.bandao`; create app record with primary language `zh-Hant`, name `班到`, subtitle `Bandao`, category Productivity. Confirm the developer team `SGP5JZGDM3` matches the value already in `ios/Runner.xcodeproj/project.pbxproj`.
 - [ ] 0.6 Google Play Console: create the app with default language `zh-Hant` and app name `班到`; enroll in Play App Signing; create the Internal Testing track. Confirm `applicationId` matches `tw.ccmos.app.bandao`.
 
