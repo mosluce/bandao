@@ -21,6 +21,7 @@
 
 ### 下一批 changes（已規劃）
 
+- **[cross]** Marketing landing site at `bandao.ccmos.tw`：產品落地頁，給未下載 app 的潛在使用者看；同時把 `/privacy` 從 admin-web 搬出去，讓 admin-web 純做產品；store metadata 的 marketing URL 有正經去處。靜態站即可（單 HTML / Astro / Nuxt SSG），新 Zeabur service + DNS CNAME。可平行於 `app-release-prep`，不阻塞 app 送審；上線後回頭把 store 的 marketing/privacy URL 改指向。
 
 ### Side ideas（尚未排程）
 
