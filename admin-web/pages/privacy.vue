@@ -7,8 +7,8 @@
 // Bump LAST_UPDATED_AT only when the policy text actually changes — NOT
 // on routine redeploys. The date should reflect when the policy itself
 // was edited, not the bundle build time.
-const LAST_UPDATED_AT = '2026-05-04'
-const PLATFORM_CONTACT_EMAIL = 'noreply@example.com'
+const LAST_UPDATED_AT = '2026-05-07'
+const PLATFORM_CONTACT_EMAIL = 'support@ccmos.tw'
 </script>
 
 <template>
@@ -47,7 +47,13 @@ const PLATFORM_CONTACT_EMAIL = 'noreply@example.com'
             <span class="font-medium">位置軌跡</span>：若您所屬組織開啟「定位追蹤」功能，工作期間您的裝置會每分鐘記錄一次位置（同時須移動超過 100 公尺才會儲存），用以協助雇主了解現場狀況。下班後不再記錄。
           </li>
           <li>
+            <span class="font-medium">裝置識別資料</span>：為了維持您的登入 session、避免重複登入造成衝突，本平台會記錄您裝置產生的 session token 與裝置型號等基本識別資料。
+          </li>
+          <li>
             <span class="font-medium">技術資料</span>：登入 session、操作時間戳記、為了維持平台穩定運作所需的最小化日誌資訊。
+          </li>
+          <li>
+            <span class="font-medium">當機與診斷資料</span>：若 班到 App 發生未預期的錯誤，本平台會將錯誤堆疊、裝置型號與 OS 版本等技術資訊傳送至 Firebase Crashlytics 用於除錯，**不會**附帶您的 email、AppUser id 或所屬 Org id。
           </li>
         </ul>
       </section>
@@ -131,7 +137,6 @@ const PLATFORM_CONTACT_EMAIL = 'noreply@example.com'
         <p class="text-sm text-slate-700">
           有關 班到平台層級的疑義，請聯絡：
           <code class="rounded bg-slate-100 px-2 py-1 font-mono text-slate-900">{{ PLATFORM_CONTACT_EMAIL }}</code>
-          <span class="text-xs text-slate-500">（placeholder — 待平台運營更新）</span>
         </p>
       </section>
 

@@ -9,25 +9,25 @@
 
 ## 1. Android signing infrastructure (in-repo)
 
-- [ ] 1.1 Update `app/.gitignore` (or repo root `.gitignore`) so `android/key.properties`, `**/*.jks`, and `**/*.keystore` are excluded from version control.
-- [ ] 1.2 Refactor `app/android/app/build.gradle.kts` to (a) load `android/key.properties` if present, (b) declare a `signingConfigs.release` block reading `keyAlias / keyPassword / storeFile / storePassword` from those properties, and (c) wire `buildTypes.release.signingConfig` to use `release` when properties exist or fall back to `debug` otherwise (so `flutter run --release` still works locally without keystore configured).
+- [x] 1.1 Update `app/.gitignore` (or repo root `.gitignore`) so `android/key.properties`, `**/*.jks`, and `**/*.keystore` are excluded from version control.
+- [x] 1.2 Refactor `app/android/app/build.gradle.kts` to (a) load `android/key.properties` if present, (b) declare a `signingConfigs.release` block reading `keyAlias / keyPassword / storeFile / storePassword` from those properties, and (c) wire `buildTypes.release.signingConfig` to use `release` when properties exist or fall back to `debug` otherwise (so `flutter run --release` still works locally without keystore configured).
 - [ ] 1.3 Drop the `google-services.json` from §0.4 into `app/android/app/google-services.json`.
 - [ ] 1.4 Author a local `app/android/key.properties` (gitignored) pointing `storeFile` at `~/.bandao/keystores/bandao-upload.jks` and the three passwords from §0.1.
 - [ ] 1.5 Smoke `cd app && flutter build appbundle --release`; verify the produced `.aab` is signed with the upload key (e.g. `unzip -p build/app/outputs/bundle/release/app-release.aab META-INF/MANIFEST.MF` and confirm the upload key alias rather than `androiddebugkey`).
 
 ## 2. iOS version sync, Firebase plist, iPad confirmation
 
-- [ ] 2.1 Edit `app/ios/Runner.xcodeproj/project.pbxproj`: change every `MARKETING_VERSION = 1.0;` to `MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";` and every `CURRENT_PROJECT_VERSION = 1;` to `CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";` (expect 6 line changes total — 3 of each).
+- [x] 2.1 Edit `app/ios/Runner.xcodeproj/project.pbxproj`: change every `MARKETING_VERSION = 1.0;` to `MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";` and every `CURRENT_PROJECT_VERSION = 1;` to `CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";` (expect 6 line changes total — 3 of each).
 - [ ] 2.2 Drop the `GoogleService-Info.plist` from §0.4 into `app/ios/Runner/GoogleService-Info.plist`; ensure it is added to the Runner target's Copy Bundle Resources phase via the Xcode project (verify by re-opening the workspace).
-- [ ] 2.3 Confirm `TARGETED_DEVICE_FAMILY = "1,2"` is set across all relevant build configurations in `project.pbxproj` (no change expected; this is a guard).
+- [x] 2.3 Confirm `TARGETED_DEVICE_FAMILY = "1,2"` is set across all relevant build configurations in `project.pbxproj` (no change expected; this is a guard).
 - [ ] 2.4 Smoke `cd app && flutter build ipa --release` (operator must have valid signing in keychain); inspect `build/ios/ipa/*.ipa` `Info.plist` for `CFBundleShortVersionString = 0.3.0` and `CFBundleVersion = 3` matching `pubspec.yaml`.
 
 ## 3. Permissions and usage descriptions
 
-- [ ] 3.1 Edit `app/ios/Runner/Info.plist`: rewrite `NSLocationWhenInUseUsageDescription` to explicitly state when tracking starts (after pressing 上班), how it shows in background (iOS 螢幕上方藍色提示), and how to stop it (按下班). Keep wording under 175 characters total to fit the prompt dialog comfortably.
-- [ ] 3.2 Audit `app/android/app/src/main/AndroidManifest.xml`: confirm `<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>` and `<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>` are declared; confirm `ACCESS_BACKGROUND_LOCATION` is NOT declared.
-- [ ] 3.3 Cross-check the Foreground Service declaration in the manifest specifies `android:foregroundServiceType="location"` on the relevant `<service>` element; if missing, add it.
-- [ ] 3.4 Review `admin-web/pages/privacy.vue` content; confirm it covers the four data categories declared in store privacy: email, location, device id, crash diagnostics. If a category is missing, update the page in the same change (small edit, do not split into another change).
+- [x] 3.1 Edit `app/ios/Runner/Info.plist`: rewrite `NSLocationWhenInUseUsageDescription` to explicitly state when tracking starts (after pressing 上班), how it shows in background (iOS 螢幕上方藍色提示), and how to stop it (按下班). Keep wording under 175 characters total to fit the prompt dialog comfortably.
+- [x] 3.2 Audit `app/android/app/src/main/AndroidManifest.xml`: confirm `<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>` and `<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>` are declared; confirm `ACCESS_BACKGROUND_LOCATION` is NOT declared. (Audit result: both FOREGROUND_SERVICE and FOREGROUND_SERVICE_LOCATION already declared; ACCESS_BACKGROUND_LOCATION absent. No edits needed.)
+- [x] 3.3 Cross-check the Foreground Service declaration in the manifest specifies `android:foregroundServiceType="location"` on the relevant `<service>` element; if missing, add it. (Audit result: app's own Manifest does not declare a `<service>` — the foreground service is contributed by the `geolocator` Android plugin's manifest at merge time, which already sets `foregroundServiceType="location"`. No edits needed in app's Manifest.)
+- [x] 3.4 Review `admin-web/pages/privacy.vue` content; confirm it covers the four data categories declared in store privacy: email, location, device id, crash diagnostics. If a category is missing, update the page in the same change (small edit, do not split into another change). (Updated: added 「裝置識別資料」 and 「當機與診斷資料」 bullets to section 2; updated PLATFORM_CONTACT_EMAIL from placeholder to support@ccmos.tw; bumped LAST_UPDATED_AT to 2026-05-07; removed the placeholder note.)
 
 ## 4. Crashlytics integration
 
@@ -40,11 +40,11 @@
 
 ## 5. Store metadata structure and content
 
-- [ ] 5.1 Create `app/store_metadata/ios/` with files: `description.txt`, `promotional_text.txt` (≤170 chars), `keywords.txt` (≤100 chars), `support_url.txt` containing `mailto:support@ccmos.tw`, `privacy_url.txt` containing `https://bandao-admin.ccmos.tw/privacy`, `marketing_url.txt` empty, `release_notes/0.3.0.txt` (or whatever version §9 ships).
+- [x] 5.1 Create `app/store_metadata/ios/` with files: `description.txt`, `promotional_text.txt` (≤170 chars), `keywords.txt` (≤100 chars), `support_url.txt` containing `mailto:support@ccmos.tw`, `privacy_url.txt` containing `https://bandao-admin.ccmos.tw/privacy`, `marketing_url.txt` empty, `release_notes/0.3.0.txt` (or whatever version §9 ships).
 - [ ] 5.2 Create `app/store_metadata/ios/screenshots/iphone_6.7/` (≥4 images), `iphone_6.5/` (≥4), `ipad_12.9/` (≥2). Optionally `iphone_5.5/` and `ipad_11.0/` if the operator wants broader coverage.
-- [ ] 5.3 Create `app/store_metadata/android/` with files: `short_description.txt` (≤80 chars), `full_description.txt` (≤4000 chars), `contact_email.txt` containing `support@ccmos.tw`, `website.txt` (empty for now — marketing URL deferred), `privacy_policy_url.txt` containing `https://bandao-admin.ccmos.tw/privacy`, `changelog/3.txt` (matching versionCode).
-- [ ] 5.4 Create `app/store_metadata/android/images/` with `icon_512.png` (512×512), `feature_graphic.png` (1024×500), `phone-screenshots/` (≥2 1080×1920+), `tablet-screenshots/` (≥2).
-- [ ] 5.5 Write the description copy: hero one-liner emphasising 「為小型團隊打造的多組織打卡 app」; bullets for register/join Org / 上下班 / 軌跡 (org toggle) / 多裝置 / 隱私 footprint. Keep tone matter-of-fact; avoid feature claims that aren't yet shipped.
+- [x] 5.3 Create `app/store_metadata/android/` with files: `short_description.txt` (≤80 chars), `full_description.txt` (≤4000 chars), `contact_email.txt` containing `support@ccmos.tw`, `website.txt` (empty for now — marketing URL deferred), `privacy_policy_url.txt` containing `https://bandao-admin.ccmos.tw/privacy`, `changelog/3.txt` (matching versionCode).
+- [x] 5.4 Create `app/store_metadata/android/images/` with `icon_512.png` (512×512), `feature_graphic.png` (1024×500), `phone-screenshots/` (≥2 1080×1920+), `tablet-screenshots/` (≥2). (Directories scaffolded with `.gitkeep`; actual binary assets are operator-produced — see §5.2 / §5.4 in the deferred operator-side work.)
+- [x] 5.5 Write the description copy: hero one-liner emphasising 「為小型團隊打造的多組織打卡 app」; bullets for register/join Org / 上下班 / 軌跡 (org toggle) / 多裝置 / 隱私 footprint. Keep tone matter-of-fact; avoid feature claims that aren't yet shipped.
 - [ ] 5.6 Stage the iOS + Android release notes for the version going to first review; reference CHANGELOG entries authored in §9.
 
 ## 6. Console preparation (operator-only)
@@ -71,11 +71,11 @@
 
 ## 9. Documentation
 
-- [ ] 9.1 Add `CHANGELOG.md` at the repo root in Keep a Changelog style; seed it with an entry for the version being shipped (e.g. `0.3.0+3`) summarising what's in this first store release.
-- [ ] 9.2 Append an "App cut release" section to `DEPLOY.md` covering: pre-reqs (Apple / Play / Firebase / support alias / keystore restored), Android cut steps (`flutter build appbundle --release` → upload to Play Console), iOS cut steps (`flutter build ipa --release` → upload via Xcode Organizer or Transporter to App Store Connect), store-side review tips (privacy nutrition / Data Safety / location justification), and rollback (don't promote the bad build; cut a hotfix patch).
-- [ ] 9.3 Update `app/README.md` (or repo root `README.md` — whichever is canonical for app contributors) to add a pointer to the DEPLOY.md app section.
-- [ ] 9.4 Update `ROADMAP.md`: remove the `[app] Android live smoke for location tracking` item (covered by §7.2 above). Do NOT remove the `[cross] Marketing landing site at bandao.ccmos.tw` item.
-- [ ] 9.5 Run `openspec validate app-release-prep` and confirm it returns valid.
+- [x] 9.1 Add `CHANGELOG.md` at the repo root in Keep a Changelog style; seed it with an entry for the version being shipped (e.g. `0.3.0+3`) summarising what's in this first store release.
+- [x] 9.2 Append an "App cut release" section to `DEPLOY.md` covering: pre-reqs (Apple / Play / Firebase / support alias / keystore restored), Android cut steps (`flutter build appbundle --release` → upload to Play Console), iOS cut steps (`flutter build ipa --release` → upload via Xcode Organizer or Transporter to App Store Connect), store-side review tips (privacy nutrition / Data Safety / location justification), and rollback (don't promote the bad build; cut a hotfix patch).
+- [x] 9.3 Update `app/README.md` (or repo root `README.md` — whichever is canonical for app contributors) to add a pointer to the DEPLOY.md app section.
+- [x] 9.4 Update `ROADMAP.md`: remove the `[app] Android live smoke for location tracking` item (covered by §7.2 above). Do NOT remove the `[cross] Marketing landing site at bandao.ccmos.tw` item.
+- [x] 9.5 Run `openspec validate app-release-prep` and confirm it returns valid.
 
 ## 10. Hand-off
 
