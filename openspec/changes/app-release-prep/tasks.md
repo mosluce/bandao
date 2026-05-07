@@ -5,7 +5,7 @@
 - [x] 0.3 Configure the `ccmos.tw` mail provider with alias `support@ccmos.tw → mosluce@no8.io`; send a test email and confirm it arrives.
 - [x] 0.4 Open Firebase Console; create the `Bandao` project; add iOS app (`tw.ccmos.app.bandao`) and Android app (`tw.ccmos.app.bandao`); enable Crashlytics for both; download `GoogleService-Info.plist` and `google-services.json` and stage them locally for §1 / §2 placement.
 - [ ] 0.5 App Store Connect: register Bundle ID `tw.ccmos.app.bandao`; create app record with primary language `zh-Hant`, name `班到`, subtitle `Bandao`, category Productivity. Confirm the developer team `SGP5JZGDM3` matches the value already in `ios/Runner.xcodeproj/project.pbxproj`.
-- [ ] 0.6 Google Play Console: create the app with default language `zh-Hant` and app name `班到`; enroll in Play App Signing; create the Internal Testing track. Confirm `applicationId` matches `tw.ccmos.app.bandao`.
+- [x] 0.6 Google Play Console: create the app with default language `zh-Hant` and app name `班到`; enroll in Play App Signing; create the Internal Testing track. Confirm `applicationId` matches `tw.ccmos.app.bandao`.
 
 ## 1. Android signing infrastructure (in-repo)
 
