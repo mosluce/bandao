@@ -12,7 +12,7 @@
 - [x] 1.1 Update `app/.gitignore` (or repo root `.gitignore`) so `android/key.properties`, `**/*.jks`, and `**/*.keystore` are excluded from version control.
 - [x] 1.2 Refactor `app/android/app/build.gradle.kts` to (a) load `android/key.properties` if present, (b) declare a `signingConfigs.release` block reading `keyAlias / keyPassword / storeFile / storePassword` from those properties, and (c) wire `buildTypes.release.signingConfig` to use `release` when properties exist or fall back to `debug` otherwise (so `flutter run --release` still works locally without keystore configured).
 - [x] 1.3 Drop the `google-services.json` from §0.4 into `app/android/app/google-services.json`.
-- [ ] 1.4 Author a local `app/android/key.properties` (gitignored) pointing `storeFile` at `~/.bandao/keystores/bandao-upload.jks` and the three passwords from §0.1.
+- [x] 1.4 Author a local `app/android/key.properties` (gitignored) pointing `storeFile` at `~/.bandao/keystores/bandao-upload.jks` and the three passwords from §0.1. (File lives at `app/android/key.properties` on operator's machine; verified by §1.5 release build succeeding with the upload key alias.)
 - [x] 1.5 Smoke `cd app && flutter build appbundle --release`; verify the produced `.aab` is signed with the upload key (e.g. `unzip -p build/app/outputs/bundle/release/app-release.aab META-INF/MANIFEST.MF` and confirm the upload key alias rather than `androiddebugkey`). (Required a workmanager pubspec bump from `^0.5.2` to `>=0.6.0 <0.8.0` — 0.5.2 still references Flutter v1 embedding APIs (`shim`, `ShimPluginRegistry`, `Registrar`) that were removed in Flutter 3.27+; resolved to 0.7.0 since 0.8+ requires Flutter SDK 3.32+.)
 
 ## 2. iOS version sync, Firebase plist, iPad confirmation
