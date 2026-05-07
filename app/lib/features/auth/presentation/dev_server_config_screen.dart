@@ -1,3 +1,4 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -224,6 +225,28 @@ class _DevServerConfigScreenState
                         ),
                       ],
                     ),
+                    if (kDebugMode) ...<Widget>[
+                      const Divider(height: 48),
+                      Text(
+                        'Crashlytics 自我測試',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '此按鈕僅在 debug build 出現；release build 不存在。按下後會強制觸發一個原生 crash，幾分鐘內應在 Firebase Console 看到對應紀錄。',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: () => FirebaseCrashlytics.instance.crash(),
+                        icon: const Icon(Icons.bug_report),
+                        label: const Text('強制觸發 Crash（測試 Crashlytics）'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
         ),

@@ -31,6 +31,12 @@ dependencies:
   # Logging
   logger: ^2.5.0
 
+  # Firebase / Crashlytics — client crash + non-fatal error reporting.
+  # No setUserIdentifier call is wired in; crashes stay unlinked from
+  # Bandao identity per the mobile-release spec.
+  firebase_core: ^3.6.0
+  firebase_crashlytics: ^4.1.3
+
   # Location
   geolocator: ^13.0.1
   app_settings: ^5.1.1

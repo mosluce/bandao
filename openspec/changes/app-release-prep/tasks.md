@@ -11,14 +11,14 @@
 
 - [x] 1.1 Update `app/.gitignore` (or repo root `.gitignore`) so `android/key.properties`, `**/*.jks`, and `**/*.keystore` are excluded from version control.
 - [x] 1.2 Refactor `app/android/app/build.gradle.kts` to (a) load `android/key.properties` if present, (b) declare a `signingConfigs.release` block reading `keyAlias / keyPassword / storeFile / storePassword` from those properties, and (c) wire `buildTypes.release.signingConfig` to use `release` when properties exist or fall back to `debug` otherwise (so `flutter run --release` still works locally without keystore configured).
-- [ ] 1.3 Drop the `google-services.json` from §0.4 into `app/android/app/google-services.json`.
+- [x] 1.3 Drop the `google-services.json` from §0.4 into `app/android/app/google-services.json`.
 - [ ] 1.4 Author a local `app/android/key.properties` (gitignored) pointing `storeFile` at `~/.bandao/keystores/bandao-upload.jks` and the three passwords from §0.1.
 - [ ] 1.5 Smoke `cd app && flutter build appbundle --release`; verify the produced `.aab` is signed with the upload key (e.g. `unzip -p build/app/outputs/bundle/release/app-release.aab META-INF/MANIFEST.MF` and confirm the upload key alias rather than `androiddebugkey`).
 
 ## 2. iOS version sync, Firebase plist, iPad confirmation
 
 - [x] 2.1 Edit `app/ios/Runner.xcodeproj/project.pbxproj`: change every `MARKETING_VERSION = 1.0;` to `MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";` and every `CURRENT_PROJECT_VERSION = 1;` to `CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";` (expect 6 line changes total — 3 of each).
-- [ ] 2.2 Drop the `GoogleService-Info.plist` from §0.4 into `app/ios/Runner/GoogleService-Info.plist`; ensure it is added to the Runner target's Copy Bundle Resources phase via the Xcode project (verify by re-opening the workspace).
+- [x] 2.2 Drop the `GoogleService-Info.plist` from §0.4 into `app/ios/Runner/GoogleService-Info.plist`; ensure it is added to the Runner target's Copy Bundle Resources phase via the Xcode project (verify by re-opening the workspace). (Operator added the file to the Runner target via Xcode UI; project.pbxproj diff includes PBXBuildFile + PBXFileReference + group entry + Resources phase entry.)
 - [x] 2.3 Confirm `TARGETED_DEVICE_FAMILY = "1,2"` is set across all relevant build configurations in `project.pbxproj` (no change expected; this is a guard).
 - [ ] 2.4 Smoke `cd app && flutter build ipa --release` (operator must have valid signing in keychain); inspect `build/ios/ipa/*.ipa` `Info.plist` for `CFBundleShortVersionString = 0.3.0` and `CFBundleVersion = 3` matching `pubspec.yaml`.
 
@@ -31,11 +31,11 @@
 
 ## 4. Crashlytics integration
 
-- [ ] 4.1 Add `firebase_core` and `firebase_crashlytics` to `app/pubspec.yaml#dependencies`; run `cd app && flutter pub get`.
+- [x] 4.1 Add `firebase_core` and `firebase_crashlytics` to `app/pubspec.yaml#dependencies`; run `cd app && flutter pub get`.
 - [ ] 4.2 iOS: edit `app/ios/Podfile` (or generate via `cd app/ios && pod install` after 4.1) to ensure Firebase pods are linked; add a Run Script Phase to the Runner target that uploads dSYMs to Crashlytics on archive (`${PODS_ROOT}/FirebaseCrashlytics/upload-symbols`).
-- [ ] 4.3 Android: add the `com.google.gms.google-services` plugin in `app/android/build.gradle.kts` (project-level `plugins {}`) and apply it together with `com.google.firebase.crashlytics` in `app/android/app/build.gradle.kts` (module-level `plugins {}`).
-- [ ] 4.4 Edit `app/lib/main.dart`: in `main()` initialize `Firebase.initializeApp()`, hook `FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError`, and `PlatformDispatcher.instance.onError` → `FirebaseCrashlytics.instance.recordError(error, stack, fatal: true); return true;`. Do NOT call `setUserIdentifier`.
-- [ ] 4.5 Add a debug-only "Force Crash" entry point (e.g. a button in a developer / about screen guarded by `if (kDebugMode)`); in release builds this UI SHALL NOT exist.
+- [x] 4.3 Android: add the `com.google.gms.google-services` plugin in `app/android/build.gradle.kts` (project-level `plugins {}`) and apply it together with `com.google.firebase.crashlytics` in `app/android/app/build.gradle.kts` (module-level `plugins {}`). (Declared in `settings.gradle.kts` `pluginManagement.plugins {}` with `apply false` since this project uses Settings-level plugin management; applied in `app/build.gradle.kts`.)
+- [x] 4.4 Edit `app/lib/main.dart`: in `main()` initialize `Firebase.initializeApp()`, hook `FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError`, and `PlatformDispatcher.instance.onError` → `FirebaseCrashlytics.instance.recordError(error, stack, fatal: true); return true;`. Do NOT call `setUserIdentifier`.
+- [x] 4.5 Add a debug-only "Force Crash" entry point (e.g. a button in a developer / about screen guarded by `if (kDebugMode)`); in release builds this UI SHALL NOT exist. (Added to `dev_server_config_screen.dart` — the existing dev menu reachable via "tap logo 5x on /login".)
 - [ ] 4.6 Local smoke: in a debug build, trigger the force-crash button; observe the crash event appear in Firebase Console's Crashlytics dashboard within 5 minutes; verify the stack trace is symbolicated.
 
 ## 5. Store metadata structure and content
