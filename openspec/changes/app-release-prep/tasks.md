@@ -36,7 +36,7 @@
 - [x] 4.3 Android: add the `com.google.gms.google-services` plugin in `app/android/build.gradle.kts` (project-level `plugins {}`) and apply it together with `com.google.firebase.crashlytics` in `app/android/app/build.gradle.kts` (module-level `plugins {}`). (Declared in `settings.gradle.kts` `pluginManagement.plugins {}` with `apply false` since this project uses Settings-level plugin management; applied in `app/build.gradle.kts`.)
 - [x] 4.4 Edit `app/lib/main.dart`: in `main()` initialize `Firebase.initializeApp()`, hook `FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError`, and `PlatformDispatcher.instance.onError` → `FirebaseCrashlytics.instance.recordError(error, stack, fatal: true); return true;`. Do NOT call `setUserIdentifier`.
 - [x] 4.5 Add a debug-only "Force Crash" entry point (e.g. a button in a developer / about screen guarded by `if (kDebugMode)`); in release builds this UI SHALL NOT exist. (Added to `dev_server_config_screen.dart` — the existing dev menu reachable via "tap logo 5x on /login".)
-- [ ] 4.6 Local smoke: in a debug build, trigger the force-crash button; observe the crash event appear in Firebase Console's Crashlytics dashboard within 5 minutes; verify the stack trace is symbolicated.
+- [x] 4.6 Local smoke: in a debug build, trigger the force-crash button; observe the crash event appear in Firebase Console's Crashlytics dashboard within 5 minutes; verify the stack trace is symbolicated.
 
 ## 5. Store metadata structure and content
 
