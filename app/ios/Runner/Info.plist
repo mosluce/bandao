@@ -46,7 +46,7 @@
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>班到需要您的位置記錄打卡事件以及工作期間的軌跡（若您所屬組織開啟此功能）。</string>
+		<string>班到在您按下「上班」後會持續記錄位置以產生工作軌跡，背景時 iOS 螢幕上方顯示藍色提示，按「下班」即停止。</string>
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>processing</string>

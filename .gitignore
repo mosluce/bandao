@@ -62,3 +62,12 @@ coverage/
 # --- Claude Code (project-local; commands/ and skills/ stay tracked) ---
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
+
+# --- App release signing (must never be tracked) ---
+# Production keystore + its passwords live in the operator's password
+# manager, never in the repo. `key.properties` references the keystore
+# file by absolute path; `flutter build appbundle --release` falls back
+# to debug signing if `key.properties` is absent.
+android/key.properties
+**/*.jks
+**/*.keystore

@@ -3,6 +3,8 @@
 Flutter mobile client for AppUsers (the workers checking in and out of sites).
 Talks to the Bandao API at `/app/*`. Built for iOS + Android only.
 
+> Production cut release runbook：見 [`DEPLOY.md`](../DEPLOY.md) 的「App cut release」章節。
+
 ## Stack
 
 - Flutter 3.29 (`.tool-versions`-pinned via asdf)

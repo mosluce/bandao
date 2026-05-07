@@ -35,9 +35,9 @@ describe('PrivacyPage', () => {
     expect(wrapper.text()).toContain('本政策範本未經法律審查')
   })
 
-  it('renders the platform contact placeholder email', async () => {
+  it('renders the platform contact email', async () => {
     const wrapper = await mountSuspended(PrivacyPage)
-    expect(wrapper.text()).toContain('noreply@example.com')
+    expect(wrapper.text()).toContain('support@ccmos.tw')
   })
 
   it('does not register any route middleware', () => {

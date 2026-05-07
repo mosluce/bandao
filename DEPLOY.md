@@ -252,6 +252,124 @@ relaxed), Zeabur will still attempt a deploy. The mitigation is keeping
 branch protection rules tight, not adding gating logic on the platform
 side.
 
+## App cut release
+
+The Flutter app at `app/` ships independently of `api/` / `admin-web/` —
+its release path is **manual upload to App Store Connect + Google Play
+Console** (no CI pipeline yet; that's a separate ROADMAP item once we've
+cut at least one release manually).
+
+The full task checklist lives in
+`openspec/changes/app-release-prep/tasks.md` (or its archived copy after
+the change ships). This section is the operator's quick-reference card.
+
+### Pre-reqs (one-time)
+
+- Apple Developer account active, Bundle ID `tw.ccmos.app.bandao`
+  registered in App Store Connect.
+- Google Play Console account active, app created with `applicationId
+  tw.ccmos.app.bandao`, Play App Signing enrolled, Internal Testing track
+  configured.
+- Firebase project for Bandao with iOS + Android apps registered;
+  `GoogleService-Info.plist` placed at `app/ios/Runner/` and
+  `google-services.json` placed at `app/android/app/`.
+- Mail alias `support@ccmos.tw` forwarding to whoever fields support;
+  used as the public contact in store metadata.
+- Android upload keystore restored from password manager:
+  - `~/.bandao/keystores/bandao-upload.jks` exists
+  - `app/android/key.properties` (gitignored) populated with
+    `storePassword`, `keyPassword`, `keyAlias=upload`,
+    `storeFile=<absolute path to .jks>`
+- iOS code signing: a valid Apple distribution certificate + provisioning
+  profile in the operator's keychain (Xcode handles automatic signing
+  for `tw.ccmos.app.bandao` once the Apple team `SGP5JZGDM3` matches).
+
+### Bump the version
+
+`app/pubspec.yaml` is the single source of truth.
+
+1. Edit `app/pubspec.yaml`'s `version: <name>+<build>` — bump build
+   number monotonically (Play / TestFlight reject duplicates).
+2. Append a new entry under `## App` in `CHANGELOG.md` describing the
+   user-visible delta.
+3. Open a PR with these changes; let CI go green; squash-merge to `main`.
+4. Tag the merge commit: `git tag app-v<name> && git push --tags`. The
+   tag is purely for audit — no CI hooks off it.
+
+### Cut Android (.aab)
+
+```bash
+cd app
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter build appbundle --release
+```
+
+The signed `.aab` lands at
+`app/build/app/outputs/bundle/release/app-release.aab`.
+
+Upload via Play Console → Internal Testing → Create new release →
+upload the `.aab`. Paste the relevant
+`app/store_metadata/android/changelog/<versionCode>.txt` entry into
+the release notes field. Promote Internal → Closed → Production after
+smoke; review can take 1–7 days for first submission.
+
+### Cut iOS (.ipa)
+
+Open `app/ios/Runner.xcworkspace` in Xcode. Verify the General tab shows
+the Version and Build values from `pubspec.yaml`. Then:
+
+```bash
+cd app
+flutter pub get
+cd ios && pod install && cd ..
+flutter build ipa --release
+```
+
+The signed `.ipa` lands at `app/build/ios/ipa/`. Upload via either:
+
+- **Xcode Organizer**: Window → Organizer → select the archive → Upload
+  to App Store Connect.
+- **Transporter** app (simpler for re-uploads): drag the `.ipa` in.
+
+After upload, the build appears in App Store Connect → TestFlight →
+internal testers can install immediately. Submit to App Store review
+once smoke passes; first review can take 1–3 days.
+
+### Store-side review tips
+
+Both stores are sensitive to:
+
+- **Privacy nutrition / Data Safety** must match what the app actually
+  does. Bandao declares: email + location + device id (linked to
+  identity, app functionality), crash diagnostics + performance data
+  (not linked, app functionality). No third-party sharing, no tracking.
+- **Location justification**: Bandao uses When-In-Use on iOS + Foreground
+  Service on Android — no Always, no ACCESS_BACKGROUND_LOCATION. In the
+  submit notes, explicitly state: "tracking starts only after the user
+  taps 上班; iOS displays the blue indicator while backgrounded; tap 下班
+  ends tracking; we never need geofence or terminated-state location."
+- **Foreground service permission** (Play): attach a screenshot of the
+  「工作期間定位追蹤中」sticky notification when filling the background
+  location justification form.
+
+### Rollback
+
+If a shipped build is bad:
+
+- **TestFlight / Play Internal Testing**: just don't promote that build
+  further; cut a hotfix patch (bump build number, fix the bug, re-cut).
+- **App Store Production**: previous version stays available until the
+  new one is approved; if the new one is approved-and-broken, the
+  fastest path is another patch through expedited review (Apple grants
+  these for genuine prod issues).
+- **Play Production**: the staged-rollout slider can be paused or rolled
+  back to a smaller percentage. Cut a hotfix to replace the bad build
+  entirely.
+
+In all cases there is no database migration to revert — the app talks
+to the same prod api regardless of build.
+
 ## Out-of-scope (tracked in `ROADMAP.md`)
 
 - `/readyz` endpoint with deep dependency checks (Mongo ping, tailnet up).
