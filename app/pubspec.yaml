@@ -47,8 +47,13 @@ dependencies:
   # Connectivity
   connectivity_plus: ^6.1.0
 
-  # Background sync
-  workmanager: ^0.5.2
+  # Background sync. Pinned >=0.6.0 because that's where the plugin
+  # dropped Flutter v1 embedding APIs (`shim`, `ShimPluginRegistry`,
+  # `Registrar`) — those don't exist in Flutter 3.27+ and break Android
+  # release compile if older workmanager is used. Upper-bounded <0.8.0
+  # because 0.8.0+ requires Flutter SDK >=3.32.0; this project pins
+  # 3.29.3 in CI and `.tool-versions`.
+  workmanager: ">=0.6.0 <0.8.0"
 
   # Local SQLite queue (drift)
   drift: ^2.21.0
