@@ -1,9 +1,9 @@
 ## 0. Operator pre-flight (off-repo)
 
-- [ ] 0.1 Generate Android upload keystore via `keytool -genkey -v -keystore ~/.bandao/keystores/bandao-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`; record store password / key password / alias.
-- [ ] 0.2 Store the keystore file + all passwords in the operator's password manager (any of 1Password, Bitwarden Premium, self-hosted Vaultwarden, or equivalent that supports binary attachments) as a single item titled "Bandao Android Upload Keystore" (attach .jks + password / alias fields). Verify retrieval works on a second device.
-- [ ] 0.3 Configure the `ccmos.tw` mail provider with alias `support@ccmos.tw → mosluce@no8.io`; send a test email and confirm it arrives.
-- [ ] 0.4 Open Firebase Console; create the `Bandao` project; add iOS app (`tw.ccmos.app.bandao`) and Android app (`tw.ccmos.app.bandao`); enable Crashlytics for both; download `GoogleService-Info.plist` and `google-services.json` and stage them locally for §1 / §2 placement.
+- [x] 0.1 Generate Android upload keystore via `keytool -genkey -v -keystore ~/.bandao/keystores/bandao-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload`; record store password / key password / alias.
+- [x] 0.2 Store the keystore file + all passwords in the operator's password manager (any of 1Password, Bitwarden Premium, self-hosted Vaultwarden, or equivalent that supports binary attachments) as a single item titled "Bandao Android Upload Keystore" (attach .jks + password / alias fields). Verify retrieval works on a second device.
+- [x] 0.3 Configure the `ccmos.tw` mail provider with alias `support@ccmos.tw → mosluce@no8.io`; send a test email and confirm it arrives.
+- [x] 0.4 Open Firebase Console; create the `Bandao` project; add iOS app (`tw.ccmos.app.bandao`) and Android app (`tw.ccmos.app.bandao`); enable Crashlytics for both; download `GoogleService-Info.plist` and `google-services.json` and stage them locally for §1 / §2 placement.
 - [ ] 0.5 App Store Connect: register Bundle ID `tw.ccmos.app.bandao`; create app record with primary language `zh-Hant`, name `班到`, subtitle `Bandao`, category Productivity. Confirm the developer team `SGP5JZGDM3` matches the value already in `ios/Runner.xcodeproj/project.pbxproj`.
 - [ ] 0.6 Google Play Console: create the app with default language `zh-Hant` and app name `班到`; enroll in Play App Signing; create the Internal Testing track. Confirm `applicationId` matches `tw.ccmos.app.bandao`.
 
@@ -11,14 +11,14 @@
 
 - [x] 1.1 Update `app/.gitignore` (or repo root `.gitignore`) so `android/key.properties`, `**/*.jks`, and `**/*.keystore` are excluded from version control.
 - [x] 1.2 Refactor `app/android/app/build.gradle.kts` to (a) load `android/key.properties` if present, (b) declare a `signingConfigs.release` block reading `keyAlias / keyPassword / storeFile / storePassword` from those properties, and (c) wire `buildTypes.release.signingConfig` to use `release` when properties exist or fall back to `debug` otherwise (so `flutter run --release` still works locally without keystore configured).
-- [ ] 1.3 Drop the `google-services.json` from §0.4 into `app/android/app/google-services.json`.
-- [ ] 1.4 Author a local `app/android/key.properties` (gitignored) pointing `storeFile` at `~/.bandao/keystores/bandao-upload.jks` and the three passwords from §0.1.
-- [ ] 1.5 Smoke `cd app && flutter build appbundle --release`; verify the produced `.aab` is signed with the upload key (e.g. `unzip -p build/app/outputs/bundle/release/app-release.aab META-INF/MANIFEST.MF` and confirm the upload key alias rather than `androiddebugkey`).
+- [x] 1.3 Drop the `google-services.json` from §0.4 into `app/android/app/google-services.json`.
+- [x] 1.4 Author a local `app/android/key.properties` (gitignored) pointing `storeFile` at `~/.bandao/keystores/bandao-upload.jks` and the three passwords from §0.1. (File lives at `app/android/key.properties` on operator's machine; verified by §1.5 release build succeeding with the upload key alias.)
+- [x] 1.5 Smoke `cd app && flutter build appbundle --release`; verify the produced `.aab` is signed with the upload key (e.g. `unzip -p build/app/outputs/bundle/release/app-release.aab META-INF/MANIFEST.MF` and confirm the upload key alias rather than `androiddebugkey`). (Required a workmanager pubspec bump from `^0.5.2` to `>=0.6.0 <0.8.0` — 0.5.2 still references Flutter v1 embedding APIs (`shim`, `ShimPluginRegistry`, `Registrar`) that were removed in Flutter 3.27+; resolved to 0.7.0 since 0.8+ requires Flutter SDK 3.32+.)
 
 ## 2. iOS version sync, Firebase plist, iPad confirmation
 
 - [x] 2.1 Edit `app/ios/Runner.xcodeproj/project.pbxproj`: change every `MARKETING_VERSION = 1.0;` to `MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";` and every `CURRENT_PROJECT_VERSION = 1;` to `CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";` (expect 6 line changes total — 3 of each).
-- [ ] 2.2 Drop the `GoogleService-Info.plist` from §0.4 into `app/ios/Runner/GoogleService-Info.plist`; ensure it is added to the Runner target's Copy Bundle Resources phase via the Xcode project (verify by re-opening the workspace).
+- [x] 2.2 Drop the `GoogleService-Info.plist` from §0.4 into `app/ios/Runner/GoogleService-Info.plist`; ensure it is added to the Runner target's Copy Bundle Resources phase via the Xcode project (verify by re-opening the workspace). (Operator added the file to the Runner target via Xcode UI; project.pbxproj diff includes PBXBuildFile + PBXFileReference + group entry + Resources phase entry.)
 - [x] 2.3 Confirm `TARGETED_DEVICE_FAMILY = "1,2"` is set across all relevant build configurations in `project.pbxproj` (no change expected; this is a guard).
 - [ ] 2.4 Smoke `cd app && flutter build ipa --release` (operator must have valid signing in keychain); inspect `build/ios/ipa/*.ipa` `Info.plist` for `CFBundleShortVersionString = 0.3.0` and `CFBundleVersion = 3` matching `pubspec.yaml`.
 
@@ -31,12 +31,12 @@
 
 ## 4. Crashlytics integration
 
-- [ ] 4.1 Add `firebase_core` and `firebase_crashlytics` to `app/pubspec.yaml#dependencies`; run `cd app && flutter pub get`.
-- [ ] 4.2 iOS: edit `app/ios/Podfile` (or generate via `cd app/ios && pod install` after 4.1) to ensure Firebase pods are linked; add a Run Script Phase to the Runner target that uploads dSYMs to Crashlytics on archive (`${PODS_ROOT}/FirebaseCrashlytics/upload-symbols`).
-- [ ] 4.3 Android: add the `com.google.gms.google-services` plugin in `app/android/build.gradle.kts` (project-level `plugins {}`) and apply it together with `com.google.firebase.crashlytics` in `app/android/app/build.gradle.kts` (module-level `plugins {}`).
-- [ ] 4.4 Edit `app/lib/main.dart`: in `main()` initialize `Firebase.initializeApp()`, hook `FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError`, and `PlatformDispatcher.instance.onError` → `FirebaseCrashlytics.instance.recordError(error, stack, fatal: true); return true;`. Do NOT call `setUserIdentifier`.
-- [ ] 4.5 Add a debug-only "Force Crash" entry point (e.g. a button in a developer / about screen guarded by `if (kDebugMode)`); in release builds this UI SHALL NOT exist.
-- [ ] 4.6 Local smoke: in a debug build, trigger the force-crash button; observe the crash event appear in Firebase Console's Crashlytics dashboard within 5 minutes; verify the stack trace is symbolicated.
+- [x] 4.1 Add `firebase_core` and `firebase_crashlytics` to `app/pubspec.yaml#dependencies`; run `cd app && flutter pub get`.
+- [x] 4.2 iOS: edit `app/ios/Podfile` (or generate via `cd app/ios && pod install` after 4.1) to ensure Firebase pods are linked; add a Run Script Phase to the Runner target that uploads dSYMs to Crashlytics on archive (`${PODS_ROOT}/FirebaseCrashlytics/upload-symbols`). (Operator ran `pod install` — Podfile.lock updated; added the Run Script Phase as the last phase on the Runner target via Xcode UI.)
+- [x] 4.3 Android: add the `com.google.gms.google-services` plugin in `app/android/build.gradle.kts` (project-level `plugins {}`) and apply it together with `com.google.firebase.crashlytics` in `app/android/app/build.gradle.kts` (module-level `plugins {}`). (Declared in `settings.gradle.kts` `pluginManagement.plugins {}` with `apply false` since this project uses Settings-level plugin management; applied in `app/build.gradle.kts`.)
+- [x] 4.4 Edit `app/lib/main.dart`: in `main()` initialize `Firebase.initializeApp()`, hook `FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError`, and `PlatformDispatcher.instance.onError` → `FirebaseCrashlytics.instance.recordError(error, stack, fatal: true); return true;`. Do NOT call `setUserIdentifier`.
+- [x] 4.5 Add a debug-only "Force Crash" entry point (e.g. a button in a developer / about screen guarded by `if (kDebugMode)`); in release builds this UI SHALL NOT exist. (Added to `dev_server_config_screen.dart` — the existing dev menu reachable via "tap logo 5x on /login".)
+- [x] 4.6 Local smoke: in a debug build, trigger the force-crash button; observe the crash event appear in Firebase Console's Crashlytics dashboard within 5 minutes; verify the stack trace is symbolicated.
 
 ## 5. Store metadata structure and content
 

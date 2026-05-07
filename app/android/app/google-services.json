@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "959187566209",
+    "project_id": "ccmos-bandao",
+    "storage_bucket": "ccmos-bandao.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:959187566209:android:8eb203cc7b327ed7319780",
+        "android_client_info": {
+          "package_name": "tw.ccmos.app.bandao"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAd3lL4qluobh2jt5LyyUdWnOY2fZh-iy8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
