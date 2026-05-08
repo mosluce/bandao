@@ -65,6 +65,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  # Integration test driver for automated store-metadata screenshots.
+  # See test_driver/integration_driver.dart + integration_test/screenshot_test.dart
+  # + scripts/take_screenshots.sh.
+  integration_test:
+    sdk: flutter
+
   flutter_lints: ^5.0.0
 
   # Codegen for drift
