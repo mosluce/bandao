@@ -178,13 +178,16 @@ for entry in "${DEVICES[@]}"; do
   # devices"). The DEBUG ribbon doesn't appear because BandaoApp sets
   # `debugShowCheckedModeBanner: false`, so debug-mode screenshots are
   # still App-Store-clean.
-  flutter drive \
+  #
+  # SCREENSHOT_OUT_DIR is exported as an env var (not --dart-define)
+  # because flutter drive's defines only reach the device-side test;
+  # the driver process running on the host reads via Platform.environment.
+  SCREENSHOT_OUT_DIR="$OUT_DIR" flutter drive \
     --driver=test_driver/integration_driver.dart \
     --target=integration_test/screenshot_test.dart \
     -d "$SIM_UDID" \
     --debug \
     --dart-define="API_BASE_URL=$API_URL" \
-    --dart-define="SCREENSHOT_OUT_DIR=$OUT_DIR" \
     --dart-define="TEST_ORG_CODE=$ORG_CODE" \
     --dart-define="TEST_USERNAME=$USERNAME" \
     --dart-define="TEST_PASSWORD=$PASSWORD"
