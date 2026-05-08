@@ -58,7 +58,7 @@
 
 ## 7. Smoke (release builds + Crashlytics + store-track installs)
 
-- [ ] 7.1 Trigger a Crashlytics test crash from a debug build (per §4.6); confirm the crash appears in Firebase Console with symbolicated stack within 5 minutes.
+- [x] 7.1 Trigger a Crashlytics test crash from a debug build (per §4.6); confirm the crash appears in Firebase Console with symbolicated stack within 5 minutes. (Same act as §4.6, already verified — crash event surfaced on Firebase Console.)
 - [ ] 7.2 Android live smoke for location tracking (folds in ROADMAP `[app] Android live smoke for location tracking`): on a real Android device installed via Play Internal Testing, run the full sequence — register / login as AppUser / 上班 / send app to background / observe `工作期間定位追蹤中` sticky notification persists / clock_in 事件出現在 admin-web `/checkin` / 下班 / sticky notification 消失 / verify the toggle for org-level location tracking turns the foreground service on/off as expected.
 - [ ] 7.3 iOS smoke via TestFlight: install the build on at least one iPhone and one iPad (largest available simulator counts if no physical iPad); run register / login / 上班 → background → confirm iOS blue indicator appears → resume → 下班 → indicator clears.
 - [ ] 7.4 Verify the on-store version (TestFlight build number / Play Internal Testing release name) matches `pubspec.yaml#version` exactly.
@@ -79,6 +79,6 @@
 
 ## 10. Hand-off
 
-- [ ] 10.1 Open a PR titled `chore(app): app-release-prep` covering all in-repo changes (§1–§5 + §9). Operator-only sections (§0 / §6 / §7 / §8) get crossed off in tasks.md as the operator completes them; PR body should explicitly note these.
+- [x] 10.1 Open a PR titled `chore(app): app-release-prep` covering all in-repo changes (§1–§5 + §9). Operator-only sections (§0 / §6 / §7 / §8) get crossed off in tasks.md as the operator completes them; PR body should explicitly note these. (In-repo work shipped as four PRs instead of one — #9 (step 3 no-deps), #10 (step 4 Firebase + Crashlytics), #11→#12 (DEVELOPMENT_TEAM correction + §0.5/§0.6 ticks). Spirit met: every in-repo change is on main; operator-only ticks tracked in this same tasks.md.)
 - [ ] 10.2 After the PR merges and the operator has completed §0 / §6, do at least one full §7 smoke; only then proceed to §8.
 - [ ] 10.3 Once both stores have the app live, run `/opsx:archive app-release-prep` to archive this change and sync the `mobile-release` capability to `openspec/specs/`.
