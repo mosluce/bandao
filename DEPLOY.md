@@ -326,11 +326,25 @@ cd ios && pod install && cd ..
 flutter build ipa --release
 ```
 
-The signed `.ipa` lands at `app/build/ios/ipa/`. Upload via either:
+The signed `.ipa` lands at `app/build/ios/ipa/`. Upload via one of:
 
+- **Automated** (recommended once configured) — `app/scripts/upload_ios.sh`:
+  ```bash
+  cd app
+  export APP_STORE_CONNECT_API_KEY_ID=ABC123XYZ4
+  export APP_STORE_CONNECT_API_ISSUER_ID=12345678-1234-1234-1234-123456789012
+  ./scripts/upload_ios.sh
+  ```
+  Pre-req (one-time, see operator setup below): an App Store Connect API
+  key with App Manager role, with the .p8 saved at
+  `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8`. The script
+  shells out to `xcrun altool --upload-app`, which uses the same App
+  Store Connect API as `fastlane pilot upload` (no fastlane stack
+  needed).
 - **Xcode Organizer**: Window → Organizer → select the archive → Upload
-  to App Store Connect.
-- **Transporter** app (simpler for re-uploads): drag the `.ipa` in.
+  to App Store Connect. Manual but no API key setup needed.
+- **Transporter** app: drag the `.ipa` in. Same as Organizer for our
+  purposes.
 
 After upload, the build appears in App Store Connect → TestFlight →
 internal testers can install immediately. Submit to App Store review
@@ -382,6 +396,33 @@ A few constraints to keep in mind:
 
 Once the script finishes, eyeball the PNGs before committing. They
 land in repo paths that ship to the store via §6.3 metadata upload.
+
+### App Store Connect API key (one-time operator setup)
+
+Required for `scripts/upload_ios.sh` and for any future fastlane-style
+automation. Skip this if you're sticking with manual Transporter uploads.
+
+1. Apple Developer Portal → Users and Access → Integrations →
+   App Store Connect API → Generate API Key.
+2. Name: `Bandao Upload`. Access role: `App Manager` (the minimum
+   level that can upload builds).
+3. **Download the .p8 file immediately** — Apple lets you download it
+   exactly once. The file name is `AuthKey_<KEY_ID>.p8`.
+4. Move it to altool's auto-discovery path:
+   ```bash
+   mkdir -p ~/.appstoreconnect/private_keys
+   mv ~/Downloads/AuthKey_*.p8 ~/.appstoreconnect/private_keys/
+   ```
+5. Save a backup in the password manager as a single item titled
+   "Bandao App Store Connect API Key":
+   - Binary attachment: `AuthKey_<KEY_ID>.p8`
+   - Custom field: `Key ID` (≈10 alphanumeric chars)
+   - Custom field: `Issuer ID` (UUID, e.g. `12345678-1234-1234-1234-123456789012`)
+   - Notes: when the key was generated, role granted, what to do if lost.
+6. If the key is ever lost: Apple Developer Portal → Users and Access
+   → Integrations → revoke the old key + generate a new one. Then
+   update Bitwarden + the local `~/.appstoreconnect/private_keys/`
+   folder.
 
 ### Store-side review tips
 
