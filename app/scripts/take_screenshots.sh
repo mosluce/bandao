@@ -173,14 +173,16 @@ for entry in "${DEVICES[@]}"; do
   # Run the integration test. flutter drive talks to the booted simulator
   # and the driver process here on the host writes PNGs to OUT_DIR.
   #
-  # `flutter drive` doesn't support --release — Flutter's documented
-  # restriction. Use --profile so we still get a banner-free build (the
-  # debug ribbon only appears in --debug) without losing AOT performance.
+  # On iOS simulator, only `--debug` is supported (release/profile are
+  # rejected with "release/profile builds are only supported for physical
+  # devices"). The DEBUG ribbon doesn't appear because BandaoApp sets
+  # `debugShowCheckedModeBanner: false`, so debug-mode screenshots are
+  # still App-Store-clean.
   flutter drive \
     --driver=test_driver/integration_driver.dart \
     --target=integration_test/screenshot_test.dart \
     -d "$SIM_UDID" \
-    --profile \
+    --debug \
     --dart-define="API_BASE_URL=$API_URL" \
     --dart-define="SCREENSHOT_OUT_DIR=$OUT_DIR" \
     --dart-define="TEST_ORG_CODE=$ORG_CODE" \
