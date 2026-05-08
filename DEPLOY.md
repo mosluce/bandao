@@ -316,35 +316,51 @@ smoke; review can take 1–7 days for first submission.
 
 ### Cut iOS (.ipa)
 
-Open `app/ios/Runner.xcworkspace` in Xcode. Verify the General tab shows
-the Version and Build values from `pubspec.yaml`. Then:
+The end-to-end release wrapper handles everything (recommended):
+
+```bash
+cd app
+export APP_STORE_CONNECT_API_KEY_ID=ABC123XYZ4
+export APP_STORE_CONNECT_API_ISSUER_ID=12345678-1234-1234-1234-123456789012
+./scripts/release_ios.sh
+```
+
+That single script does:
+
+1. Bumps `pubspec.yaml`'s build number (`+N` → `+N+1`). Apple rejects
+   re-uploads of the same build number, so this auto-increment is
+   load-bearing.
+2. Runs `flutter build ipa --release --dart-define=API_BASE_URL=https://bandao-api.ccmos.tw`.
+   The dart-define is **required** — without it the .ipa falls back to
+   `Env.compileTimeDefault` (`http://localhost:9090` on iOS), which
+   means the on-device build cannot reach the prod backend and login
+   silently fails.
+3. Uploads the signed .ipa to App Store Connect via
+   `xcrun altool --upload-app` (same API as `fastlane pilot upload`).
+4. Reminds you to commit the pubspec bump + tag.
+
+Useful flags:
+
+- `./scripts/release_ios.sh --name 0.4.0` — bump marketing version too
+  (e.g. `0.3.0+5` → `0.4.0+1`).
+- `./scripts/release_ios.sh --no-bump` — re-cut the same `version+build`,
+  e.g. when a previous upload was rejected by Apple before processing
+  (uncommon).
+- `./scripts/release_ios.sh --no-upload` — build only, skip upload.
+
+If you'd rather drive each step yourself:
 
 ```bash
 cd app
 flutter pub get
 cd ios && pod install && cd ..
-flutter build ipa --release
+flutter build ipa --release \
+  --dart-define=API_BASE_URL=https://bandao-api.ccmos.tw
+./scripts/upload_ios.sh
 ```
 
-The signed `.ipa` lands at `app/build/ios/ipa/`. Upload via one of:
-
-- **Automated** (recommended once configured) — `app/scripts/upload_ios.sh`:
-  ```bash
-  cd app
-  export APP_STORE_CONNECT_API_KEY_ID=ABC123XYZ4
-  export APP_STORE_CONNECT_API_ISSUER_ID=12345678-1234-1234-1234-123456789012
-  ./scripts/upload_ios.sh
-  ```
-  Pre-req (one-time, see operator setup below): an App Store Connect API
-  key with App Manager role, with the .p8 saved at
-  `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8`. The script
-  shells out to `xcrun altool --upload-app`, which uses the same App
-  Store Connect API as `fastlane pilot upload` (no fastlane stack
-  needed).
-- **Xcode Organizer**: Window → Organizer → select the archive → Upload
-  to App Store Connect. Manual but no API key setup needed.
-- **Transporter** app: drag the `.ipa` in. Same as Organizer for our
-  purposes.
+Or upload via Xcode Organizer / Transporter manually if you don't want
+to set up the App Store Connect API key (see operator setup below).
 
 After upload, the build appears in App Store Connect → TestFlight →
 internal testers can install immediately. Submit to App Store review
