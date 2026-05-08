@@ -12,9 +12,12 @@
 
 ## App
 
-### [0.3.0+3] - 2026-05-07
+### [0.3.0+4] - 2026-05-08
 
-首次公開上架到 App Store + Google Play。
+首次 TestFlight 可用版本。`+3` 的 cut 因為 build 指令缺
+`--dart-define=API_BASE_URL=...`，內建 URL 跑回 `Env.compileTimeDefault`
+的 `localhost:9090`，TestFlight 使用者完全連不到後端 — 已被
+`+4` 重 cut 取代。`scripts/release_ios.sh` 起會自動帶 dart-define。
 
 #### Added
 - 上班、下班、轉場（轉出 / 轉入）三種打卡事件
