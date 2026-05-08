@@ -109,12 +109,14 @@ declare -a IPAD_129_NAMES=(
 
 # Find the first installed simulator matching one of the candidate names.
 # Echoes the matched name on success; returns non-zero on no match.
+#
+# Stays bash-3.2 compatible (macOS default `/bin/bash`) — no namerefs.
 resolve_simulator() {
   local class="$1"
-  local -n names_ref
+  local -a names
   case "$class" in
-    iphone_6.7) names_ref=IPHONE_67_NAMES ;;
-    ipad_12.9)  names_ref=IPAD_129_NAMES ;;
+    iphone_6.7) names=("${IPHONE_67_NAMES[@]}") ;;
+    ipad_12.9)  names=("${IPAD_129_NAMES[@]}") ;;
     *) return 1 ;;
   esac
 
@@ -122,7 +124,7 @@ resolve_simulator() {
   available="$(xcrun simctl list devices available)"
 
   local name
-  for name in "${names_ref[@]}"; do
+  for name in "${names[@]}"; do
     # Match `<name> (UDID) (...)` exactly — the parenthesis after the name
     # separates the device name from the UDID. This avoids "iPhone" matching
     # "iPhone 17", which `flutter drive` then treats as ambiguous.
