@@ -336,6 +336,53 @@ After upload, the build appears in App Store Connect → TestFlight →
 internal testers can install immediately. Submit to App Store review
 once smoke passes; first review can take 1–3 days.
 
+### Capture iOS screenshots
+
+App Store requires at least one set of iPhone (6.7"+) screenshots and —
+because we ship to iPad — one set of iPad 12.9" screenshots. The
+`app/scripts/take_screenshots.sh` wrapper automates this end-to-end:
+boots each simulator, runs an integration test that logs in with a
+test account and walks through `/login → /home → /history`, and
+writes the PNGs straight into `app/store_metadata/ios/screenshots/`.
+
+```bash
+cd app
+./scripts/take_screenshots.sh \
+  --org-code  ABC123 \
+  --username  test@example.com \
+  --password  yourPassword
+# (or set BANDAO_TEST_ORG_CODE / _USERNAME / _PASSWORD env vars)
+```
+
+Output:
+
+```
+store_metadata/ios/screenshots/
+├── iphone_6.7/{01_login,02_home,03_history}.png
+└── ipad_12.9/{01_login,02_home,03_history}.png
+```
+
+A few constraints to keep in mind:
+
+- **Cold-start required**: the test asserts you land on `/login`. If
+  the simulator still has a cached session from a prior run, wipe the
+  app (`Device → Erase All Content and Settings`) or use a fresh
+  simulator before re-running.
+- **Test account needs Org membership**: the AppUser identified by
+  the credentials must already belong to an Org so the post-login
+  redirect lands on the home screen instead of forcing an Org-create
+  flow.
+- **History page is empty unless the test account has events**: if
+  you want a populated `/history` screenshot, log in manually first
+  on the same simulator, do a few clock-in / clock-out cycles, then
+  run the script. Or accept the empty-state screenshot.
+- **Running on a release build** (`flutter drive --release`) so the
+  output has no debug banner — Apple will reject screenshots that
+  show the red `DEBUG` ribbon.
+
+Once the script finishes, eyeball the PNGs before committing. They
+land in repo paths that ship to the store via §6.3 metadata upload.
+
 ### Store-side review tips
 
 Both stores are sensitive to:
