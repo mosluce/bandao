@@ -13,6 +13,7 @@ import 'dart:io';
 
 import 'package:bandao_app/app/bandao_app.dart';
 import 'package:bandao_app/app/router.dart';
+import 'package:bandao_app/features/auth/state/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -46,14 +47,28 @@ void main() {
 
     runApp(const ProviderScope(child: BandaoApp()));
 
-    // Splash → /login redirect for an unauthenticated cold start.
-    // The org_code TextField is disabled until LoginScreen's async
-    // `_loadLastOrgCode` resolves; pump-and-settle once for the splash
-    // animation, then a second time for the storage read to flip
-    // `_loadedOrgCode = true`.
+    // Splash → either /login (cold start) or /home (token still valid
+    // from a prior run). The org_code TextField is disabled until
+    // LoginScreen's async `_loadLastOrgCode` resolves; pump-and-settle
+    // once for splash, then again for the storage read.
     await tester.pumpAndSettle(const Duration(seconds: 3));
     await tester.pump(const Duration(milliseconds: 1500));
     await tester.pumpAndSettle();
+
+    // If a previous run left a session token in secure_storage, the
+    // router will land us on /home instead of /login. Log out
+    // programmatically to bring us back to /login so we can capture the
+    // login screen first.
+    if (find.byKey(const Key('login.org_code')).evaluate().isEmpty) {
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(MaterialApp)),
+      );
+      await container.read(authProvider.notifier).logout();
+      // Auth listener fires → router redirects → splash settles → /login.
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+    }
 
     // iOS requires switching the surface to an image-backed render before
     // takeScreenshot() can sample pixels. No-op on Android.
@@ -66,9 +81,9 @@ void main() {
       find.byKey(const Key('login.org_code')),
       findsOneWidget,
       reason:
-          'Cold-start should land on /login. If this fails, the simulator '
-          'still has a session cookie/token from a prior run — wipe the '
-          'app or use a fresh simulator.',
+          'Could not reach /login even after a programmatic logout. The '
+          'app may be stuck in a non-auth state — wipe the simulator '
+          'completely and retry.',
     );
     await binding.takeScreenshot('01_login');
 
