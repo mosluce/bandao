@@ -103,12 +103,14 @@ void main() {
     await fillField('login.username', _username);
     await fillField('login.password', _password);
 
-    // Hide the soft keyboard so the post-login screenshot doesn't capture
-    // a half-keyboard at the bottom of the frame.
+    // The password field has `onSubmitted: _submit` wired up, so sending
+    // the "done" keyboard action triggers login AND dismisses the
+    // keyboard in one shot. Tapping login.submit explicitly afterwards
+    // would race with the post-login navigation — by the time we'd find
+    // the button, /home has replaced /login and login.submit no longer
+    // exists, throwing "Found 0 widgets with key login.submit".
     await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('login.submit')));
     // Backend roundtrip + AuthProvider state update + go_router redirect.
     // The Bandao app has periodic timers (queue processor / location
     // pings) that keep pumpAndSettle from quiescing quickly. Mix
