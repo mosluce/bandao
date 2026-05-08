@@ -47,7 +47,13 @@ void main() {
     runApp(const ProviderScope(child: BandaoApp()));
 
     // Splash → /login redirect for an unauthenticated cold start.
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+    // The org_code TextField is disabled until LoginScreen's async
+    // `_loadLastOrgCode` resolves; pump-and-settle once for the splash
+    // animation, then a second time for the storage read to flip
+    // `_loadedOrgCode = true`.
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.pumpAndSettle();
 
     // iOS requires switching the surface to an image-backed render before
     // takeScreenshot() can sample pixels. No-op on Android.
@@ -67,23 +73,35 @@ void main() {
     await binding.takeScreenshot('01_login');
 
     // ─── login flow → /home ───────────────────────────────────────
-    await tester.enterText(
-      find.byKey(const Key('login.org_code')),
-      _orgCode,
-    );
-    await tester.enterText(
-      find.byKey(const Key('login.username')),
-      _username,
-    );
-    await tester.enterText(
-      find.byKey(const Key('login.password')),
-      _password,
-    );
+    // integration-test text input on iOS simulator silently drops
+    // enterText calls when the target field isn't already focused.
+    // Tap → settle → enterText → settle reliably populates the field.
+    Future<void> fillField(String keyName, String value) async {
+      final finder = find.byKey(Key(keyName));
+      await tester.tap(finder);
+      await tester.pumpAndSettle();
+      await tester.enterText(finder, value);
+      await tester.pumpAndSettle();
+    }
+
+    await fillField('login.org_code', _orgCode);
+    await fillField('login.username', _username);
+    await fillField('login.password', _password);
+
+    // Hide the soft keyboard so the post-login screenshot doesn't capture
+    // a half-keyboard at the bottom of the frame.
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
+
     await tester.tap(find.byKey(const Key('login.submit')));
     // Backend roundtrip + AuthProvider state update + go_router redirect.
-    // 8s is generous; cut down if it stays consistently fast.
-    await tester.pumpAndSettle(const Duration(seconds: 8));
+    // The Bandao app has periodic timers (queue processor / location
+    // pings) that keep pumpAndSettle from quiescing quickly. Mix
+    // pumpAndSettle with explicit pump() to give the network call real
+    // time to complete.
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
 
     // ─── 02_home ──────────────────────────────────────────────────
     await binding.takeScreenshot('02_home');
@@ -91,7 +109,9 @@ void main() {
     // ─── 03_history ───────────────────────────────────────────────
     final ctx = tester.element(find.byType(Scaffold).first);
     GoRouter.of(ctx).go(AppRoutes.history);
-    await tester.pumpAndSettle(const Duration(seconds: 3));
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
     await binding.takeScreenshot('03_history');
   });
 }
