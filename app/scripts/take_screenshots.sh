@@ -87,19 +87,46 @@ DEVICES=(
   "ipad_12.9:iPad Pro 13-inch (M4)"
 )
 
-# Fallback search list per class — try each in order until one matches.
-fallbacks_for() {
-  case "$1" in
-    iphone_6.7) echo "iPhone 16 Pro Max" "iPhone 15 Pro Max" "iPhone 14 Pro Max" ;;
-    ipad_12.9)  echo "iPad Pro 13-inch (M4)" "iPad Pro 12.9-inch (6th generation)" "iPad Pro 12.9-inch" ;;
-    *) echo "" ;;
-  esac
-}
+# Fallback search list per device class — first match wins. Names go from
+# newest to oldest so we prefer the latest-generation simulator. Each entry
+# must match an exact device name from `xcrun simctl list devices`.
+declare -a IPHONE_67_NAMES=(
+  "iPhone 17 Pro Max"
+  "iPhone 17 Plus"
+  "iPhone 16 Pro Max"
+  "iPhone 16 Plus"
+  "iPhone 15 Pro Max"
+  "iPhone 15 Plus"
+  "iPhone 14 Pro Max"
+  "iPhone 14 Plus"
+)
+declare -a IPAD_129_NAMES=(
+  "iPad Pro 13-inch (M4)"
+  "iPad Pro 12.9-inch (6th generation)"
+  "iPad Pro 12.9-inch (5th generation)"
+  "iPad Pro 12.9-inch"
+)
 
+# Find the first installed simulator matching one of the candidate names.
+# Echoes the matched name on success; returns non-zero on no match.
 resolve_simulator() {
   local class="$1"
-  for name in $(fallbacks_for "$class"); do
-    if xcrun simctl list devices | grep -F "$name" | grep -v "unavailable" >/dev/null; then
+  local -n names_ref
+  case "$class" in
+    iphone_6.7) names_ref=IPHONE_67_NAMES ;;
+    ipad_12.9)  names_ref=IPAD_129_NAMES ;;
+    *) return 1 ;;
+  esac
+
+  local available
+  available="$(xcrun simctl list devices available)"
+
+  local name
+  for name in "${names_ref[@]}"; do
+    # Match `<name> (UDID) (...)` exactly — the parenthesis after the name
+    # separates the device name from the UDID. This avoids "iPhone" matching
+    # "iPhone 17", which `flutter drive` then treats as ambiguous.
+    if printf '%s\n' "$available" | grep -F " $name (" >/dev/null; then
       echo "$name"
       return 0
     fi
@@ -111,7 +138,21 @@ resolve_simulator() {
 for entry in "${DEVICES[@]}"; do
   CLASS="${entry%%:*}"
   if ! SIM_NAME="$(resolve_simulator "$CLASS")"; then
-    echo "── skip $CLASS — no matching simulator installed" >&2
+    echo "──✗ skip $CLASS — no matching simulator installed." >&2
+    case "$CLASS" in
+      iphone_6.7)
+        echo "    Need a Pro Max / Plus class iPhone simulator." >&2
+        echo "    Open Xcode → Window → Devices and Simulators → Simulators tab" >&2
+        echo "    → '+' → pick e.g. 'iPhone 17 Pro Max' or 'iPhone 16 Pro Max'." >&2
+        echo "    Or: xcodebuild -downloadPlatform iOS" >&2
+        ;;
+      ipad_12.9)
+        echo "    Need an iPad Pro 12.9\"+ simulator (M4 / 6th gen / 5th gen)." >&2
+        echo "    Open Xcode → Window → Devices and Simulators → Simulators tab" >&2
+        echo "    → '+' → pick e.g. 'iPad Pro 13-inch (M4)'." >&2
+        ;;
+    esac
+    echo >&2
     continue
   fi
 
@@ -122,18 +163,22 @@ for entry in "${DEVICES[@]}"; do
   echo "    output → $OUT_DIR"
 
   # Boot simulator (idempotent — `simctl boot` is fine on already-booted).
-  SIM_UDID="$(xcrun simctl list devices | grep -F "$SIM_NAME" | grep -v unavailable \
+  SIM_UDID="$(xcrun simctl list devices available | grep -F " $SIM_NAME (" \
               | head -1 | sed -E 's/.*\(([-A-F0-9]+)\).*/\1/')"
   xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
   open -a Simulator
 
   # Run the integration test. flutter drive talks to the booted simulator
   # and the driver process here on the host writes PNGs to OUT_DIR.
+  #
+  # `flutter drive` doesn't support --release — Flutter's documented
+  # restriction. Use --profile so we still get a banner-free build (the
+  # debug ribbon only appears in --debug) without losing AOT performance.
   flutter drive \
     --driver=test_driver/integration_driver.dart \
     --target=integration_test/screenshot_test.dart \
-    -d "$SIM_NAME" \
-    --release \
+    -d "$SIM_UDID" \
+    --profile \
     --dart-define="API_BASE_URL=$API_URL" \
     --dart-define="SCREENSHOT_OUT_DIR=$OUT_DIR" \
     --dart-define="TEST_ORG_CODE=$ORG_CODE" \
