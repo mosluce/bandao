@@ -44,4 +44,4 @@
 - [x] 4.1 If the diagnostic prints / interceptor gate revert in §0 was committed separately, ensure it is reverted before merge so the shipping diff is just the `SecureStorage` change. (Reverts done in §0; nothing was committed separately, single working-tree change.)
 - [x] 4.2 Update `app/CHANGELOG.md` (or root `CHANGELOG.md`, whichever is canonical for app-side entries) with a note under the relevant version: "Fix: bearer token now survives iOS device-lock during background sync; eliminates spurious logout when the user moved during a locked-screen background period." (entered under root `CHANGELOG.md` § App / [0.3.0+7])
 - [x] 4.3 Run `openspec validate fix-locked-keychain-logout` and confirm the change is valid before requesting review.
-- [ ] 4.4 Open a PR; in the description, link to this OpenSpec change and include the reproduction log evidence (`token=NULL` after `Cmd+L`) as the smoking gun.
+- [x] 4.4 Open a PR; in the description, link to this OpenSpec change and include the reproduction log evidence (`token=NULL` after `Cmd+L`) as the smoking gun. (PR #21: https://github.com/mosluce/bandao/pull/21)
