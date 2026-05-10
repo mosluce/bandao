@@ -12,6 +12,18 @@
 
 ## App
 
+### [0.3.0+7] - 2026-05-09
+
+#### Fixed
+- iOS：背景中移動觸發背景同步、且裝置處於鎖屏狀態時，會因 Keychain
+  讀不到 bearer token 導致 `POST /app/checkin/locations` 沒帶
+  `Authorization` header，server 回 401，processor 走 `_onAuthExpired`
+  把人靜默登出，使用者拿出手機後跳到 `/login`。修法：
+  - `SecureStorage` 在啟動時讀一次 token 進記憶體，hot path 讀寫不再每次
+    打 Keychain；同時把 iOS Keychain accessibility 改成 `first_unlock`，
+    補 cold-launch-while-locked 邊界。
+  - 行為對使用者透明，session 一旦建立即可橫跨整個鎖屏背景時段。
+
 ### [0.3.0+4] - 2026-05-08
 
 首次 TestFlight 可用版本。`+3` 的 cut 因為 build 指令缺
