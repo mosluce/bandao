@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -24,20 +25,56 @@ class SecureStorageKeys {
 /// Thin typed wrapper around `flutter_secure_storage`. The wrapper exists so
 /// the rest of the app does not depend on the keys directly and so that tests
 /// can plug in an in-memory fake without faking the whole flutter plugin.
+///
+/// **Bearer token invariants (DO NOT bypass this wrapper):**
+///
+/// - `auth.bearer_token` is cached in process memory after the first
+///   successful read. All reads/writes/clears MUST go through this wrapper —
+///   any direct `FlutterSecureStorage` access for that key would let the
+///   in-memory cache drift from persistent state.
+/// - The default underlying storage is constructed with
+///   `IOSOptions(accessibility: KeychainAccessibility.first_unlock)` so the
+///   token survives device-lock once the user has unlocked the device at
+///   least once after reboot. This is what keeps the user logged in when
+///   iOS keeps the app alive in the background (location tracking) while
+///   the screen is locked.
 class SecureStorage {
   SecureStorage([FlutterSecureStorage? storage])
-      : _storage = storage ?? const FlutterSecureStorage();
+      : _storage = storage ?? const FlutterSecureStorage(iOptions: _iosOptions);
+
+  static const IOSOptions _iosOptions = IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock,
+  );
+
+  /// Test hook: lets unit tests assert the iOS Keychain accessibility class
+  /// the wrapper applies to its default storage.
+  @visibleForTesting
+  static IOSOptions get defaultIosOptionsForTest => _iosOptions;
 
   final FlutterSecureStorage _storage;
 
-  Future<String?> readToken() =>
-      _storage.read(key: SecureStorageKeys.bearerToken);
+  String? _cachedToken;
+  bool _tokenLoaded = false;
 
-  Future<void> writeToken(String token) =>
-      _storage.write(key: SecureStorageKeys.bearerToken, value: token);
+  Future<String?> readToken() async {
+    if (_tokenLoaded) return _cachedToken;
+    final value = await _storage.read(key: SecureStorageKeys.bearerToken);
+    _cachedToken = value;
+    _tokenLoaded = true;
+    return value;
+  }
 
-  Future<void> clearToken() =>
-      _storage.delete(key: SecureStorageKeys.bearerToken);
+  Future<void> writeToken(String token) async {
+    await _storage.write(key: SecureStorageKeys.bearerToken, value: token);
+    _cachedToken = token;
+    _tokenLoaded = true;
+  }
+
+  Future<void> clearToken() async {
+    await _storage.delete(key: SecureStorageKeys.bearerToken);
+    _cachedToken = null;
+    _tokenLoaded = true;
+  }
 
   Future<String?> readLastOrgCode() =>
       _storage.read(key: SecureStorageKeys.lastOrgCode);
