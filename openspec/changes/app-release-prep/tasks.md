@@ -49,9 +49,9 @@
 
 ## 6. Console preparation (operator-only)
 
-- [ ] 6.1 In App Store Connect, fill the App Information page: name 班到, subtitle Bandao, primary language zh-Hant, primary category Productivity. Upload the icon (1024×1024 png, no alpha).
-- [ ] 6.2 Fill the App Privacy nutrition labels: Email + Location + Device ID linked to identity (app functionality); Crash Data + Performance Data not linked (app functionality); no third-party sharing; no tracking.
-- [ ] 6.3 Upload the iOS metadata files from §5.1–§5.2 via App Store Connect UI (or fastlane `deliver init` once phase 2 starts; for now, manual upload).
+- [x] 6.1 In App Store Connect, fill the App Information page: name 班到, subtitle Bandao, primary language zh-Hant, primary category Productivity. Upload the icon (1024×1024 png, no alpha).
+- [x] 6.2 Fill the App Privacy nutrition labels: Email + Location + Device ID linked to identity (app functionality); Crash Data + Performance Data not linked (app functionality); no third-party sharing; no tracking.
+- [x] 6.3 Upload the iOS metadata files from §5.1–§5.2 via App Store Connect UI (or fastlane `deliver init` once phase 2 starts; for now, manual upload).
 - [ ] 6.4 In Google Play Console, fill the store listing: app name 班到, short description, full description, screenshots, feature graphic, app icon. Set category to Productivity. Mark the app as free with no IAP.
 - [ ] 6.5 Fill the Data Safety form: same data items as iOS + answer "Is location collected in the background?" → Yes (via foreground service); attach a screenshot of the sticky notification as supporting evidence; confirm none of the data is shared with third parties.
 - [ ] 6.6 Confirm Play App Signing is enabled (it should already be, from §0.6); verify Internal Testing track is created and an internal tester list exists.
@@ -60,13 +60,13 @@
 
 - [x] 7.1 Trigger a Crashlytics test crash from a debug build (per §4.6); confirm the crash appears in Firebase Console with symbolicated stack within 5 minutes. (Same act as §4.6, already verified — crash event surfaced on Firebase Console.)
 - [ ] 7.2 Android live smoke for location tracking (folds in ROADMAP `[app] Android live smoke for location tracking`): on a real Android device installed via Play Internal Testing, run the full sequence — register / login as AppUser / 上班 / send app to background / observe `工作期間定位追蹤中` sticky notification persists / clock_in 事件出現在 admin-web `/checkin` / 下班 / sticky notification 消失 / verify the toggle for org-level location tracking turns the foreground service on/off as expected.
-- [ ] 7.3 iOS smoke via TestFlight: install the build on at least one iPhone and one iPad (largest available simulator counts if no physical iPad); run register / login / 上班 → background → confirm iOS blue indicator appears → resume → 下班 → indicator clears.
+- [x] 7.3 iOS smoke via TestFlight: install the build on at least one iPhone and one iPad (largest available simulator counts if no physical iPad); run register / login / 上班 → background → confirm iOS blue indicator appears → resume → 下班 → indicator clears.
 - [ ] 7.4 Verify the on-store version (TestFlight build number / Play Internal Testing release name) matches `pubspec.yaml#version` exactly.
 - [ ] 7.5 Confirm the in-store displayed app name on both TestFlight (or App Store sandbox) and Play Console preview reads 班到 with Bandao subtitle / promotional text where applicable.
 
 ## 8. Submit for review (operator-only)
 
-- [ ] 8.1 Apple: submit the TestFlight build for App Store review via App Store Connect; in the submit notes, briefly explain the work-shift location tracking model (manual 上班/下班, blue indicator visible while backgrounded, no Always permission requested) and link to the privacy URL.
+- [x] 8.1 Apple: submit the TestFlight build for App Store review via App Store Connect; in the submit notes, briefly explain the work-shift location tracking model (manual 上班/下班, blue indicator visible while backgrounded, no Always permission requested) and link to the privacy URL.
 - [ ] 8.2 Google: promote the Internal Testing build to Closed Testing or Production track; complete the background-location-via-foreground-service justification form (Play Console will surface this); attach the sticky-notification screenshot if requested.
 
 ## 9. Documentation

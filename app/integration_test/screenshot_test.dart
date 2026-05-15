@@ -1,13 +1,22 @@
 // Automated store-metadata screenshot pipeline.
 //
-// Run via the wrapper at `app/scripts/take_screenshots.sh`. The wrapper
-// boots a simulator for the device class, runs `flutter drive` against
-// this test, and the driver in `test_driver/integration_driver.dart`
-// writes each captured PNG to `app/store_metadata/ios/screenshots/<class>/`
-// (or the equivalent android directory).
+// Run via the wrapper at `app/scripts/take_screenshots.sh` (iOS) or
+// `app/scripts/take_android_screenshots.sh` (Android). The wrapper boots
+// a simulator/emulator for the device class, runs `flutter drive`
+// against this test, and persists each captured PNG to
+// `app/store_metadata/{ios,android}/...`.
 //
-// Credentials are passed via `--dart-define` flags so they never enter
-// the repo. See script for the list of required defines.
+// Capture mechanism differs by platform:
+//   - iOS: `binding.takeScreenshot(name)` writes via the integration_test
+//     callback bus to the host driver in `test_driver/integration_driver.dart`.
+//   - Android: integration_test 4.x's `takeScreenshot` hangs indefinitely
+//     on Android emulators after `convertFlutterSurfaceToImage`. We dodge
+//     by printing a `SHOOT:<name>` marker to stdout and pausing briefly;
+//     the host script tails stdout, runs `adb exec-out screencap -p`, and
+//     writes the PNG itself. The Dart side never touches the Flutter
+//     surface — bulletproof against renderer state issues.
+//
+// Credentials are passed via `--dart-define` so they never enter the repo.
 
 import 'dart:io';
 
@@ -47,31 +56,52 @@ void main() {
 
     runApp(const ProviderScope(child: BandaoApp()));
 
-    // Splash → either /login (cold start) or /home (token still valid
-    // from a prior run). The org_code TextField is disabled until
-    // LoginScreen's async `_loadLastOrgCode` resolves; pump-and-settle
-    // once for splash, then again for the storage read.
-    await tester.pumpAndSettle(const Duration(seconds: 3));
-    await tester.pump(const Duration(milliseconds: 1500));
-    await tester.pumpAndSettle();
+    // The Bandao app has 1 Hz periodic timers (queue_processor,
+    // location_tracking_service, location_ping_processor). Those keep
+    // `pumpAndSettle` from ever quiescing — it hangs to its 10-minute
+    // internal timeout. Use explicit pump loops with a fixed wall-clock
+    // budget instead.
+    Future<void> pumpFor(Duration total) async {
+      const frame = Duration(milliseconds: 100);
+      var elapsed = Duration.zero;
+      while (elapsed < total) {
+        await tester.pump(frame);
+        elapsed += frame;
+      }
+    }
 
-    // If a previous run left a session token in secure_storage, the
-    // router will land us on /home instead of /login. Log out
-    // programmatically to bring us back to /login so we can capture the
-    // login screen first.
+    // Platform-aware screenshot capture. See the file header for why
+    // Android takes a different path.
+    Future<void> capture(String name) async {
+      if (Platform.isAndroid) {
+        // ignore: avoid_print
+        print('SHOOT:$name');
+        // Give the host script time to run adb exec-out screencap before
+        // the next interaction perturbs the frame.
+        await Future.delayed(const Duration(seconds: 2));
+      } else {
+        await binding.takeScreenshot(name);
+      }
+    }
+
+    // Splash → /login (cold) or /home (token still valid). The
+    // org_code TextField is disabled until LoginScreen's async
+    // `_loadLastOrgCode` resolves; pump generously to cover splash +
+    // the secure_storage read.
+    await pumpFor(const Duration(seconds: 5));
+
+    // If a stale session token sent us to /home, log out so we can
+    // capture the login screen first.
     if (find.byKey(const Key('login.org_code')).evaluate().isEmpty) {
       final container = ProviderScope.containerOf(
         tester.element(find.byType(MaterialApp)),
       );
       await container.read(authProvider.notifier).logout();
-      // Auth listener fires → router redirects → splash settles → /login.
-      await tester.pumpAndSettle(const Duration(seconds: 2));
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pumpAndSettle();
+      await pumpFor(const Duration(seconds: 3));
     }
 
-    // iOS requires switching the surface to an image-backed render before
-    // takeScreenshot() can sample pixels. No-op on Android.
+    // iOS-only: swap the live surface for an image-backed render so
+    // `binding.takeScreenshot()` can sample pixels.
     if (Platform.isIOS) {
       await binding.convertFlutterSurfaceToImage();
     }
@@ -85,50 +115,40 @@ void main() {
           'app may be stuck in a non-auth state — wipe the simulator '
           'completely and retry.',
     );
-    await binding.takeScreenshot('01_login');
+    await capture('01_login');
 
     // ─── login flow → /home ───────────────────────────────────────
     // integration-test text input on iOS simulator silently drops
     // enterText calls when the target field isn't already focused.
-    // Tap → settle → enterText → settle reliably populates the field.
+    // Tap → pump → enterText → pump reliably populates the field.
     Future<void> fillField(String keyName, String value) async {
       final finder = find.byKey(Key(keyName));
       await tester.tap(finder);
-      await tester.pumpAndSettle();
+      await pumpFor(const Duration(milliseconds: 500));
       await tester.enterText(finder, value);
-      await tester.pumpAndSettle();
+      await pumpFor(const Duration(milliseconds: 500));
     }
 
     await fillField('login.org_code', _orgCode);
     await fillField('login.username', _username);
     await fillField('login.password', _password);
 
-    // The password field has `onSubmitted: _submit` wired up, so sending
-    // the "done" keyboard action triggers login AND dismisses the
-    // keyboard in one shot. Tapping login.submit explicitly afterwards
-    // would race with the post-login navigation — by the time we'd find
-    // the button, /home has replaced /login and login.submit no longer
-    // exists, throwing "Found 0 widgets with key login.submit".
+    // The password field has `onSubmitted: _submit` wired up, so the
+    // "done" keyboard action triggers login AND dismisses the keyboard
+    // in one shot. Tapping login.submit explicitly would race with the
+    // post-login navigation.
     await tester.testTextInput.receiveAction(TextInputAction.done);
 
     // Backend roundtrip + AuthProvider state update + go_router redirect.
-    // The Bandao app has periodic timers (queue processor / location
-    // pings) that keep pumpAndSettle from quiescing quickly. Mix
-    // pumpAndSettle with explicit pump() to give the network call real
-    // time to complete.
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    await pumpFor(const Duration(seconds: 6));
 
     // ─── 02_home ──────────────────────────────────────────────────
-    await binding.takeScreenshot('02_home');
+    await capture('02_home');
 
     // ─── 03_history ───────────────────────────────────────────────
     final ctx = tester.element(find.byType(Scaffold).first);
     GoRouter.of(ctx).go(AppRoutes.history);
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-    await binding.takeScreenshot('03_history');
+    await pumpFor(const Duration(seconds: 3));
+    await capture('03_history');
   });
 }

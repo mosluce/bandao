@@ -20,8 +20,8 @@
 # Skips simulators that aren't available on this machine. To rebuild the
 # device class list, see `xcrun simctl list devices`.
 #
-# Android is intentionally not implemented yet — the iOS-first decision
-# in the app-release-prep change explicitly defers Play Store work.
+# For Android, see the sibling script `take_android_screenshots.sh` —
+# same Dart test, different device-class discovery + boot path.
 
 set -euo pipefail
 
