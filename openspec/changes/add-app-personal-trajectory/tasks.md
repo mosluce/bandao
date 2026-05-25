@@ -55,8 +55,8 @@
 
 ## 8. App Review reply artifact
 
-- [ ] 8.1 Create `app/store_metadata/ios/app_review_replies/2.5.4-2026-05-15.md` with the verbatim reply body (see the English draft already prepared in the conversation thread) — cite guideline `2.5.4`, submission id `2f88a54d-2b9a-4069-b5fa-88e2ed770187`
-- [ ] 8.2 Add demo-account credentials placeholder section the operator fills in before submitting
+- [x] 8.1 Created `app/store_metadata/ios/app_review_replies/2.5.4-2026-05-15.md` — cites guideline 2.5.4, submission id `2f88a54d-2b9a-4069-b5fa-88e2ed770187`, explains the new tab + home card + Privacy form update + reworded permission string
+- [x] 8.2 Demo-credentials section with `<CODE> / <demo-user> / <demo-pass>` placeholders + seeding instruction; explicitly marked "fill before submitting"
 
 ## 9. Version bump + changelog
 
