@@ -41,6 +41,12 @@ dependencies:
   geolocator: ^13.0.1
   app_settings: ^5.1.1
 
+  # Map rendering for the "我的工作日記" trajectory view. Uses OpenStreetMap
+  # tiles via CARTO Positron (free, attribution-only). latlong2 is also the
+  # coordinate type flutter_map exposes; reused for geodesic distance.
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
   # Open privacy policy URL in an in-app browser from the consent dialog.
   url_launcher: ^6.3.1
 

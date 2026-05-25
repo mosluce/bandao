@@ -8,11 +8,11 @@
 
 ## 2. App: data layer for personal trajectory
 
-- [ ] 2.1 Add `flutter_map` and `latlong2` to `app/pubspec.yaml`; `flutter pub get`; verify iOS/Android build still produces a binary
-- [ ] 2.2 Create `app/lib/features/trajectory/data/my_locations_repository.dart` — wraps `dio` call to `GET /app/checkin/me/locations`, parses to `List<LocationPing>` (reuse existing `core/api/models/location_ping.dart`)
-- [ ] 2.3 Create `app/lib/features/trajectory/data/trajectory_stats.dart` — pure function computing distance (geodesic sum via `latlong2`) and on-shift duration from a ping list; unit tests
-- [ ] 2.4 Create `app/lib/features/trajectory/state/trajectory_controller.dart` — Riverpod async state holding `{ selectedDate, pings, loading, error }`; exposes `selectDate(DateTime)` and `refresh()`
-- [ ] 2.5 Widget/unit tests for the controller: fetch on selectedDate change, no-network error path, empty-day path, permission-denied path
+- [x] 2.1 Add `flutter_map` and `latlong2` to `app/pubspec.yaml`; `flutter pub get` clean (full iOS/Android build deferred until §11 smoke to avoid the 10-minute cold-cache cost on every iteration)
+- [x] 2.2 Create `app/lib/features/trajectory/data/my_locations_repository.dart` — wraps `dio` call to `GET /app/checkin/me/locations`, parses to `List<LocationPingDto>` (reuses existing `core/api/models/location_ping.dart`)
+- [x] 2.3 Create `app/lib/features/trajectory/data/trajectory_stats.dart` — pure function computing distance (geodesic sum via `latlong2`) and on-shift duration from a ping list; 5 unit tests pass
+- [x] 2.4 Create `app/lib/features/trajectory/state/trajectory_controller.dart` — Riverpod `AsyncNotifier<TrajectoryDayState>` holding `{ selectedDate, pings, stats }`; exposes `selectDate(DateTime)` and `refresh()`
+- [x] 2.5 Controller tests: build-today, selectDate-refetch, repository error → AsyncError, refresh re-queries the same day (permission-denied path deferred to §3 screen tests where the permission widget lives)
 
 ## 3. App: trajectory screen
 
