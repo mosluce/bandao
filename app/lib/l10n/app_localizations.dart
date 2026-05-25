@@ -214,6 +214,36 @@ class AppLocalizations {
   String get splashNetworkMessage =>
       _isZh ? '無法連線伺服器，請稍後再試。' : 'Could not reach the server. Please retry.';
 
+  // Trajectory ("我的工作日記") — the user-facing surface that justifies
+  // UIBackgroundModes:location per App Review 2.5.4.
+  String get trajectoryTitle => _isZh ? '我的工作日記' : 'My Work Day';
+  String get trajectoryNavLabel => _isZh ? '我的軌跡' : 'My Trajectory';
+  String get trajectoryEmpty => _isZh ? '該日無軌跡資料' : 'No trajectory for this day';
+  String get trajectoryStatDistance => _isZh ? '走動距離' : 'Distance';
+  String get trajectoryStatDuration => _isZh ? '在班時長' : 'On-shift';
+  String get trajectoryStatPings => _isZh ? '位置點' : 'Pings';
+  String get trajectoryTodayCardTitle => _isZh ? '我的今天' : 'Today';
+  String get trajectoryTodayCardCta => _isZh ? '查看軌跡' : 'View trajectory';
+  String get trajectoryPermissionTitle =>
+      _isZh ? '尚未授權定位' : 'Location permission needed';
+  String get trajectoryPermissionBody => _isZh
+      ? '需要定位權限才能繪製您的工作軌跡。請至系統設定開啟。'
+      : 'Allow location access in system settings to view your work-day trajectory.';
+  String get trajectoryPermissionOpenSettings =>
+      _isZh ? '前往系統設定' : 'Open settings';
+  String get trajectoryAttribution => '© OpenStreetMap contributors © CARTO';
+  String get trajectoryDateToday => _isZh ? '今天' : 'Today';
+  String trajectoryDistanceKm(double km) =>
+      '${km.toStringAsFixed(1)} ${_isZh ? '公里' : 'km'}';
+  String trajectoryDurationHm(int hours, int minutes) {
+    if (_isZh) {
+      if (hours == 0) return '$minutes 分';
+      return '$hours 小時 $minutes 分';
+    }
+    if (hours == 0) return '${minutes}m';
+    return '${hours}h ${minutes}m';
+  }
+
   bool get _isZh => locale.languageCode == 'zh';
 }
 

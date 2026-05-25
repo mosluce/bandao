@@ -16,12 +16,12 @@
 
 ## 3. App: trajectory screen
 
-- [ ] 3.1 Create `app/lib/features/trajectory/presentation/trajectory_screen.dart` — scaffold with app bar, date dropdown (today + previous 7 days, Org-tz aware), map area, stats area
-- [ ] 3.2 Implement `flutter_map` setup: CARTO Positron tile URL, attribution overlay `© OpenStreetMap contributors © CARTO`, polyline layer, start/end markers, auto fit-bounds on data load
-- [ ] 3.3 Empty-day path — render text `該日無軌跡資料`, skip map instantiation
-- [ ] 3.4 Permission-denied path — render primer card with "前往系統設定" button hooked to `app_settings`; do not instantiate map
-- [ ] 3.5 Stats panel rendering: 走動距離 (km, 1 decimal), 在班時長 (`H 小時 M 分`), 位置點 (integer count)
-- [ ] 3.6 Widget tests: today-with-data, empty-day, permission-denied, picker-changes-trigger-refetch
+- [x] 3.1 Create `app/lib/features/trajectory/presentation/trajectory_screen.dart` — scaffold with app bar, date dropdown (today + previous 7 days; uses device local time, matching the existing `history_screen.dart` convention — Org-tz strict mode left for a later cleanup), map area, stats area
+- [x] 3.2 `flutter_map` setup: CARTO Positron tile URL, RichAttributionWidget showing `© OpenStreetMap contributors © CARTO`, polyline layer, start/end markers, auto fit-bounds via `CameraFit.bounds`
+- [x] 3.3 Empty-day path renders `該日無軌跡資料` and does not instantiate FlutterMap
+- [x] 3.4 Permission-denied path renders primer card with `前往系統設定` button hooked to `AppSettings.openAppSettings()`; FlutterMap not instantiated
+- [x] 3.5 Stats panel: 走動距離 (km, 1 decimal), 在班時長 (`H 小時 M 分`), 位置點 (integer count)
+- [x] 3.6 Widget tests: empty-day, permission-denied, picker-change-triggers-refetch. Data-branch widget assertion (FlutterMap mounted) is omitted because TestWidgetsFlutterBinding stubs network → bubbles uncaught tile-fetch exceptions; the with-data branch is covered by the controller test (stats computation) and §11 manual smoke (visual)
 
 ## 4. App: home summary card
 
