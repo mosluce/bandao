@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../checkin/presentation/background_sync_tip.dart';
@@ -185,15 +184,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               const TrackingChip(),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              icon: const Icon(Icons.history),
-                              onPressed: () => context.go('/history'),
-                              label: Text(l10n.historyEntry),
-                            ),
-                          ),
+                          // 「事件歷史」 entry moved to the persistent bottom
+                          // NavigationBar shell; the in-page TextButton was
+                          // removed to keep one canonical way to reach it.
                         ],
                       ),
                     ),

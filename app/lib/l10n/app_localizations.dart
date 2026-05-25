@@ -214,6 +214,10 @@ class AppLocalizations {
   String get splashNetworkMessage =>
       _isZh ? '無法連線伺服器，請稍後再試。' : 'Could not reach the server. Please retry.';
 
+  // Bottom navigation labels for the authenticated shell.
+  String get navHome => _isZh ? '首頁' : 'Home';
+  String get navHistory => _isZh ? '歷史' : 'History';
+
   // Trajectory ("我的工作日記") — the user-facing surface that justifies
   // UIBackgroundModes:location per App Review 2.5.4.
   String get trajectoryTitle => _isZh ? '我的工作日記' : 'My Work Day';

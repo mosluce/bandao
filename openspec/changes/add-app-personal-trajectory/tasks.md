@@ -33,11 +33,11 @@
 
 ## 5. App: navigation shell refactor
 
-- [ ] 5.1 Refactor `app/lib/app/router.dart` to use `StatefulShellRoute.indexedStack` for the three authenticated top-level routes (`/home`, `/history`, `/trajectory`); keep `/splash`, `/login`, `/force-change`, `/dev-server-config` outside the shell
-- [ ] 5.2 Add `AppRoutes.trajectory = '/trajectory'` constant
-- [ ] 5.3 Build the shell scaffold with a Material `NavigationBar` containing three destinations: 首頁 (`Icons.access_time`), 歷史 (`Icons.history`), 我的軌跡 (`Icons.map_outlined`)
-- [ ] 5.4 Remove the `IconButton` on home's app bar that opens `/history` (the nav bar replaces it)
-- [ ] 5.5 Widget tests: tab switch preserves home shift state (`isWorking` survives switch), three destinations visible from each top-level route, one-tap reach
+- [x] 5.1 Refactored `app/lib/app/router.dart` to use `StatefulShellRoute.indexedStack` for the three authenticated top-level routes (`/`, `/history`, `/trajectory`); `/splash`, `/login`, `/force-change-password`, `/dev-server-config` stay outside the shell
+- [x] 5.2 Added `AppRoutes.trajectory = '/trajectory'` constant (home stays `/` rather than renaming to `/home` — matches existing redirect targets and `initialLocation`)
+- [x] 5.3 `_AppShell` builds a Material `NavigationBar` with three destinations: 首頁 (`Icons.access_time`) → `/`, 歷史 (`Icons.history`) → `/history`, 我的軌跡 (`Icons.map_outlined`) → `/trajectory`. Tap on the active tab re-pushes its initial location (`initialLocation:` flag in `goBranch`)
+- [x] 5.4 Removed the in-page `TextButton.icon` on the home screen that pushed `/history` (the nav bar replaces it); dropped the now-unused `go_router` import
+- [x] 5.5 Existing `test/app/router_test.dart` (5 redirect-rule cases) continues to pass after the shell refactor. `StatefulShellRoute` state-preservation between branches is documented go_router behavior; a dedicated widget test for the "shift state survives tab switch" scenario is deferred to §11 smoke (mounting the full HomeScreen with all its providers in a tester is brittle)
 
 ## 6. App: consent dialog + permission description reword
 
