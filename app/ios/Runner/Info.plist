@@ -45,6 +45,13 @@
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
+		<!-- Export-compliance exemption: Bandao only uses Apple-provided
+		     cryptography (HTTPS/TLS for the API, Keychain for the bearer
+		     token). That qualifies for the standard exemption under
+		     Category 5, Part 2. Setting this to NO skips the App Store
+		     Connect prompt on every TestFlight upload. -->
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>你的位置會用來繪製「我的工作日記」，讓你可以在 app 內回顧自己每一天的工作路線與走動距離。按下「上班」後開始記錄，背景時 iOS 螢幕上方顯示藍色提示，按「下班」即停止。</string>
 		<key>UIBackgroundModes</key>
