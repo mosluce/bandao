@@ -245,6 +245,28 @@ for CLASS in "${DEVICES[@]}"; do
     continue
   fi
 
+  # Pre-grant location permission so the trajectory screen renders the
+  # map instead of the permission primer. `pm grant` requires the app to
+  # be installed — pre-install grants silently fail, so we ALSO fork a
+  # background loop that re-grants every 2 seconds for 60s. By the time
+  # the integration test navigates to /trajectory and calls
+  # locationPermissionProvider.refresh(), the apk has installed and at
+  # least one of the grants has stuck.
+  "$ADB" -s "$SERIAL" shell pm grant tw.ccmos.app.bandao \
+    android.permission.ACCESS_FINE_LOCATION 2>/dev/null || true
+  "$ADB" -s "$SERIAL" shell pm grant tw.ccmos.app.bandao \
+    android.permission.ACCESS_COARSE_LOCATION 2>/dev/null || true
+  (
+    for i in $(seq 1 30); do
+      "$ADB" -s "$SERIAL" shell pm grant tw.ccmos.app.bandao \
+        android.permission.ACCESS_FINE_LOCATION >/dev/null 2>&1 || true
+      "$ADB" -s "$SERIAL" shell pm grant tw.ccmos.app.bandao \
+        android.permission.ACCESS_COARSE_LOCATION >/dev/null 2>&1 || true
+      sleep 2
+    done
+  ) &
+  GRANT_LOOP_PID=$!
+
   # Capture is host-driven on Android: the Dart test prints `SHOOT:<name>`
   # to stdout when it has the right frame on screen, then sleeps briefly.
   # We tail flutter drive's combined output, and on each marker run
@@ -274,6 +296,10 @@ for CLASS in "${DEVICES[@]}"; do
     fi
   done
   set -e
+
+  # Stop the background grant loop now that the test is done.
+  kill "$GRANT_LOOP_PID" 2>/dev/null || true
+  unset GRANT_LOOP_PID
 
   # Stop the emulator before the next class boots so adb device discovery
   # stays unambiguous.

@@ -170,6 +170,22 @@ for entry in "${DEVICES[@]}"; do
   xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
   open -a Simulator
 
+  # Pre-grant location permission so the trajectory screen renders the
+  # map instead of the permission primer. simctl privacy grant doesn't
+  # stick reliably for not-yet-installed apps, so we ALSO fork a quick
+  # background loop that re-grants every 2 seconds for the first 60s.
+  # By the time the integration test navigates to /trajectory and calls
+  # locationPermissionProvider.refresh(), the bundle has been installed
+  # and at least one of the grants has landed.
+  xcrun simctl privacy "$SIM_UDID" grant location tw.ccmos.app.bandao 2>/dev/null || true
+  (
+    for i in $(seq 1 30); do
+      xcrun simctl privacy "$SIM_UDID" grant location tw.ccmos.app.bandao >/dev/null 2>&1 || true
+      sleep 2
+    done
+  ) &
+  GRANT_LOOP_PID=$!
+
   # Run the integration test. flutter drive talks to the booted simulator
   # and the driver process here on the host writes PNGs to OUT_DIR.
   #
@@ -191,6 +207,10 @@ for entry in "${DEVICES[@]}"; do
     --dart-define="TEST_ORG_CODE=$ORG_CODE" \
     --dart-define="TEST_USERNAME=$USERNAME" \
     --dart-define="TEST_PASSWORD=$PASSWORD"
+
+  # Stop the background grant loop now that the test is done.
+  kill "$GRANT_LOOP_PID" 2>/dev/null || true
+  unset GRANT_LOOP_PID
 
   echo "──▶ $CLASS done"
 done
