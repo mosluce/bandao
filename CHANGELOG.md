@@ -12,6 +12,33 @@
 
 ## App
 
+### [0.3.1+8] - 2026-05-21
+
+#### Added
+- 新增「我的工作日記」(`/trajectory`) — 在 app 內回顧自己今天的工作路線、走動距離與在班時長。
+  支援今天 + 過去 7 天任一日切換，map 走 CARTO Positron tile，距離透過 `latlong2` 取
+  geodesic 累加。
+- 首頁加上「我的今天」摘要卡 — 顯示當日距離與在班時長，點擊即跳轉到 `/trajectory`；
+  上班中或當日有 ping 時顯示，否則隱藏。
+- 底部導覽列改為三分頁的 `StatefulShellRoute.indexedStack`：首頁、歷史、我的軌跡，
+  每個分頁保留自己的 state，切換時不重 build。
+- API：`GET /app/checkin/me/locations` — AppUser bearer auth、token-derived identity，
+  ordering 與 range 規則與既有 admin `/checkin/users/:id/locations` 完全一致。
+  此 endpoint 不受 Org `location_tracking_enabled` toggle 拘束（toggle 僅 gate POST）。
+
+#### Changed
+- `NSLocationWhenInUseUsageDescription` 與打卡前的同意對話框文案改為「我的工作日記」
+  優先 — 先說明使用者本人能在 app 內回顧，再提到組織管理員可查閱。
+- App Store / Play Store 描述 + promotional text reframe，「我的工作日記」放第一條
+  特色 bullet。
+- 移除首頁底部的「事件歷史」TextButton — 已由底部導覽列取代。
+
+#### Why
+- iOS App Review submission `2f88a54d-2b9a-4069-b5fa-88e2ed770187` (0.3.0+7) 被 2.5.4
+  退件，理由是 `UIBackgroundModes: location` 只服務 employer-side tracking 不符合 Apple
+  政策。新增的「我的工作日記」讓 AppUser 自己成為背景位置資料的主要受益者。完整 review
+  reply 留存於 `app/store_metadata/ios/app_review_replies/2.5.4-2026-05-15.md`。
+
 ### [0.3.0+7] - 2026-05-09
 
 #### Fixed

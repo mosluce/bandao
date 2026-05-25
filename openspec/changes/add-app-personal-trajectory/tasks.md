@@ -60,9 +60,9 @@
 
 ## 9. Version bump + changelog
 
-- [ ] 9.1 Bump `app/pubspec.yaml` to `0.3.1+8`
-- [ ] 9.2 Add `app/store_metadata/ios/release_notes/0.3.1.txt` with a zh-TW one-paragraph note about 我的工作日記
-- [ ] 9.3 Update `CHANGELOG.md` at repo root: new entry under `[app] 0.3.1+8`
+- [x] 9.1 `app/pubspec.yaml` bumped to `0.3.1+8`
+- [x] 9.2 `app/store_metadata/ios/release_notes/0.3.1.txt` written — zh-TW one-paragraph note about 我的工作日記 + nav-bar rework
+- [x] 9.3 `CHANGELOG.md` `[0.3.1+8]` section added with Added / Changed / Why bullets and reply-file pointer
 
 ## 10. Deploy runbook updates
 
