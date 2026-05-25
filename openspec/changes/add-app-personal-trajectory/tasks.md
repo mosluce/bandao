@@ -47,11 +47,11 @@
 
 ## 7. Store metadata + screenshots
 
-- [ ] 7.1 Rewrite `app/store_metadata/ios/description.txt` to lead the feature list with "我的工作日記" (per design.md D7 and mobile-release spec)
-- [ ] 7.2 Rewrite `app/store_metadata/ios/promotional_text.txt` to reference 我的工作日記
-- [ ] 7.3 Update Android equivalent (`app/store_metadata/android/short_description.txt`, `full_description.txt`) if those exist; same lead-with-personal-log treatment
-- [ ] 7.4 Capture a new App Store screenshot of the `/trajectory` screen on an iPhone 17 Pro Max simulator with a real polyline; place file in `app/store_metadata/ios/screenshots/` so its sort order puts it in slot 2 or 3
-- [ ] 7.5 Update Play Store screenshot set analogously
+- [x] 7.1 `app/store_metadata/ios/description.txt` reordered — first feature bullet is now "我的工作日記"; org-side tracking demoted; audience bullet says you AND admins can view
+- [x] 7.2 `app/store_metadata/ios/promotional_text.txt` rewritten to lead with the personal log
+- [x] 7.3 Android `short_description.txt` + `full_description.txt` mirror the iOS reframe
+- [ ] 7.4 Capture new iPhone 17 Pro Max App Store screenshot of `/trajectory` with a real polyline — **deferred to §11 smoke** (needs a running simulator + a demo day of pings)
+- [ ] 7.5 Play Store trajectory screenshot — **deferred to §11 smoke** for the same reason
 
 ## 8. App Review reply artifact
 
