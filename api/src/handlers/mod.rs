@@ -114,6 +114,10 @@ pub fn router(state: AppState) -> Router {
             "/app/checkin/locations",
             post(location_tracking::submit_location_pings),
         )
+        .route(
+            "/app/checkin/me/locations",
+            get(location_tracking::list_my_locations),
+        )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
             app_require_session,

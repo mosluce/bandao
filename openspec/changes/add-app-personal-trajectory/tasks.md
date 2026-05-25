@@ -1,10 +1,10 @@
 ## 1. API: GET /app/checkin/me/locations
 
-- [ ] 1.1 Add `list_my_locations` handler in `api/src/handlers/location_tracking.rs` — bearer auth via `RequireAppUser`, take `app_user_id` from token context, reuse `list_by_app_user_paginated`, reuse `validate_range`
-- [ ] 1.2 Register route in `api/src/handlers/mod.rs` next to the existing `/app/checkin/locations` (POST) route
-- [ ] 1.3 Confirm no Org-toggle check is applied to the new GET (only the existing POST keeps the `LOCATION_TRACKING_DISABLED` gate)
-- [ ] 1.4 Add integration tests in `api/tests/`: token-derived identity, date range filtering, oversized range rejection, 401 unauthenticated, cross-user isolation, toggle-off-still-readable
-- [ ] 1.5 `cargo test -p api` clean
+- [x] 1.1 Add `list_my_locations` handler in `api/src/handlers/location_tracking.rs` — bearer auth via `RequireAppUser`, take `app_user_id` from token context, reuse `list_by_app_user_paginated`, reuse `validate_range`
+- [x] 1.2 Register route in `api/src/handlers/mod.rs` next to the existing `/app/checkin/locations` (POST) route
+- [x] 1.3 Confirm no Org-toggle check is applied to the new GET (only the existing POST keeps the `LOCATION_TRACKING_DISABLED` gate)
+- [x] 1.4 Add integration tests in `api/tests/`: token-derived identity, date range filtering, oversized range rejection, 401 unauthenticated, cross-user isolation, toggle-off-still-readable
+- [x] 1.5 `cargo test -p api` clean (one pre-existing flake on `app_me_password::voluntary_change_works_after_flag_already_cleared` from testcontainers contention; passes when re-run alone)
 
 ## 2. App: data layer for personal trajectory
 
