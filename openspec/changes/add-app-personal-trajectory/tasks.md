@@ -50,8 +50,8 @@
 - [x] 7.1 `app/store_metadata/ios/description.txt` reordered — first feature bullet is now "我的工作日記"; org-side tracking demoted; audience bullet says you AND admins can view
 - [x] 7.2 `app/store_metadata/ios/promotional_text.txt` rewritten to lead with the personal log
 - [x] 7.3 Android `short_description.txt` + `full_description.txt` mirror the iOS reframe
-- [ ] 7.4 Capture new iPhone 17 Pro Max App Store screenshot of `/trajectory` with a real polyline — **deferred to §11 smoke** (needs a running simulator + a demo day of pings)
-- [ ] 7.5 Play Store trajectory screenshot — **deferred to §11 smoke** for the same reason
+- [x] 7.4 iOS screenshots re-captured (iPhone 17 Pro Max + iPad Pro 13"): `04_trajectory.png` shows the real polyline through 信義/松山 with start+end markers and stats `1.2 公里 / 58 分 / 30 點`; `01_login` / `02_home` / `03_history` re-shot so the bottom NavigationBar shell is visible on every authenticated screen. Pipeline pre-grants location via `simctl privacy` + 60s background loop and the test calls `locationPermissionProvider.refresh()` before navigating to `/trajectory`.
+- [x] 7.5 Android phone-class screenshot captured on `Medium_Phone_API_36.0` AVD using the same `adb pm grant` loop. Tablet AVD not installed locally → auto-skipped; operator can install one and re-run if Play Store tablet listing is needed
 
 ## 8. App Review reply artifact
 
