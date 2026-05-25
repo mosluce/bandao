@@ -46,7 +46,7 @@
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>班到在您按下「上班」後會持續記錄位置以產生工作軌跡，背景時 iOS 螢幕上方顯示藍色提示，按「下班」即停止。</string>
+		<string>你的位置會用來繪製「我的工作日記」，讓你可以在 app 內回顧自己每一天的工作路線與走動距離。按下「上班」後開始記錄，背景時 iOS 螢幕上方顯示藍色提示，按「下班」即停止。</string>
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>processing</string>

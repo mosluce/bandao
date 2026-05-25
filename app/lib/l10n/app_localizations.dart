@@ -115,16 +115,20 @@ class AppLocalizations {
   String get locationConsentTitle =>
       _isZh ? '啟用定位追蹤' : 'Enable location tracking';
   String get locationConsentBody => _isZh
-      ? '您所屬組織開啟了工作期間定位追蹤。在此功能下：'
-      : 'Your organization has enabled work-shift location tracking. While active:';
+      ? '上班期間會記錄您的位置，您可以在「我的工作日記」回顧自己今天的工作路線與走動距離；'
+          '同時也會提供給組織管理員。在此功能下：'
+      : 'While you are on shift the app records your location so you can review '
+          'your own work-day in "My Work Day" — distance walked, route, totals. '
+          'The same data is shared with your organization\'s admins. While active:';
   String get locationConsentBulletCadence =>
       _isZh ? '上班期間約每分鐘記錄一次位置' : 'Position is recorded roughly every minute';
   String get locationConsentBulletDistance =>
       _isZh ? '移動超過 100 公尺才會儲存' : 'Only saved when you have moved more than 100m';
   String get locationConsentBulletRetention =>
       _isZh ? '保存 90 天後自動清除' : 'Stored for 90 days, then automatically deleted';
-  String get locationConsentBulletAudience =>
-      _isZh ? '僅供您所屬組織的管理員查閱' : 'Visible only to your organization\'s admins';
+  String get locationConsentBulletAudience => _isZh
+      ? '您本人可於「我的工作日記」查閱，組織管理員亦可查閱'
+      : 'Visible to you in "My Work Day", and to your organization\'s admins';
   String get locationConsentPrivacyLink =>
       _isZh ? '查看完整隱私政策' : 'View full privacy policy';
   String get locationConsentCancel => _isZh ? '取消' : 'Cancel';

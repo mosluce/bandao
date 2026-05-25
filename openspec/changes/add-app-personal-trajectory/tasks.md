@@ -41,9 +41,9 @@
 
 ## 6. App: consent dialog + permission description reword
 
-- [ ] 6.1 Rewrite `NSLocationWhenInUseUsageDescription` in `app/ios/Runner/Info.plist` to lead with personal-log framing (see design.md D6 for text)
-- [ ] 6.2 Update the Flutter clock-in consent dialog body text — find the existing dialog in the checkin flow and lead with the personal-log framing
-- [ ] 6.3 Update `app/lib/l10n/app_localizations.dart` strings if the consent text lives there
+- [x] 6.1 Rewrote `NSLocationWhenInUseUsageDescription` to lead with the personal log (verbatim from design.md D6)
+- [x] 6.2 Reworded `locationConsentBody` and `locationConsentBulletAudience` in the consent dialog l10n strings — body leads with "讓您可以回顧自己今天的工作路線" before mentioning admin visibility; audience bullet now says both you and admins can view
+- [x] 6.3 Updated existing `location_consent_dialog_test` assertion to match the new audience bullet (`您本人可於` + `組織管理員亦可查閱`)
 
 ## 7. Store metadata + screenshots
 
