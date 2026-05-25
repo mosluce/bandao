@@ -115,16 +115,20 @@ class AppLocalizations {
   String get locationConsentTitle =>
       _isZh ? '啟用定位追蹤' : 'Enable location tracking';
   String get locationConsentBody => _isZh
-      ? '您所屬組織開啟了工作期間定位追蹤。在此功能下：'
-      : 'Your organization has enabled work-shift location tracking. While active:';
+      ? '上班期間會記錄您的位置，您可以在「我的工作日記」回顧自己今天的工作路線與走動距離；'
+          '同時也會提供給組織管理員。在此功能下：'
+      : 'While you are on shift the app records your location so you can review '
+          'your own work-day in "My Work Day" — distance walked, route, totals. '
+          'The same data is shared with your organization\'s admins. While active:';
   String get locationConsentBulletCadence =>
       _isZh ? '上班期間約每分鐘記錄一次位置' : 'Position is recorded roughly every minute';
   String get locationConsentBulletDistance =>
       _isZh ? '移動超過 100 公尺才會儲存' : 'Only saved when you have moved more than 100m';
   String get locationConsentBulletRetention =>
       _isZh ? '保存 90 天後自動清除' : 'Stored for 90 days, then automatically deleted';
-  String get locationConsentBulletAudience =>
-      _isZh ? '僅供您所屬組織的管理員查閱' : 'Visible only to your organization\'s admins';
+  String get locationConsentBulletAudience => _isZh
+      ? '您本人可於「我的工作日記」查閱，組織管理員亦可查閱'
+      : 'Visible to you in "My Work Day", and to your organization\'s admins';
   String get locationConsentPrivacyLink =>
       _isZh ? '查看完整隱私政策' : 'View full privacy policy';
   String get locationConsentCancel => _isZh ? '取消' : 'Cancel';
@@ -213,6 +217,40 @@ class AppLocalizations {
   String get splashLogout => _isZh ? '登出' : 'Sign out';
   String get splashNetworkMessage =>
       _isZh ? '無法連線伺服器，請稍後再試。' : 'Could not reach the server. Please retry.';
+
+  // Bottom navigation labels for the authenticated shell.
+  String get navHome => _isZh ? '首頁' : 'Home';
+  String get navHistory => _isZh ? '歷史' : 'History';
+
+  // Trajectory ("我的工作日記") — the user-facing surface that justifies
+  // UIBackgroundModes:location per App Review 2.5.4.
+  String get trajectoryTitle => _isZh ? '我的工作日記' : 'My Work Day';
+  String get trajectoryNavLabel => _isZh ? '我的軌跡' : 'My Trajectory';
+  String get trajectoryEmpty => _isZh ? '該日無軌跡資料' : 'No trajectory for this day';
+  String get trajectoryStatDistance => _isZh ? '走動距離' : 'Distance';
+  String get trajectoryStatDuration => _isZh ? '在班時長' : 'On-shift';
+  String get trajectoryStatPings => _isZh ? '位置點' : 'Pings';
+  String get trajectoryTodayCardTitle => _isZh ? '我的今天' : 'Today';
+  String get trajectoryTodayCardCta => _isZh ? '查看軌跡' : 'View trajectory';
+  String get trajectoryPermissionTitle =>
+      _isZh ? '尚未授權定位' : 'Location permission needed';
+  String get trajectoryPermissionBody => _isZh
+      ? '需要定位權限才能繪製您的工作軌跡。請至系統設定開啟。'
+      : 'Allow location access in system settings to view your work-day trajectory.';
+  String get trajectoryPermissionOpenSettings =>
+      _isZh ? '前往系統設定' : 'Open settings';
+  String get trajectoryAttribution => '© OpenStreetMap contributors © CARTO';
+  String get trajectoryDateToday => _isZh ? '今天' : 'Today';
+  String trajectoryDistanceKm(double km) =>
+      '${km.toStringAsFixed(1)} ${_isZh ? '公里' : 'km'}';
+  String trajectoryDurationHm(int hours, int minutes) {
+    if (_isZh) {
+      if (hours == 0) return '$minutes 分';
+      return '$hours 小時 $minutes 分';
+    }
+    if (hours == 0) return '${minutes}m';
+    return '${hours}h ${minutes}m';
+  }
 
   bool get _isZh => locale.languageCode == 'zh';
 }

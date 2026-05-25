@@ -1,6 +1,13 @@
 //! `/app/checkin/locations` (AppUser bearer) — batch ingest of location
 //! pings collected by the mobile client during a shift.
 //!
+//! `/app/checkin/me/locations` (AppUser bearer) — self-paginated query so
+//! the AppUser can review their own movement in the "我的工作日記" surface.
+//! Mirrors the admin list endpoint's validation rules; intentionally
+//! NOT gated by the Org `location_tracking_enabled` toggle so an AppUser
+//! can still read pings that were persisted before the toggle was turned
+//! off (the toggle only gates ingest).
+//!
 //! `/checkin/users/:id/locations` (admin cookie) — paginated query.
 //!
 //! `/checkin/users/:id/locations/export` (admin cookie) — xlsx export of one
@@ -274,6 +281,44 @@ fn validate_ping(
         });
     }
     Ok(())
+}
+
+// --- GET /app/checkin/me/locations ---
+
+/// Self-list — the AppUser reads their own pings. Same validation and
+/// ordering as the admin endpoint; identity is taken from the bearer
+/// token, never from the request body or path.
+pub async fn list_my_locations(
+    State(state): State<AppState>,
+    RequireAppUser(ctx): RequireAppUser,
+    Query(q): Query<LocationListQuery>,
+) -> ApiResult<Json<Vec<LocationPingDto>>> {
+    let before = match q.before.as_deref() {
+        Some(raw) => Some(parse_rfc3339(raw)?),
+        None => None,
+    };
+    let from = match q.from.as_deref() {
+        Some(raw) => Some(parse_rfc3339(raw).map_err(|_| ApiError::InvalidRange)?),
+        None => None,
+    };
+    let to = match q.to.as_deref() {
+        Some(raw) => Some(parse_rfc3339(raw).map_err(|_| ApiError::InvalidRange)?),
+        None => None,
+    };
+    if from.is_some() || to.is_some() {
+        validate_range(from, to)?;
+    }
+    let limit = q
+        .limit
+        .unwrap_or(LIST_DEFAULT_LIMIT)
+        .clamp(1, LIST_MAX_LIMIT);
+
+    let pings = state
+        .db
+        .location_pings
+        .list_by_app_user_paginated(ctx.app_user_id, before, from, to, limit)
+        .await?;
+    Ok(Json(pings.iter().map(LocationPingDto::from_ping).collect()))
 }
 
 // --- GET /checkin/users/:id/locations ---

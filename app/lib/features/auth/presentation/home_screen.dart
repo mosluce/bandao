@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../checkin/presentation/background_sync_tip.dart';
@@ -14,6 +13,7 @@ import '../../checkin/state/checkin_queue_provider.dart';
 import '../../checkin/state/checkin_status_provider.dart';
 import '../../checkin/state/handover_notice_provider.dart';
 import '../../checkin/state/location_permission_provider.dart';
+import '../../trajectory/presentation/today_summary_card.dart';
 import '../state/auth_provider.dart';
 import '../state/auth_state.dart';
 
@@ -176,6 +176,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           const SizedBox(height: 16),
                           const HomeButtons(),
                           const SizedBox(height: 16),
+                          const TodaySummaryCard(),
+                          const SizedBox(height: 16),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
@@ -185,15 +187,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               const TrackingChip(),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton.icon(
-                              icon: const Icon(Icons.history),
-                              onPressed: () => context.go('/history'),
-                              label: Text(l10n.historyEntry),
-                            ),
-                          ),
+                          // 「事件歷史」 entry moved to the persistent bottom
+                          // NavigationBar shell; the in-page TextButton was
+                          // removed to keep one canonical way to reach it.
                         ],
                       ),
                     ),

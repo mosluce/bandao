@@ -36,7 +36,8 @@ void main() {
       expect(find.textContaining('上班期間約每分鐘記錄'), findsOneWidget);
       expect(find.textContaining('移動超過 100 公尺'), findsOneWidget);
       expect(find.textContaining('保存 90 天後自動清除'), findsOneWidget);
-      expect(find.textContaining('管理員查閱'), findsOneWidget);
+      expect(find.textContaining('您本人可於'), findsOneWidget);
+      expect(find.textContaining('組織管理員亦可查閱'), findsOneWidget);
       expect(find.text('查看完整隱私政策'), findsOneWidget);
       expect(find.text('取消'), findsOneWidget);
       expect(find.text('同意並上班'), findsOneWidget);

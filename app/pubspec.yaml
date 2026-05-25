@@ -2,7 +2,7 @@ name: bandao_app
 description: "Bandao (班到) mobile app for AppUsers."
 publish_to: 'none'
 
-version: 0.3.0+7
+version: 0.3.1+8
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -40,6 +40,12 @@ dependencies:
   # Location
   geolocator: ^13.0.1
   app_settings: ^5.1.1
+
+  # Map rendering for the "我的工作日記" trajectory view. Uses OpenStreetMap
+  # tiles via CARTO Positron (free, attribution-only). latlong2 is also the
+  # coordinate type flutter_map exposes; reused for geodesic distance.
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
   # Open privacy policy URL in an in-app browser from the consent dialog.
   url_launcher: ^6.3.1

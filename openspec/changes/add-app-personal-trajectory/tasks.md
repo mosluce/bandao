@@ -1,0 +1,80 @@
+## 1. API: GET /app/checkin/me/locations
+
+- [x] 1.1 Add `list_my_locations` handler in `api/src/handlers/location_tracking.rs` — bearer auth via `RequireAppUser`, take `app_user_id` from token context, reuse `list_by_app_user_paginated`, reuse `validate_range`
+- [x] 1.2 Register route in `api/src/handlers/mod.rs` next to the existing `/app/checkin/locations` (POST) route
+- [x] 1.3 Confirm no Org-toggle check is applied to the new GET (only the existing POST keeps the `LOCATION_TRACKING_DISABLED` gate)
+- [x] 1.4 Add integration tests in `api/tests/`: token-derived identity, date range filtering, oversized range rejection, 401 unauthenticated, cross-user isolation, toggle-off-still-readable
+- [x] 1.5 `cargo test -p api` clean (one pre-existing flake on `app_me_password::voluntary_change_works_after_flag_already_cleared` from testcontainers contention; passes when re-run alone)
+
+## 2. App: data layer for personal trajectory
+
+- [x] 2.1 Add `flutter_map` and `latlong2` to `app/pubspec.yaml`; `flutter pub get` clean (full iOS/Android build deferred until §11 smoke to avoid the 10-minute cold-cache cost on every iteration)
+- [x] 2.2 Create `app/lib/features/trajectory/data/my_locations_repository.dart` — wraps `dio` call to `GET /app/checkin/me/locations`, parses to `List<LocationPingDto>` (reuses existing `core/api/models/location_ping.dart`)
+- [x] 2.3 Create `app/lib/features/trajectory/data/trajectory_stats.dart` — pure function computing distance (geodesic sum via `latlong2`) and on-shift duration from a ping list; 5 unit tests pass
+- [x] 2.4 Create `app/lib/features/trajectory/state/trajectory_controller.dart` — Riverpod `AsyncNotifier<TrajectoryDayState>` holding `{ selectedDate, pings, stats }`; exposes `selectDate(DateTime)` and `refresh()`
+- [x] 2.5 Controller tests: build-today, selectDate-refetch, repository error → AsyncError, refresh re-queries the same day (permission-denied path deferred to §3 screen tests where the permission widget lives)
+
+## 3. App: trajectory screen
+
+- [x] 3.1 Create `app/lib/features/trajectory/presentation/trajectory_screen.dart` — scaffold with app bar, date dropdown (today + previous 7 days; uses device local time, matching the existing `history_screen.dart` convention — Org-tz strict mode left for a later cleanup), map area, stats area
+- [x] 3.2 `flutter_map` setup: CARTO Positron tile URL, RichAttributionWidget showing `© OpenStreetMap contributors © CARTO`, polyline layer, start/end markers, auto fit-bounds via `CameraFit.bounds`
+- [x] 3.3 Empty-day path renders `該日無軌跡資料` and does not instantiate FlutterMap
+- [x] 3.4 Permission-denied path renders primer card with `前往系統設定` button hooked to `AppSettings.openAppSettings()`; FlutterMap not instantiated
+- [x] 3.5 Stats panel: 走動距離 (km, 1 decimal), 在班時長 (`H 小時 M 分`), 位置點 (integer count)
+- [x] 3.6 Widget tests: empty-day, permission-denied, picker-change-triggers-refetch. Data-branch widget assertion (FlutterMap mounted) is omitted because TestWidgetsFlutterBinding stubs network → bubbles uncaught tile-fetch exceptions; the with-data branch is covered by the controller test (stats computation) and §11 manual smoke (visual)
+
+## 4. App: home summary card
+
+- [x] 4.1 `today_summary_card.dart` — Consumer widget shows distance + duration via `l10n.trajectoryDistanceKm` / `trajectoryDurationHm`, tap-through to `/trajectory`
+- [x] 4.2 Visibility: render when on-shift (`onSite` or `inTransit`) OR today's ping count > 0; else `SizedBox.shrink()`
+- [x] 4.3 Refresh trigger: subscribes to `LocationTrackingService.tickStream`, debounced to one refresh per 60s. App lifecycle `resumed` forces an immediate refresh (bypasses debounce)
+- [x] 4.4 Card inserted in `home_screen.dart` between `HomeButtons` and the `Wrap` containing `QueueChip` / `TrackingChip`
+- [x] 4.5 Widget tests (4): hidden on off-shift + zero pings, visible on-shift + zero pings, visible off-shift with pings, tap navigates to /trajectory
+
+## 5. App: navigation shell refactor
+
+- [x] 5.1 Refactored `app/lib/app/router.dart` to use `StatefulShellRoute.indexedStack` for the three authenticated top-level routes (`/`, `/history`, `/trajectory`); `/splash`, `/login`, `/force-change-password`, `/dev-server-config` stay outside the shell
+- [x] 5.2 Added `AppRoutes.trajectory = '/trajectory'` constant (home stays `/` rather than renaming to `/home` — matches existing redirect targets and `initialLocation`)
+- [x] 5.3 `_AppShell` builds a Material `NavigationBar` with three destinations: 首頁 (`Icons.access_time`) → `/`, 歷史 (`Icons.history`) → `/history`, 我的軌跡 (`Icons.map_outlined`) → `/trajectory`. Tap on the active tab re-pushes its initial location (`initialLocation:` flag in `goBranch`)
+- [x] 5.4 Removed the in-page `TextButton.icon` on the home screen that pushed `/history` (the nav bar replaces it); dropped the now-unused `go_router` import
+- [x] 5.5 Existing `test/app/router_test.dart` (5 redirect-rule cases) continues to pass after the shell refactor. `StatefulShellRoute` state-preservation between branches is documented go_router behavior; a dedicated widget test for the "shift state survives tab switch" scenario is deferred to §11 smoke (mounting the full HomeScreen with all its providers in a tester is brittle)
+
+## 6. App: consent dialog + permission description reword
+
+- [x] 6.1 Rewrote `NSLocationWhenInUseUsageDescription` to lead with the personal log (verbatim from design.md D6)
+- [x] 6.2 Reworded `locationConsentBody` and `locationConsentBulletAudience` in the consent dialog l10n strings — body leads with "讓您可以回顧自己今天的工作路線" before mentioning admin visibility; audience bullet now says both you and admins can view
+- [x] 6.3 Updated existing `location_consent_dialog_test` assertion to match the new audience bullet (`您本人可於` + `組織管理員亦可查閱`)
+
+## 7. Store metadata + screenshots
+
+- [x] 7.1 `app/store_metadata/ios/description.txt` reordered — first feature bullet is now "我的工作日記"; org-side tracking demoted; audience bullet says you AND admins can view
+- [x] 7.2 `app/store_metadata/ios/promotional_text.txt` rewritten to lead with the personal log
+- [x] 7.3 Android `short_description.txt` + `full_description.txt` mirror the iOS reframe
+- [x] 7.4 iOS screenshots re-captured (iPhone 17 Pro Max + iPad Pro 13"): `04_trajectory.png` shows the real polyline through 信義/松山 with start+end markers and stats `1.2 公里 / 58 分 / 30 點`; `01_login` / `02_home` / `03_history` re-shot so the bottom NavigationBar shell is visible on every authenticated screen. Pipeline pre-grants location via `simctl privacy` + 60s background loop and the test calls `locationPermissionProvider.refresh()` before navigating to `/trajectory`.
+- [x] 7.5 Android phone-class screenshot captured on `Medium_Phone_API_36.0` AVD using the same `adb pm grant` loop. Tablet AVD not installed locally → auto-skipped; operator can install one and re-run if Play Store tablet listing is needed
+
+## 8. App Review reply artifact
+
+- [x] 8.1 Created `app/store_metadata/ios/app_review_replies/2.5.4-2026-05-15.md` — cites guideline 2.5.4, submission id `2f88a54d-2b9a-4069-b5fa-88e2ed770187`, explains the new tab + home card + Privacy form update + reworded permission string
+- [x] 8.2 Demo-credentials section with `<CODE> / <demo-user> / <demo-pass>` placeholders + seeding instruction; explicitly marked "fill before submitting"
+
+## 9. Version bump + changelog
+
+- [x] 9.1 `app/pubspec.yaml` bumped to `0.3.1+8`
+- [x] 9.2 `app/store_metadata/ios/release_notes/0.3.1.txt` written — zh-TW one-paragraph note about 我的工作日記 + nav-bar rework
+- [x] 9.3 `CHANGELOG.md` `[0.3.1+8]` section added with Added / Changed / Why bullets and reply-file pointer
+
+## 10. Deploy runbook updates
+
+- [x] 10.1 Added "App Review submission checklist" sub-section to `DEPLOY.md` between iOS upload and screenshots — first checkbox is the App Privacy form verification (both "App Functionality" and "Other Purposes" for Precise Location)
+- [x] 10.2 Second checkbox covers the demo-day seeding step (manual clock-in / drive / clock-out on the demo Org so `/trajectory` has a polyline)
+- [x] 10.3 Third checkbox tells the operator to paste the latest `app_review_replies/2.5.4-*.md` body into App Review Notes + the message thread, after filling in the `<CODE> / <demo-user> / <demo-pass>` placeholders
+
+## 11. Smoke + ship
+
+- [x] 11.1 `flutter analyze` — `No issues found!` across whole app
+- [x] 11.2 `flutter test` — 160 tests pass (previously 151 + 9 new for trajectory data layer / screen / home card)
+- [ ] 11.3 Manual smoke on a real iPhone — **needs operator**: clock in, walk a few minutes, open 我的軌跡 tab, verify polyline; clock out, verify home card retains final stats and blue indicator disappears
+- [ ] 11.4 Manual smoke on Android — **needs operator**: same path, verify foreground service notification still present and bottom nav bar shows three tabs
+- [ ] 11.5 Cut iOS build 0.3.1 (8) and submit to App Store Connect with the 2.5.4 reply (`app/store_metadata/ios/app_review_replies/2.5.4-2026-05-15.md`) pasted into App Review notes — **needs operator** (uses `scripts/release_ios.sh`)
+- [ ] 11.6 Cut Android build 0.3.1 (8) and submit to Play Console — **needs operator**

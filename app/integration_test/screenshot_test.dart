@@ -23,6 +23,7 @@ import 'dart:io';
 import 'package:bandao_app/app/bandao_app.dart';
 import 'package:bandao_app/app/router.dart';
 import 'package:bandao_app/features/auth/state/auth_provider.dart';
+import 'package:bandao_app/features/checkin/state/location_permission_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -150,5 +151,28 @@ void main() {
     GoRouter.of(ctx).go(AppRoutes.history);
     await pumpFor(const Duration(seconds: 3));
     await capture('03_history');
+
+    // ─── 04_trajectory ────────────────────────────────────────────
+    // The "我的工作日記" tab — the AppUser-facing surface that
+    // justifies UIBackgroundModes:location to App Review 2.5.4.
+    // Whether the polyline renders depends on the demo Org having
+    // pings persisted for today; off-data the screen shows the
+    // empty state. See DEPLOY.md "App Review submission checklist".
+    //
+    // The location permission AsyncNotifier caches its first-build
+    // result, which on a cold simulator is `denied` even when the
+    // host script ran `simctl privacy ... grant location` pre-install.
+    // Force a re-read here so a host-side grant that lands between
+    // app launch and this point is picked up before /trajectory mounts.
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+    await container.read(locationPermissionProvider.notifier).refresh();
+
+    GoRouter.of(ctx).go(AppRoutes.trajectory);
+    // The trajectory screen fires off the GET /app/checkin/me/locations
+    // on first build; give the network round-trip + flutter_map's
+    // initial tile fetch room to settle before sampling pixels.
+    await pumpFor(const Duration(seconds: 8));
+    await capture('04_trajectory');
   });
 }

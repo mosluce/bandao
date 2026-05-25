@@ -366,6 +366,32 @@ After upload, the build appears in App Store Connect → TestFlight →
 internal testers can install immediately. Submit to App Store review
 once smoke passes; first review can take 1–3 days.
 
+### App Review submission checklist (post-upload, pre-submit)
+
+Driven by the 2.5.4 rejection of submission `2f88a54d-2b9a-4069-b5fa-88e2ed770187`
+on 2026-05-15 — keep these in place for every future build that ships
+`UIBackgroundModes: location`.
+
+- [ ] **App Privacy form**: Verify "Precise Location" lists **both**
+      use cases — "App Functionality" (the AppUser viewing their own
+      trajectory in "我的工作日記") **and** "Other Purposes" (org-side
+      admin records). If only one is listed, edit the data type and
+      re-save before submitting.
+- [ ] **Demo-day seeding**: On the demo Org / demo user that the
+      App Review credentials grant access to, seed at least one full
+      day of location pings so the "我的軌跡" tab has a visible
+      polyline. Quickest path: open the app on a real device with
+      the demo creds, tap 上班, drive / walk for a few minutes,
+      tap 下班. Verify in the app that `/trajectory` shows the
+      polyline before submitting.
+- [ ] **App Review notes / message thread**: Paste the full body of
+      `app/store_metadata/ios/app_review_replies/2.5.4-<date>.md`
+      (most recent file in that directory) into App Store Connect's
+      "App Review Information → Notes" field, AND into the message
+      thread of the rejected submission if you're resubmitting against
+      the same conversation. Fill in the `<CODE> / <demo-user> /
+      <demo-pass>` placeholders before pasting.
+
 ### Capture iOS screenshots
 
 App Store requires at least one set of iPhone (6.7"+) screenshots and —
