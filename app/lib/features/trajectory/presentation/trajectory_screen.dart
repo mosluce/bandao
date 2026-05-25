@@ -67,7 +67,11 @@ class _DateDropdown extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: DropdownButtonFormField<DateTime>(
         key: const ValueKey('trajectoryDateDropdown'),
-        initialValue: options.firstWhere(
+        // CI pins Flutter 3.29.3 which only knows `value:`. The newer
+        // `initialValue:` (3.33+) replaces it and emits a deprecation
+        // warning on local 3.38, but using it breaks the CI analyze step.
+        // ignore: deprecated_member_use
+        value: options.firstWhere(
           (d) => _sameDay(d, selected),
           orElse: () => options.first,
         ),
