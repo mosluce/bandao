@@ -57,8 +57,8 @@ Optional:
   -h, --help           Print this help.
 
 Output:
-  store_metadata/android/images/phone-screenshots/{01_login,02_home,03_history}.png
-  store_metadata/android/images/tablet-screenshots/{01_login,02_home,03_history}.png
+  store_metadata/android/images/phone-screenshots/{01_login,02_home,03_history,04_trajectory}.png
+  store_metadata/android/images/tablet-screenshots/{01_login,02_home,03_history,04_trajectory}.png
 USAGE
 }
 

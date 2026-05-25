@@ -45,8 +45,8 @@ Optional:
   -h, --help           Print this help.
 
 Output:
-  store_metadata/ios/screenshots/iphone_6.7/{01_login,02_home,03_history}.png
-  store_metadata/ios/screenshots/ipad_12.9/{01_login,02_home,03_history}.png
+  store_metadata/ios/screenshots/iphone_6.7/{01_login,02_home,03_history,04_trajectory}.png
+  store_metadata/ios/screenshots/ipad_12.9/{01_login,02_home,03_history,04_trajectory}.png
 USAGE
 }
 
