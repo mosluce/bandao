@@ -25,11 +25,11 @@
 
 ## 4. App: home summary card
 
-- [ ] 4.1 Create `app/lib/features/trajectory/presentation/today_summary_card.dart` — Riverpod widget that shows distance + duration for today, tap-through to `/trajectory`
-- [ ] 4.2 Visibility rule: render when on-shift OR today's ping count > 0; otherwise return `SizedBox.shrink()`
-- [ ] 4.3 Refresh trigger: subscribe to `LocationTrackingService.tickStream`, debounced to one network call per 60s; also refresh on `WidgetsBindingObserver.didChangeAppLifecycleState` resume
-- [ ] 4.4 Insert card on `home_screen.dart` between the clock-in/out hero area and the queue chip (or wherever fits the existing layout — confirm via screenshot)
-- [ ] 4.5 Widget test: card hidden on off-shift no-data day, visible on on-shift day, tap navigates to /trajectory
+- [x] 4.1 `today_summary_card.dart` — Consumer widget shows distance + duration via `l10n.trajectoryDistanceKm` / `trajectoryDurationHm`, tap-through to `/trajectory`
+- [x] 4.2 Visibility: render when on-shift (`onSite` or `inTransit`) OR today's ping count > 0; else `SizedBox.shrink()`
+- [x] 4.3 Refresh trigger: subscribes to `LocationTrackingService.tickStream`, debounced to one refresh per 60s. App lifecycle `resumed` forces an immediate refresh (bypasses debounce)
+- [x] 4.4 Card inserted in `home_screen.dart` between `HomeButtons` and the `Wrap` containing `QueueChip` / `TrackingChip`
+- [x] 4.5 Widget tests (4): hidden on off-shift + zero pings, visible on-shift + zero pings, visible off-shift with pings, tap navigates to /trajectory
 
 ## 5. App: navigation shell refactor
 

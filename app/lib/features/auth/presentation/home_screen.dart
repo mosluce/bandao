@@ -13,6 +13,7 @@ import '../../checkin/state/checkin_queue_provider.dart';
 import '../../checkin/state/checkin_status_provider.dart';
 import '../../checkin/state/handover_notice_provider.dart';
 import '../../checkin/state/location_permission_provider.dart';
+import '../../trajectory/presentation/today_summary_card.dart';
 import '../state/auth_provider.dart';
 import '../state/auth_state.dart';
 
@@ -174,6 +175,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           const LocationPermissionBlocker(),
                           const SizedBox(height: 16),
                           const HomeButtons(),
+                          const SizedBox(height: 16),
+                          const TodaySummaryCard(),
                           const SizedBox(height: 16),
                           Wrap(
                             spacing: 8,
