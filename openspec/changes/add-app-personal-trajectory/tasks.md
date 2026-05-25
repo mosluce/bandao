@@ -66,9 +66,9 @@
 
 ## 10. Deploy runbook updates
 
-- [ ] 10.1 In `DEPLOY.md` under "App cut release > iOS cut", add a sub-step reminding the operator to verify App Privacy form's "Precise Location" use case includes "App Functionality" (not only "Other Purposes")
-- [ ] 10.2 Add a sub-step reminding the operator to seed at least one demo day of pings on the review demo Org before pressing submit
-- [ ] 10.3 Add a sub-step reminding the operator to paste the contents of `app_review_replies/2.5.4-2026-05-15.md` into App Store Connect's "App Review notes" / message thread on resubmit
+- [x] 10.1 Added "App Review submission checklist" sub-section to `DEPLOY.md` between iOS upload and screenshots — first checkbox is the App Privacy form verification (both "App Functionality" and "Other Purposes" for Precise Location)
+- [x] 10.2 Second checkbox covers the demo-day seeding step (manual clock-in / drive / clock-out on the demo Org so `/trajectory` has a polyline)
+- [x] 10.3 Third checkbox tells the operator to paste the latest `app_review_replies/2.5.4-*.md` body into App Review Notes + the message thread, after filling in the `<CODE> / <demo-user> / <demo-pass>` placeholders
 
 ## 11. Smoke + ship
 
