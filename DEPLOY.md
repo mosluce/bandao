@@ -368,9 +368,19 @@ once smoke passes; first review can take 1–3 days.
 
 ### App Review submission checklist (post-upload, pre-submit)
 
+#### iOS (App Store Connect)
+
 Driven by the 2.5.4 rejection of submission `2f88a54d-2b9a-4069-b5fa-88e2ed770187`
 on 2026-05-15 — keep these in place for every future build that ships
 `UIBackgroundModes: location`.
+
+> **Distribution channel: UNLISTED, not public.** The 2026-05-26 re-rejection added
+> Guideline 3.2 (Business): 班到 is a limited-audience business app and does not belong on
+> the public App Store. We are moving to **Unlisted App Distribution**. On every submission:
+> add the Review Note `This app is intended for unlisted distribution.`, and ensure the
+> unlisted request has been filed (https://developer.apple.com/contact/request/unlisted-app/ — account Owner only).
+> Full reply + 3.2 answers + checklist:
+> `app/store_metadata/ios/app_review_replies/unlisted-distribution-2026-05-26.md`.
 
 - [ ] **App Privacy form**: Verify "Precise Location" lists **both**
       use cases — "App Functionality" (the AppUser viewing their own
@@ -384,13 +394,49 @@ on 2026-05-15 — keep these in place for every future build that ships
       the demo creds, tap 上班, drive / walk for a few minutes,
       tap 下班. Verify in the app that `/trajectory` shows the
       polyline before submitting.
-- [ ] **App Review notes / message thread**: Paste the full body of
-      `app/store_metadata/ios/app_review_replies/2.5.4-<date>.md`
-      (most recent file in that directory) into App Store Connect's
+- [ ] **App Review notes / message thread**: Paste the full "Reply body"
+      of the most recent reply file in
+      `app/store_metadata/ios/app_review_replies/` (currently
+      `unlisted-distribution-2026-05-26.md`) into App Store Connect's
       "App Review Information → Notes" field, AND into the message
       thread of the rejected submission if you're resubmitting against
-      the same conversation. Fill in the `<CODE> / <demo-user> /
-      <demo-pass>` placeholders before pasting.
+      the same conversation. Confirm the 3.2 Q5 billing answer and the
+      demo creds before pasting.
+- [ ] **Unlisted distribution**: Add Review Note
+      `This app is intended for unlisted distribution.` and confirm the
+      unlisted request form has been filed. Requires the build to be
+      submitted to standard App Review (not beta/prerelease).
+
+#### Android (Play Console)
+
+Driven by the "缺少試用/訪客帳戶詳細資料" policy rejection of versionCode 4
+on 2026-05-25 — keep these in place for every future first-time and
+resubmit Play review.
+
+- [ ] **App content → App access**: Choose "All or some functionality
+      in my app is restricted" and add a sign-in section with the
+      demo credentials (`demo / demo / demodemo`). The third field on
+      our login screen is the **org code (組織代碼)** — it does not map
+      to Play's built-in Username/Password fields, so put it in the
+      "Any other info" free-text box together with the in-app
+      walkthrough (clock in/out, trajectory tab, history tab). Source
+      copy lives in `app/store_metadata/android/app_review_replies/<rejection>-<date>.md`.
+- [ ] **Demo-day seeding**: Same rule as iOS — seed at least one
+      recent day of location pings on the demo user so 我的軌跡 has
+      a visible polyline when the reviewer opens it.
+- [ ] **Resubmit existing release**: For an App-access-only fix, no
+      versionCode bump is needed; just go back to the rejected release
+      in Play Console → Internal/Closed/Production and click "Send for
+      review" again. If Play forces a new release (e.g. it asks for
+      an updated .aab), bump `app/pubspec.yaml` to the next build
+      number, copy `app/store_metadata/android/changelog/<old>.txt`
+      to `<new>.txt`, rebuild per "Cut Android (.aab)" above, then
+      upload.
+- [ ] **Optional reply to Google Play**: If the policy-review status
+      page exposes a "reply to Google Play" message box, paste the
+      "Optional reviewer-facing reply" section from the same
+      `app/store_metadata/android/app_review_replies/<rejection>-<date>.md`
+      file.
 
 ### Capture iOS screenshots
 
