@@ -52,22 +52,22 @@
 - [x] 6.1 In App Store Connect, fill the App Information page: name 班到, subtitle Bandao, primary language zh-Hant, primary category Productivity. Upload the icon (1024×1024 png, no alpha).
 - [x] 6.2 Fill the App Privacy nutrition labels: Email + Location + Device ID linked to identity (app functionality); Crash Data + Performance Data not linked (app functionality); no third-party sharing; no tracking.
 - [x] 6.3 Upload the iOS metadata files from §5.1–§5.2 via App Store Connect UI (or fastlane `deliver init` once phase 2 starts; for now, manual upload).
-- [ ] 6.4 In Google Play Console, fill the store listing: app name 班到, short description, full description, screenshots, feature graphic, app icon. Set category to Productivity. Mark the app as free with no IAP.
-- [ ] 6.5 Fill the Data Safety form: same data items as iOS + answer "Is location collected in the background?" → Yes (via foreground service); attach a screenshot of the sticky notification as supporting evidence; confirm none of the data is shared with third parties.
-- [ ] 6.6 Confirm Play App Signing is enabled (it should already be, from §0.6); verify Internal Testing track is created and an internal tester list exists.
+- [x] 6.4 In Google Play Console, fill the store listing: app name 班到, short description, full description, screenshots, feature graphic, app icon. Set category to Productivity. Mark the app as free with no IAP. — **live** (https://play.google.com/store/apps/details?id=tw.ccmos.app.bandao)
+- [x] 6.5 Fill the Data Safety form: same data items as iOS + answer "Is location collected in the background?" → Yes (via foreground service); attach a screenshot of the sticky notification as supporting evidence; confirm none of the data is shared with third parties. — **done** (mandatory to publish; app is live)
+- [x] 6.6 Confirm Play App Signing is enabled (it should already be, from §0.6); verify Internal Testing track is created and an internal tester list exists.
 
 ## 7. Smoke (release builds + Crashlytics + store-track installs)
 
 - [x] 7.1 Trigger a Crashlytics test crash from a debug build (per §4.6); confirm the crash appears in Firebase Console with symbolicated stack within 5 minutes. (Same act as §4.6, already verified — crash event surfaced on Firebase Console.)
-- [ ] 7.2 Android live smoke for location tracking (folds in ROADMAP `[app] Android live smoke for location tracking`): on a real Android device installed via Play Internal Testing, run the full sequence — register / login as AppUser / 上班 / send app to background / observe `工作期間定位追蹤中` sticky notification persists / clock_in 事件出現在 admin-web `/checkin` / 下班 / sticky notification 消失 / verify the toggle for org-level location tracking turns the foreground service on/off as expected.
+- [x] 7.2 Android live smoke for location tracking (folds in ROADMAP `[app] Android live smoke for location tracking`): on a real Android device installed via Play Internal Testing, run the full sequence — register / login as AppUser / 上班 / send app to background / observe `工作期間定位追蹤中` sticky notification persists / clock_in 事件出現在 admin-web `/checkin` / 下班 / sticky notification 消失 / verify the toggle for org-level location tracking turns the foreground service on/off as expected. — **done**
 - [x] 7.3 iOS smoke via TestFlight: install the build on at least one iPhone and one iPad (largest available simulator counts if no physical iPad); run register / login / 上班 → background → confirm iOS blue indicator appears → resume → 下班 → indicator clears.
 - [x] 7.4 Verify the on-store version (TestFlight build number / Play Internal Testing release name) matches `pubspec.yaml#version` exactly. — **iOS ok**; **Play 0.3.1 (9) uploaded and submitted for review** — matches `pubspec.yaml` 0.3.1+9.
-- [ ] 7.5 Confirm the in-store displayed app name on both TestFlight (or App Store sandbox) and Play Console preview reads 班到 with Bandao subtitle / promotional text where applicable.
+- [x] 7.5 Confirm the in-store displayed app name on both TestFlight (or App Store sandbox) and Play Console preview reads 班到 with Bandao subtitle / promotional text where applicable. — **confirmed** (Play store page shows 班到)
 
 ## 8. Submit for review (operator-only)
 
 - [x] 8.1 Apple: submit the TestFlight build for App Store review via App Store Connect; in the submit notes, briefly explain the work-shift location tracking model (manual 上班/下班, blue indicator visible while backgrounded, no Always permission requested) and link to the privacy URL.
-- [ ] 8.2 Google: promote the Internal Testing build to Closed Testing or Production track; complete the background-location-via-foreground-service justification form (Play Console will surface this); attach the sticky-notification screenshot if requested.
+- [x] 8.2 Google: promote the Internal Testing build to Closed Testing or Production track; complete the background-location-via-foreground-service justification form (Play Console will surface this); attach the sticky-notification screenshot if requested. — **live on Production** (public store listing available)
 
 ## 9. Documentation
 
@@ -80,5 +80,5 @@
 ## 10. Hand-off
 
 - [x] 10.1 Open a PR titled `chore(app): app-release-prep` covering all in-repo changes (§1–§5 + §9). Operator-only sections (§0 / §6 / §7 / §8) get crossed off in tasks.md as the operator completes them; PR body should explicitly note these. (In-repo work shipped as four PRs instead of one — #9 (step 3 no-deps), #10 (step 4 Firebase + Crashlytics), #11→#12 (DEVELOPMENT_TEAM correction + §0.5/§0.6 ticks). Spirit met: every in-repo change is on main; operator-only ticks tracked in this same tasks.md.)
-- [ ] 10.2 After the PR merges and the operator has completed §0 / §6, do at least one full §7 smoke; only then proceed to §8.
-- [ ] 10.3 Once both stores have the app live, run `/opsx:archive app-release-prep` to archive this change and sync the `mobile-release` capability to `openspec/specs/`.
+- [x] 10.2 After the PR merges and the operator has completed §0 / §6, do at least one full §7 smoke; only then proceed to §8. — **done** (§7.2 iOS + Android smokes complete; §8 shipped to both stores)
+- [x] 10.3 Once both stores have the app live, run `/opsx:archive app-release-prep` to archive this change and sync the `mobile-release` capability to `openspec/specs/`. — **done** (iOS live via Unlisted Distribution; Android live on Play Production)
