@@ -24,5 +24,5 @@
 ## 5. Verify + store metadata follow-up
 
 - [x] 5.1 Manual smoke: open `/download` in an incognito window (logged out) — page renders, not redirected to login; badges open the correct App Store / Play listings; QR codes scan to the same URLs. — **automated-verified**: unit tests render the full page (links, badges, QR SVGs, privacy/support), page declares no middleware (logged-out safe), badge assets serve 200, `pnpm build` succeeds. Physical QR scan + real-browser click-through folds into §5.2 operator deploy.
-- [ ] 5.2 Deploy admin-web to `bandao-admin.ccmos.tw`; confirm `https://bandao-admin.ccmos.tw/download` is live and public. — **needs operator**
-- [ ] 5.3 After the page is live, set `app/store_metadata/ios/marketing_url.txt` to the download-page URL and sync to App Store Connect on the next metadata update. — **needs operator** (post-deploy)
+- [x] 5.2 Deploy admin-web to `bandao-admin.ccmos.tw`; confirm `https://bandao-admin.ccmos.tw/download` is live and public. — **done** (live; page renders both cards, badges, QR codes, privacy/support links)
+- [x] 5.3 After the page is live, set `app/store_metadata/ios/marketing_url.txt` to the download-page URL and sync to App Store Connect on the next metadata update. — **repo done** (`marketing_url.txt` → `https://bandao-admin.ccmos.tw/download`); App Store Connect push folds into the next iOS metadata sync.
