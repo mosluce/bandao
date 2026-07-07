@@ -61,7 +61,7 @@
 - [x] 7.1 Trigger a Crashlytics test crash from a debug build (per §4.6); confirm the crash appears in Firebase Console with symbolicated stack within 5 minutes. (Same act as §4.6, already verified — crash event surfaced on Firebase Console.)
 - [ ] 7.2 Android live smoke for location tracking (folds in ROADMAP `[app] Android live smoke for location tracking`): on a real Android device installed via Play Internal Testing, run the full sequence — register / login as AppUser / 上班 / send app to background / observe `工作期間定位追蹤中` sticky notification persists / clock_in 事件出現在 admin-web `/checkin` / 下班 / sticky notification 消失 / verify the toggle for org-level location tracking turns the foreground service on/off as expected.
 - [x] 7.3 iOS smoke via TestFlight: install the build on at least one iPhone and one iPad (largest available simulator counts if no physical iPad); run register / login / 上班 → background → confirm iOS blue indicator appears → resume → 下班 → indicator clears.
-- [ ] 7.4 Verify the on-store version (TestFlight build number / Play Internal Testing release name) matches `pubspec.yaml#version` exactly.
+- [x] 7.4 Verify the on-store version (TestFlight build number / Play Internal Testing release name) matches `pubspec.yaml#version` exactly. — **iOS ok**; **Play 0.3.1 (9) uploaded and submitted for review** — matches `pubspec.yaml` 0.3.1+9.
 - [ ] 7.5 Confirm the in-store displayed app name on both TestFlight (or App Store sandbox) and Play Console preview reads 班到 with Bandao subtitle / promotional text where applicable.
 
 ## 8. Submit for review (operator-only)

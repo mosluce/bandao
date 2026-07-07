@@ -74,7 +74,7 @@
 
 - [x] 11.1 `flutter analyze` — `No issues found!` across whole app
 - [x] 11.2 `flutter test` — 160 tests pass (previously 151 + 9 new for trajectory data layer / screen / home card)
-- [ ] 11.3 Manual smoke on a real iPhone — **needs operator**: clock in, walk a few minutes, open 我的軌跡 tab, verify polyline; clock out, verify home card retains final stats and blue indicator disappears
-- [ ] 11.4 Manual smoke on Android — **needs operator**: same path, verify foreground service notification still present and bottom nav bar shows three tabs
-- [ ] 11.5 Cut iOS build 0.3.1 (8) and submit to App Store Connect with the 2.5.4 reply (`app/store_metadata/ios/app_review_replies/2.5.4-2026-05-15.md`) pasted into App Review notes — **needs operator** (uses `scripts/release_ios.sh`)
-- [ ] 11.6 Cut Android build 0.3.1 (8) and submit to Play Console — **needs operator**
+- [x] 11.3 Manual smoke on a real iPhone — clock in, walk a few minutes, open 我的軌跡 tab, verify polyline; clock out, verify home card retains final stats and blue indicator disappears
+- [x] 11.4 Manual smoke on Android — same path, verify foreground service notification still present and bottom nav bar shows three tabs
+- [x] 11.5 Cut iOS build and submit to App Store Connect with the 2.5.4 reply (`app/store_metadata/ios/app_review_replies/2.5.4-2026-05-15.md`) pasted into App Review notes — **shipped** (iOS live via Unlisted Distribution)
+- [x] 11.6 Cut Android build 0.3.1 (9) and submit to Play Console — **shipped** (app-release.aab uploaded and submitted for review; changelog `store_metadata/android/changelog/9.txt`)
