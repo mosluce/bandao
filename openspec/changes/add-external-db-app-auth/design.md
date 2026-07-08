@@ -44,9 +44,12 @@ App 使用者目前僅能用內建驗證登入：`POST /app/auth/login` 解析 `
 - **為何 optional password_hash**：external 使用者沒有本地密碼；用 Option 明確表達，避免塞空字串。
 
 ### D4. 密碼／secret 處理
-- Org DB 連線密碼用 `api/` 既有對稱加密機制加密後存 Mongo（欄位 `password_encrypted`）；API 回應永不含明文（write-only 欄位，僅回 `password_set: bool`）。
-- 使用者登入輸入的明碼只在記憶體內傳給 provider 綁參，不寫 log；錯誤訊息不含密碼。
-- **為何**：Org DB 憑證是高價值 secret；試登入輸入的員工密碼也不得留痕。
+加密對象是**我們連進客戶 MSSQL 的連線帳號密碼**（`external_auth.password`），不是員工登入密碼。兩者處理方式不同：
+- **員工登入密碼**：external 模式下不儲存，丟給 provider 綁參比對完即丟；只在記憶體傳遞，不寫 log、不入錯誤訊息。
+- **連線密碼**：每次登入／試登入都要還原成明文才能連 MSSQL，因此**必須用可逆的對稱加密（AEAD）而非 argon2 雜湊**（雜湊單向、還原不了）。加密後存 Mongo 的 `password_encrypted`；API 回應永不含明文，只回 `password_set: bool`。
+- **現況盤點**：`api/` 目前**沒有**任何對稱加密——只有 `argon2`（單向）與 `rand`，config 也無加密金鑰 env。因此本項需**新引入** AEAD 依賴（如 `chacha20poly1305` 或 `aes-gcm`）+ 一把金鑰來源（如 `BANDAO_SECRET_KEY` env，並補進 DEPLOY.md 的 env 矩陣）。這不是沿用既有工具。
+- **為何要加密**：Org DB 連線憑證是別人系統的高價值 secret；Mongo dump／備份外流／DB 層入侵時不應以明文躺著。
+- **替代**：明文存放——一旦 Mongo 外洩即等於交出客戶 DB 存取權，否決。
 
 ### D5. 參數化查詢契約
 Org 的 `query` 必須含 `@account` 與 `@password` 佔位符，由 MssqlProvider 以 tiberius 參數綁定執行，永不字串拼接。查詢預期回傳 0 或 1 列；取 `key_col` 為 `external_key`、`display_col` 為 `display_name`。
@@ -93,6 +96,6 @@ Org 的 `query` 必須含 `@account` 與 `@password` 佔位符，由 MssqlProvid
 
 ## Open Questions
 
-- Org DB 憑證加密要沿用哪個既有 secret？（實作時確認 `api/` 目前有無對稱加密工具，若無需引入並定義 key 來源。）
+- ~~Org DB 憑證加密要沿用哪個既有 secret？~~ **已釐清**：`api/` 無現成對稱加密，需新引入 AEAD 依賴 + 金鑰 env（見 D4）。待定的是金鑰來源命名與部署注入方式（傾向 `BANDAO_SECRET_KEY`，DEPLOY.md env 矩陣補一格）、以及是否要支援金鑰輪換。
 - 試登入是否需要速率限制門檻？（傾向加基本限制，數值待定。）
 - external 模式下「停用」影子身份的語意是否要在 App 端也立即斷線？（傾向沿用既有 disable → session 失效邏輯。）

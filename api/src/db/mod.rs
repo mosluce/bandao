@@ -280,6 +280,12 @@ impl Db {
             .await?;
 
         let app_users: Collection<AppUser> = self.database.collection("app_users");
+        // The username-uniqueness index must be PARTIAL: external shadow users
+        // carry no `username_lower`, and a non-partial unique index would treat
+        // the missing field as null and reject a second external user per Org.
+        // Older deployments have the non-partial index under the same name —
+        // drop it first (ignored when absent) so the partial version applies.
+        let _ = app_users.drop_index("app_users_org_username_unique").await;
         app_users
             .create_index(
                 IndexModel::builder()
@@ -288,6 +294,27 @@ impl Db {
                         IndexOptions::builder()
                             .unique(true)
                             .name("app_users_org_username_unique".to_string())
+                            .partial_filter_expression(
+                                doc! { "username_lower": { "$type": "string" } },
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        // External shadow users are unique per Org on `external_key`; partial so
+        // internal users (no `external_key`) are excluded from the constraint.
+        app_users
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "org_id": 1, "external_key": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .unique(true)
+                            .name("app_users_org_external_key_unique".to_string())
+                            .partial_filter_expression(
+                                doc! { "external_key": { "$type": "string" } },
+                            )
                             .build(),
                     )
                     .build(),

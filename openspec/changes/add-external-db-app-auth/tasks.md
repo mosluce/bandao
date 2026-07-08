@@ -1,17 +1,17 @@
 ## 1. Data model & config (api)
 
-- [ ] 1.1 Add `AppUserAuthSource` enum (`Internal` | `External`) to `domain`; make `AppUser.password_hash: Option<String>` and add `auth_source` + `external_key: Option<String>`
-- [ ] 1.2 Add `auth_source` (default `Internal`) and `external_auth` sub-document types to the `Org.settings` model; define `ExternalAuthConfig { driver, host, port, database, username, password_encrypted, query, key_col, display_col }`
-- [ ] 1.3 Confirm/introduce a symmetric-encryption helper in `api/` for `external_auth` password (resolve the design Open Question on key source); encrypt on write, decrypt only in-memory at auth time
-- [ ] 1.4 Add the partial/sparse unique index `(org_id, external_key)` for external shadow users; keep the existing `(org_id, username_lower)` unique index for internal
-- [ ] 1.5 Update `app_users` repository: `find_by_org_and_external_key`, `upsert_shadow(org_id, external_key, display_name)`, and adjust list to include external users; ensure DTO carries `auth_source` / `external_key`
+- [x] 1.1 Add `AppUserAuthSource` enum (`Internal` | `External`) to `domain`; make `AppUser.password_hash: Option<String>` and add `auth_source` + `external_key: Option<String>` (also made `username`/`username_lower`/`created_by_dashboard_user_id` optional — absent for shadow users)
+- [x] 1.2 Add `auth_source` (default `Internal`) and `external_auth` sub-document types to the `Org.settings` model; define `ExternalAuthConfig { driver, host, port, database, username, password_encrypted, query, key_col, display_col }` (+ `Org::auth_source()` / `Org::external_auth()` accessors)
+- [ ] 1.3 Introduce a symmetric AEAD helper in `api/` for the `external_auth` connection password — `api/` currently has NO reversible crypto (only argon2/rand), so add a dep (e.g. `chacha20poly1305`/`aes-gcm`) + a key source env (e.g. `BANDAO_SECRET_KEY`, added to `config.rs` and the DEPLOY.md env matrix); encrypt on write, decrypt only in-memory at auth/test time; never log or return plaintext — **BLOCKED: needs key-source naming + rotation decision**
+- [x] 1.4 Add the partial/sparse unique index `(org_id, external_key)` for external shadow users; keep the existing `(org_id, username_lower)` unique index for internal (migrated it to PARTIAL so shadow users' missing `username_lower` don't collide on null)
+- [x] 1.5 Update `app_users` repository: `find_by_org_and_external_key`, `upsert_shadow(org_id, external_key, display_name)`, and adjust list to include external users; ensure DTO carries `auth_source` / `external_key`
 
 ## 2. Auth provider abstraction (api)
 
-- [ ] 2.1 Define `AppAuthProvider` trait: `authenticate(&cfg, account, password) -> Result<ExternalIdentity, AuthProviderError>` with `ExternalIdentity { external_key, display_name }`
-- [ ] 2.2 Implement `InternalProvider` wrapping the current Mongo + password-hash flow behind the trait
-- [ ] 2.3 Add a provider registry that selects a provider from `Org.auth_source` (+ `external_auth.driver`); unsupported driver → `EXTERNAL_AUTH_UNAVAILABLE`
-- [ ] 2.4 Add `ApiError` variants `EXTERNAL_AUTH_UNAVAILABLE` and `EXTERNAL_AUTH_MODE`; wire into the outward error format
+- [x] 2.1 Define `AppAuthProvider` trait (`authenticate(account, password) -> Result<AppUser, AuthProviderError>`; providers resolve to the local row that anchors the session — cleaner than a bare `ExternalIdentity`) + `AuthProviderError { InvalidCredentials, Unavailable(diagnostic) }`
+- [x] 2.2 Implement `InternalProvider` wrapping the current Mongo + password-hash flow behind the trait
+- [x] 2.3 Add a provider registry (`provider_for`) that selects from `Org.auth_source` (+ `external_auth.driver`); unsupported driver / missing config → `Unavailable`
+- [x] 2.4 Add `ApiError` variants `EXTERNAL_AUTH_UNAVAILABLE` (503) and `EXTERNAL_AUTH_MODE` (409); wire into the outward error format
 
 ## 3. MSSQL provider (api)
 
@@ -22,9 +22,9 @@
 
 ## 4. Login & shadow provisioning (api)
 
-- [ ] 4.1 Rewrite `POST /app/auth/login` to resolve the Org, select the provider, and delegate credential verification
-- [ ] 4.2 On external success, upsert the shadow AppUser `(org_id, external_key)` (create with `auth_source=external`, `password_hash=None`, `needs_password_change=false`; else refresh `display_name`/`last_login_at`), enforce `status==active`, then issue the session
-- [ ] 4.3 Collapse credential failures to `INVALID_CREDENTIALS`; surface provider unavailability as `EXTERNAL_AUTH_UNAVAILABLE`; keep the internal path behavior-identical
+- [x] 4.1 Rewrite `POST /app/auth/login` to resolve the Org, select the provider, and delegate credential verification (internal path verified: all 8 login integration tests pass; external_db currently returns `EXTERNAL_AUTH_UNAVAILABLE` via the stubbed MSSQL provider)
+- [ ] 4.2 On external success, upsert the shadow AppUser `(org_id, external_key)` (create with `auth_source=external`, `password_hash=None`, `needs_password_change=false`; else refresh `display_name`/`last_login_at`), enforce `status==active`, then issue the session — repo `upsert_shadow` ready (1.5); wiring lands with the real MSSQL provider (group 3)
+- [x] 4.3 Collapse credential failures to `INVALID_CREDENTIALS`; surface provider unavailability as `EXTERNAL_AUTH_UNAVAILABLE`; keep the internal path behavior-identical
 
 ## 5. Org auth-source & test-login endpoints (api)
 

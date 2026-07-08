@@ -153,7 +153,13 @@ impl BoardAppUserDto {
     pub fn from_app_user(u: &AppUser) -> Self {
         Self {
             id: u.id.to_hex(),
-            username: u.username.clone(),
+            // External shadow users have no username; fall back to their
+            // external_key so the board still shows a stable identifier.
+            username: u
+                .username
+                .clone()
+                .or_else(|| u.external_key.clone())
+                .unwrap_or_default(),
             display_name: u.display_name.clone(),
         }
     }

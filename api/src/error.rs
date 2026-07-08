@@ -119,6 +119,19 @@ pub enum ApiError {
     #[error("operation not valid in current state")]
     InvalidState,
 
+    /// External-database authentication could not be completed for a reason
+    /// other than bad credentials — connection failure, query error, missing or
+    /// malformed config, or an unsupported driver. Distinct from
+    /// `InvalidCredentials` so the caller can tell a system problem apart from a
+    /// mistyped password.
+    #[error("external authentication is unavailable")]
+    ExternalAuthUnavailable,
+    /// An internal-only AppUser mutation (create / password-reset) was attempted
+    /// while the Org's auth source is `external_db`, where credentials are owned
+    /// by the external database rather than by this system.
+    #[error("operation not available while the org uses external authentication")]
+    ExternalAuthMode,
+
     #[error("password hashing failed")]
     Password,
     #[error("database error")]
@@ -142,6 +155,10 @@ impl ApiError {
             ApiError::Forbidden => (StatusCode::FORBIDDEN, "FORBIDDEN"),
             ApiError::NotFound => (StatusCode::NOT_FOUND, "NOT_FOUND"),
             ApiError::InvalidCredentials => (StatusCode::UNAUTHORIZED, "INVALID_CREDENTIALS"),
+            ApiError::ExternalAuthUnavailable => {
+                (StatusCode::SERVICE_UNAVAILABLE, "EXTERNAL_AUTH_UNAVAILABLE")
+            }
+            ApiError::ExternalAuthMode => (StatusCode::CONFLICT, "EXTERNAL_AUTH_MODE"),
             ApiError::Validation(_) => (StatusCode::BAD_REQUEST, "VALIDATION"),
             ApiError::InvalidSlugFormat => (StatusCode::BAD_REQUEST, "INVALID_SLUG_FORMAT"),
             ApiError::SlugReserved => (StatusCode::BAD_REQUEST, "SLUG_RESERVED"),
