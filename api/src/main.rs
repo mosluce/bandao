@@ -6,6 +6,10 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    // Load a local `.env` if present (dev convenience). Absent/real-env vars
+    // win — this only fills gaps, never overrides the process environment.
+    dotenvy::dotenv().ok();
+
     init_tracing();
 
     let config = match Config::from_env() {
