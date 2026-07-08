@@ -176,8 +176,13 @@ fn build_config(
     org: &crate::domain::Org,
     input: ExternalAuthInput,
 ) -> ApiResult<ExternalAuthConfig> {
-    providers::validate_query_settings(&input.driver, &input.query, &input.key_col, &input.display_col)
-        .map_err(ApiError::Validation)?;
+    providers::validate_query_settings(
+        &input.driver,
+        &input.query,
+        &input.key_col,
+        &input.display_col,
+    )
+    .map_err(ApiError::Validation)?;
 
     let password_encrypted = match input.password {
         Some(pw) => state.config.secret_box()?.encrypt(&pw)?,
@@ -185,9 +190,7 @@ fn build_config(
             .external_auth()
             .map(|c| c.password_encrypted)
             .filter(|c| !c.is_empty())
-            .ok_or_else(|| {
-                ApiError::Validation("connection password is required".to_string())
-            })?,
+            .ok_or_else(|| ApiError::Validation("connection password is required".to_string()))?,
     };
 
     Ok(ExternalAuthConfig {

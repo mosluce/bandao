@@ -65,7 +65,10 @@ impl MssqlProvider {
         cfg.host(&self.config.host);
         cfg.port(self.config.port);
         cfg.database(&self.config.database);
-        cfg.authentication(AuthMethod::sql_server(&self.config.username, &conn_password));
+        cfg.authentication(AuthMethod::sql_server(
+            &self.config.username,
+            &conn_password,
+        ));
         // Legacy MSSQL instances routinely present self-signed certs.
         cfg.trust_cert();
 

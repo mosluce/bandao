@@ -71,12 +71,12 @@ impl Config {
             .filter(|v| !v.is_empty());
 
         let secret_key = match std::env::var("BANDAO_SECRET_KEY") {
-            Ok(v) if !v.is_empty() => Some(secret_box::decode_key(&v).ok_or(
-                ConfigError::Invalid {
+            Ok(v) if !v.is_empty() => {
+                Some(secret_box::decode_key(&v).ok_or(ConfigError::Invalid {
                     var: "BANDAO_SECRET_KEY",
                     message: "expected base64 of exactly 32 bytes".to_string(),
-                },
-            )?),
+                })?)
+            }
             _ => None,
         };
 

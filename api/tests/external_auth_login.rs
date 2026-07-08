@@ -16,10 +16,7 @@ use tiberius::{AuthMethod, Client, Config as TiberiusConfig};
 use tokio::net::TcpStream;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
-async fn mssql_client(
-    host: &str,
-    port: u16,
-) -> Client<tokio_util::compat::Compat<TcpStream>> {
+async fn mssql_client(host: &str, port: u16) -> Client<tokio_util::compat::Compat<TcpStream>> {
     let mut cfg = TiberiusConfig::new();
     cfg.host(host);
     cfg.port(port);
@@ -186,7 +183,10 @@ async fn external_db_login_provisions_shadow_and_gates_internal_ops() {
         .unwrap()
         .iter()
         .any(|u| u["external_key"] == "1001" && u["auth_source"] == "external");
-    assert!(found, "external shadow user should be listed after first login");
+    assert!(
+        found,
+        "external shadow user should be listed after first login"
+    );
 
     // 7. Internal-only mutations are gated while external auth is active.
     let created = admin

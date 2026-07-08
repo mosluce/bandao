@@ -437,7 +437,10 @@ pub async fn export_locations(
         .as_deref()
         .or(app_user.external_key.as_deref())
         .unwrap_or("user");
-    let filename = format!("bandao-locations-{}-{}-{}.xlsx", user_label, from_date, to_date);
+    let filename = format!(
+        "bandao-locations-{}-{}-{}.xlsx",
+        user_label, from_date, to_date
+    );
 
     Response::builder()
         .status(StatusCode::OK)
