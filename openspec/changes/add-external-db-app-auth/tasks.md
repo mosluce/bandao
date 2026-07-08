@@ -42,12 +42,12 @@
 
 ## 7. admin-web
 
-- [ ] 7.1 Regenerate/extend API types for `auth_source`, the password-free `external_auth` view, test-login request/response, and the new error codes
-- [ ] 7.2 Add a dedicated settings sub-page `pages/settings/auth.vue` (admin-only, redirect non-admin): auth-source radio, MSSQL connection fields, write-only password field (`已設定` + 變更), query template, `key_col` / `display_col`
-- [ ] 7.3 Build the 試登入 panel: test account/password inputs calling the dry-run endpoint, rendering resolved `external_key` / `display_name` or the specific diagnostic
-- [ ] 7.4 Add the mode-switch confirmation modal warning that existing accounts will be unable to log in (data preserved, reversible); wire save through the settings composable
-- [ ] 7.5 Add the lightweight 驗證來源 entry card on the dashboard (`pages/index.vue`) linking to the sub-page and showing current mode
-- [ ] 7.6 Make the App-users page (`pages/app-users/index.vue`) external-mode aware: hide 新增 / 重設密碼, show 唯一識別 / 名稱 / 最後登入 columns, keep 停用, and add the “needs first login” empty state
+- [x] 7.1 Extend API types for `auth_source`, the password-free `external_auth` view, test-login request/response, and the new error codes
+- [x] 7.2 Added dedicated settings sub-page `pages/settings/auth.vue` (admin-only, redirect non-admin): auth-source radio, MSSQL connection fields, write-only password field (`已設定` + 變更), query template, `key_col` / `display_col`
+- [x] 7.3 Built the 試登入 panel: test account/password inputs calling the dry-run endpoint, rendering resolved `external_key` / `display_name` or the specific diagnostic
+- [x] 7.4 Added the mode-switch confirmation modal warning that existing accounts will be unable to log in (data preserved, reversible); wire save through the settings composable
+- [x] 7.5 Added the 驗證來源 entry link (dashboard admin tools) card on the dashboard (`pages/index.vue`) linking to the sub-page and showing current mode
+- [x] 7.6 Made the App-users page (`pages/app-users/index.vue`) external-mode aware: hide 新增 / 重設密碼, show 唯一識別 / 名稱 / 最後登入 columns, keep 停用, and add the “needs first login” empty state
 
 ## 8. Docs & verification
 
