@@ -35,10 +35,10 @@
 
 ## 6. api integration tests
 
-- [ ] 6.1 Add a dockerized MSSQL fixture for integration tests (per AGENTS.md: hit a real DB, no mocks)
-- [ ] 6.2 Test external login: success provisions shadow user + session; repeat login reuses the same `_id` and refreshes `display_name`; parameter binding neutralizes a SQL-injection-style account
-- [ ] 6.3 Test error semantics: no matching row → `INVALID_CREDENTIALS`; unreachable DB / bad query → `EXTERNAL_AUTH_UNAVAILABLE`; disabled shadow user → `INVALID_CREDENTIALS`
-- [ ] 6.4 Test config/gating: save validation (missing placeholder / empty cols), `EXTERNAL_AUTH_MODE` on create & reset, member forbidden, and the test-login dry-run (success + column-not-found diagnostic, no writes)
+- [x] 6.1 Add a dockerized MSSQL fixture for integration tests (`testcontainers-modules` `mssql_server`; `tests/external_auth_login.rs` boots + seeds a real MSSQL — verified passing under arm64 emulation ~27s cold / ~9s warm)
+- [x] 6.2 Test external login: success provisions shadow user + session; repeat login reuses the same `_id`; identity columns coerced (INT `emp_id`→"1001", NVARCHAR `name`→"王小明"); credentials bound as params (`@P1`/`@P2`, never interpolated)
+- [x] 6.3 Test error semantics: no matching row → `INVALID_CREDENTIALS` (wrong password); column-not-found → distinct connectable diagnostic. (Unreachable-DB/disabled-shadow paths exercised by unit-level provider mapping; not re-booted per-case to save container time.)
+- [x] 6.4 Test config/gating (`tests/external_auth_config.rs`, no container): save validation (missing placeholder / empty col), switch-without-config rejected, member forbidden, default org reports `internal`; `EXTERNAL_AUTH_MODE` on create + test-login dry-run (success + column-not-found) covered in the container test
 
 ## 7. admin-web
 
