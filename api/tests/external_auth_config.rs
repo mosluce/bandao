@@ -31,7 +31,7 @@ async fn query_missing_placeholder_is_rejected() {
 
     // Missing @password.
     let resp = admin
-        .put(app.url("/orgs/me/external-auth"))
+        .post(app.url("/orgs/me/external-auth"))
         .json(&config_body(
             "SELECT id, name FROM staff WHERE acct=@account",
             "id",
@@ -46,7 +46,7 @@ async fn query_missing_placeholder_is_rejected() {
 
     // Empty key_col.
     let resp = admin
-        .put(app.url("/orgs/me/external-auth"))
+        .post(app.url("/orgs/me/external-auth"))
         .json(&config_body(
             "SELECT id, name FROM staff WHERE acct=@account AND pwd=@password",
             "",
@@ -64,7 +64,7 @@ async fn switching_to_external_without_config_is_rejected() {
     let (admin, _) = app.register_admin("admin@example.com", "Acme").await;
 
     let resp = admin
-        .put(app.url("/orgs/me/external-auth"))
+        .post(app.url("/orgs/me/external-auth"))
         .json(&json!({ "auth_source": "external_db" }))
         .send()
         .await
@@ -82,7 +82,7 @@ async fn member_cannot_configure_external_auth() {
         .await;
 
     let resp = member
-        .put(app.url("/orgs/me/external-auth"))
+        .post(app.url("/orgs/me/external-auth"))
         .json(&config_body(
             "SELECT id, name FROM staff WHERE acct=@account AND pwd=@password",
             "id",

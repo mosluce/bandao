@@ -15,7 +15,7 @@ pub mod users;
 use axum::Json;
 use axum::Router;
 use axum::middleware as axum_middleware;
-use axum::routing::{delete, get, patch, post, put};
+use axum::routing::{delete, get, patch, post};
 use serde_json::{Value, json};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
@@ -52,7 +52,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/orgs/me/owner", post(orgs::transfer_owner))
         .route("/orgs/me/settings", patch(checkin::update_settings))
-        .route("/orgs/me/external-auth", put(external_auth::configure))
+        .route("/orgs/me/external-auth", post(external_auth::configure))
         .route(
             "/orgs/me/external-auth/test-login",
             post(external_auth::test_login),

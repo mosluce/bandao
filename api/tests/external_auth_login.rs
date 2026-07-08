@@ -76,7 +76,7 @@ async fn external_db_login_provisions_shadow_and_gates_internal_ops() {
     });
 
     let resp = admin
-        .put(app.url("/orgs/me/external-auth"))
+        .post(app.url("/orgs/me/external-auth"))
         .json(&json!({ "auth_source": "external_db", "external_auth": external_auth }))
         .send()
         .await

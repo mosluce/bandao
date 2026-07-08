@@ -15,7 +15,7 @@ export function useExternalAuth() {
 
   async function configure(req: ConfigureExternalAuthRequest): Promise<OrgDto> {
     return api<OrgDto>('/orgs/me/external-auth', {
-      method: 'PUT',
+      method: 'POST',
       body: req,
     })
   }
