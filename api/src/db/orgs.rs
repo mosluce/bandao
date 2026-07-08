@@ -2,7 +2,7 @@ use bson::oid::ObjectId;
 use bson::{DateTime, doc};
 use mongodb::Collection;
 
-use crate::domain::{DEFAULT_ORG_TIMEZONE, Org};
+use crate::domain::{DEFAULT_ORG_TIMEZONE, ExternalAuthConfig, Org, OrgAuthSource};
 use crate::error::{ApiError, ApiResult};
 
 #[derive(Clone)]
@@ -59,6 +59,37 @@ impl OrgRepository {
         }
         if let Some(flag) = location_tracking_enabled {
             set.insert("settings.checkin.location_tracking_enabled", flag);
+        }
+        let result = self
+            .coll
+            .find_one_and_update(doc! { "_id": id }, doc! { "$set": set })
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await?;
+        result.ok_or(ApiError::NotFound)
+    }
+
+    /// Set `settings.auth_source` and, when provided, replace
+    /// `settings.external_auth`. Switching to `internal` leaves any stored
+    /// `external_auth` config intact (so switching back restores it) unless a
+    /// new config is supplied.
+    pub async fn set_auth_config(
+        &self,
+        id: ObjectId,
+        auth_source: OrgAuthSource,
+        external_auth: Option<&ExternalAuthConfig>,
+    ) -> ApiResult<Org> {
+        let now = DateTime::now();
+        let source_str = match auth_source {
+            OrgAuthSource::Internal => "internal",
+            OrgAuthSource::ExternalDb => "external_db",
+        };
+        let mut set = doc! {
+            "updated_at": now,
+            "settings.auth_source": source_str,
+        };
+        if let Some(cfg) = external_auth {
+            let cfg_doc = bson::to_document(cfg)?;
+            set.insert("settings.external_auth", cfg_doc);
         }
         let result = self
             .coll

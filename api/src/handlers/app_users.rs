@@ -7,7 +7,7 @@ use serde::Serialize;
 use crate::auth::extractor::RequireAdmin;
 use crate::auth::{app_password, password};
 use crate::db::{AppUserInsertError, CheckinStatusInsertError};
-use crate::domain::AppUserStatus;
+use crate::domain::{AppUserStatus, OrgAuthSource};
 use crate::error::{ApiError, ApiResult};
 use crate::handlers::app_dto::{
     AppUserDto, CreateAppUserRequest, CreateAppUserResponse, UpdateAppUserRequest,
@@ -45,11 +45,27 @@ pub async fn list(
 /// `POST /app-users` — admin-only. Validates input shape, generates a fresh
 /// initial password, stores its bcrypt hash, and returns the cleartext
 /// password exactly once alongside the new AppUser DTO.
+/// Reject internal-only AppUser mutations while the Org authenticates via an
+/// external database — credentials there are owned by the external system.
+async fn ensure_internal_auth(state: &AppState, org_id: ObjectId) -> ApiResult<()> {
+    let org = state
+        .db
+        .orgs
+        .find_by_id(org_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    if matches!(org.auth_source(), OrgAuthSource::ExternalDb) {
+        return Err(ApiError::ExternalAuthMode);
+    }
+    Ok(())
+}
+
 pub async fn create(
     State(state): State<AppState>,
     RequireAdmin(active): RequireAdmin,
     Json(req): Json<CreateAppUserRequest>,
 ) -> ApiResult<(StatusCode, Json<CreateAppUserResponse>)> {
+    ensure_internal_auth(&state, active.org_id).await?;
     let username_raw = req.username.trim();
     validate_username(username_raw)?;
     let display_name = req.display_name.trim();
@@ -163,6 +179,7 @@ pub async fn password_reset(
     RequireAdmin(active): RequireAdmin,
     Path(id): Path<String>,
 ) -> ApiResult<Json<PasswordResetResponse>> {
+    ensure_internal_auth(&state, active.org_id).await?;
     let target_id = ObjectId::parse_str(&id).map_err(|_| ApiError::NotFound)?;
     let user = load_in_org(&state, active.org_id, target_id).await?;
 

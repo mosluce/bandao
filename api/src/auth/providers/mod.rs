@@ -42,6 +42,38 @@ pub trait AppAuthProvider: Send + Sync {
     ) -> Result<AppUser, AuthProviderError>;
 }
 
+/// The only external driver implemented today.
+pub const SUPPORTED_DRIVER: &str = "mssql";
+
+/// Validate operator-supplied external-auth query settings before persisting.
+/// The query must be parameterized on both credentials (so they are bound, never
+/// interpolated), and the identity columns must be named. Returns a human-readable
+/// reason on failure. Does NOT touch the network — connectivity is checked via
+/// the test-login endpoint.
+pub fn validate_query_settings(
+    driver: &str,
+    query: &str,
+    key_col: &str,
+    display_col: &str,
+) -> Result<(), String> {
+    if driver != SUPPORTED_DRIVER {
+        return Err(format!("unsupported driver: {driver}"));
+    }
+    if !query.contains("@account") {
+        return Err("query must contain the @account placeholder".to_string());
+    }
+    if !query.contains("@password") {
+        return Err("query must contain the @password placeholder".to_string());
+    }
+    if key_col.trim().is_empty() {
+        return Err("key_col must not be empty".to_string());
+    }
+    if display_col.trim().is_empty() {
+        return Err("display_col must not be empty".to_string());
+    }
+    Ok(())
+}
+
 /// Build the provider for `org` based on its `auth_source`. Returns
 /// `Unavailable` when an `external_db` Org has missing/malformed config or an
 /// unsupported driver — the login handler maps that to

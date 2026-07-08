@@ -5,6 +5,7 @@ pub mod middleware;
 pub mod org_code;
 pub mod password;
 pub mod providers;
+pub mod secret_box;
 pub mod session_token;
 pub mod slug;
 

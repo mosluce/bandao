@@ -54,10 +54,46 @@ pub struct OrgDto {
     pub owner_id: String,
     pub timezone: String,
     pub checkin: OrgCheckinDto,
+    pub auth_source: crate::domain::OrgAuthSource,
+    /// External-auth configuration WITHOUT the connection password. Present only
+    /// when the Org has an `external_auth` config stored.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_auth: Option<ExternalAuthSummaryDto>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug_changed_at: Option<String>,
+}
+
+/// Password-free view of `Org.settings.external_auth`. The connection password
+/// is never serialized; callers learn only whether one is set.
+#[derive(Debug, Serialize)]
+pub struct ExternalAuthSummaryDto {
+    pub driver: String,
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub username: String,
+    pub query: String,
+    pub key_col: String,
+    pub display_col: String,
+    pub password_set: bool,
+}
+
+impl ExternalAuthSummaryDto {
+    fn from_config(cfg: &crate::domain::ExternalAuthConfig) -> Self {
+        Self {
+            driver: cfg.driver.clone(),
+            host: cfg.host.clone(),
+            port: cfg.port,
+            database: cfg.database.clone(),
+            username: cfg.username.clone(),
+            query: cfg.query.clone(),
+            key_col: cfg.key_col.clone(),
+            display_col: cfg.display_col.clone(),
+            password_set: !cfg.password_encrypted.is_empty(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -78,6 +114,11 @@ impl OrgDto {
                 transfer_enabled: org.checkin_transfer_enabled(),
                 location_tracking_enabled: org.checkin_location_tracking_enabled(),
             },
+            auth_source: org.auth_source(),
+            external_auth: org
+                .external_auth()
+                .as_ref()
+                .map(ExternalAuthSummaryDto::from_config),
             slug: org.slug.clone(),
             slug_changed_at: org
                 .slug_changed_at

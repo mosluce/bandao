@@ -2,7 +2,7 @@
 
 - [x] 1.1 Add `AppUserAuthSource` enum (`Internal` | `External`) to `domain`; make `AppUser.password_hash: Option<String>` and add `auth_source` + `external_key: Option<String>` (also made `username`/`username_lower`/`created_by_dashboard_user_id` optional — absent for shadow users)
 - [x] 1.2 Add `auth_source` (default `Internal`) and `external_auth` sub-document types to the `Org.settings` model; define `ExternalAuthConfig { driver, host, port, database, username, password_encrypted, query, key_col, display_col }` (+ `Org::auth_source()` / `Org::external_auth()` accessors)
-- [ ] 1.3 Introduce a symmetric AEAD helper in `api/` for the `external_auth` connection password — `api/` currently has NO reversible crypto (only argon2/rand), so add a dep (e.g. `chacha20poly1305`/`aes-gcm`) + a key source env (e.g. `BANDAO_SECRET_KEY`, added to `config.rs` and the DEPLOY.md env matrix); encrypt on write, decrypt only in-memory at auth/test time; never log or return plaintext — **BLOCKED: needs key-source naming + rotation decision**
+- [x] 1.3 Introduce a symmetric AEAD helper in `api/` for the `external_auth` connection password — added `chacha20poly1305` (XChaCha20-Poly1305) `SecretBox` + `BANDAO_SECRET_KEY` env (base64 of 32 bytes) in `config.rs`; encrypt on write, decrypt only in-memory; never log/return plaintext. No key rotation (per decision). DEPLOY.md env matrix: task 8.1.
 - [x] 1.4 Add the partial/sparse unique index `(org_id, external_key)` for external shadow users; keep the existing `(org_id, username_lower)` unique index for internal (migrated it to PARTIAL so shadow users' missing `username_lower` don't collide on null)
 - [x] 1.5 Update `app_users` repository: `find_by_org_and_external_key`, `upsert_shadow(org_id, external_key, display_name)`, and adjust list to include external users; ensure DTO carries `auth_source` / `external_key`
 
@@ -15,23 +15,23 @@
 
 ## 3. MSSQL provider (api)
 
-- [ ] 3.1 Add `tiberius` dependency (+ async TCP glue) to `api/Cargo.toml`
-- [ ] 3.2 Implement `MssqlProvider`: connect with timeout, bind `@account` / `@password` as parameters (never string-interpolate), run `query`, read `key_col` / `display_col` from the single result row
-- [ ] 3.3 Map provider outcomes: 0 rows → credential failure; connect/query/column errors → typed unavailability with a specific diagnostic for test-login; ensure password never reaches logs/errors
-- [ ] 3.4 Implement `external_auth` config validation: `query` contains both `@account` and `@password`; `key_col` and `display_col` non-empty
+- [x] 3.1 Add `tiberius` dependency (+ async TCP glue) to `api/Cargo.toml` (`tiberius 0.12` `["tds73","rustls"]` + `tokio-util` compat; resolves & compiles)
+- [x] 3.2 Implement `MssqlProvider`: connect, bind `@account` / `@password` as tiberius params `@P1`/`@P2` (never string-interpolate), run `query`, read `key_col` / `display_col` from the single result row (multi-type column coercion) — **compiles; live verification pending group 6**
+- [x] 3.3 Map provider outcomes: 0 rows → credential failure; connect/query/column errors → typed `Unavailable` with a specific diagnostic (column-not-found distinct from connect/query); password never placed in logs/errors
+- [x] 3.4 Implement `external_auth` config validation (`providers::validate_query_settings`): driver supported, `query` contains both `@account`/`@password`, `key_col`/`display_col` non-empty
 
 ## 4. Login & shadow provisioning (api)
 
 - [x] 4.1 Rewrite `POST /app/auth/login` to resolve the Org, select the provider, and delegate credential verification (internal path verified: all 8 login integration tests pass; external_db currently returns `EXTERNAL_AUTH_UNAVAILABLE` via the stubbed MSSQL provider)
-- [ ] 4.2 On external success, upsert the shadow AppUser `(org_id, external_key)` (create with `auth_source=external`, `password_hash=None`, `needs_password_change=false`; else refresh `display_name`/`last_login_at`), enforce `status==active`, then issue the session — repo `upsert_shadow` ready (1.5); wiring lands with the real MSSQL provider (group 3)
+- [x] 4.2 On external success, upsert the shadow AppUser `(org_id, external_key)` (create with `auth_source=external`, `password_hash=None`, `needs_password_change=false`; else refresh `display_name`/`last_login_at`), enforce `status==active`, then issue the session — `MssqlProvider::authenticate` calls `upsert_shadow`; login handler enforces active + issues session
 - [x] 4.3 Collapse credential failures to `INVALID_CREDENTIALS`; surface provider unavailability as `EXTERNAL_AUTH_UNAVAILABLE`; keep the internal path behavior-identical
 
 ## 5. Org auth-source & test-login endpoints (api)
 
-- [ ] 5.1 Extend `PATCH /orgs/me/settings` (or add a dedicated route) so admins can set `auth_source` and the `external_auth` config; validate config before persisting; reject `external_db` without a valid config; write `password_set` semantics (never echo the password)
-- [ ] 5.2 Gate `POST /app-users` and `POST /app-users/:id/password-reset` with `EXTERNAL_AUTH_MODE` while `auth_source == external_db`; keep `PATCH` disable working in both modes
-- [ ] 5.3 Implement `POST /orgs/me/external-auth/test-login` (admin-only, org-scoped, dry-run): run the full provider flow, return resolved identity or a specific diagnostic, create no session / no shadow row, never log the test password
-- [ ] 5.4 Update `OrgDto` / settings DTOs to expose `auth_source` and a password-free `external_auth` view (`password_set`)
+- [x] 5.1 Added dedicated `PUT /orgs/me/external-auth` (admin-only) to set `auth_source` + `external_auth` config; validates before persisting; rejects `external_db` without a valid config; write-only password (encrypt new, else keep stored)
+- [x] 5.2 Gate `POST /app-users` and `POST /app-users/:id/password-reset` with `EXTERNAL_AUTH_MODE` while `auth_source == external_db` (`ensure_internal_auth`); `PATCH` disable still works in both modes
+- [x] 5.3 Implement `POST /orgs/me/external-auth/test-login` (admin-only, org-scoped, dry-run via `resolve_identity`): returns `{connected, matched, external_key, display_name, error}`, creates no session / no shadow row, test password not persisted/logged — **live verification pending group 6**
+- [x] 5.4 `OrgDto` exposes `auth_source` and a password-free `external_auth` view (`ExternalAuthSummaryDto` with `password_set`)
 
 ## 6. api integration tests
 
