@@ -51,5 +51,5 @@
 
 ## 8. Docs & verification
 
-- [ ] 8.1 Note the `tiberius` dependency, the prod-reachability known limitation, and the external-auth setup flow in the relevant module README(s) / DEPLOY.md
-- [ ] 8.2 Run `cargo test` (incl. new MSSQL integration tests), `cargo clippy`, `pnpm lint`/typecheck; smoke the admin-web settings + test-login flow against a real MSSQL before archiving
+- [x] 8.1 DEPLOY.md: added `BANDAO_SECRET_KEY` to the env matrix + an "External-database App-user auth" subsection covering the `tiberius` dependency, the prod network-reachability known limitation, and the setup flow
+- [~] 8.2 `cargo test` (full suite incl. live MSSQL integration) ✓ all green; `cargo clippy --all-targets` ✓ clean; admin-web `nuxt typecheck` ✓ + production build ✓ (no eslint configured in admin-web). **Remaining: interactive browser click-through of the settings + 試登入 flow against a real MSSQL — a manual smoke needing a browser session (deferred to the user).**
