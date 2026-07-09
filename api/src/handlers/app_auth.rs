@@ -4,6 +4,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 
 use crate::auth::app_extractor::AppAuthContext;
+use crate::auth::providers::{self, AuthProviderError};
 use crate::auth::{password, slug as slug_auth};
 use crate::domain::AppUserStatus;
 use crate::error::{ApiError, ApiResult};
@@ -34,19 +35,21 @@ pub async fn login(
         Err(_) => return Err(ApiError::InvalidCredentials),
     };
 
-    // Case-insensitive username lookup via the denormalized `username_lower`
-    // field. Trim incoming username to be lenient about leading whitespace.
-    let username_key = req.username.trim().to_ascii_lowercase();
-    let user = state
-        .db
-        .app_users
-        .find_by_org_and_username_lower(org.id, &username_key)
-        .await?
-        .ok_or(ApiError::InvalidCredentials)?;
-
-    if !password::verify(&req.password, &user.password_hash)? {
-        return Err(ApiError::InvalidCredentials);
-    }
+    // Verify credentials through the provider selected by the Org's auth
+    // source. `internal` looks up + verifies the local hash; `external_db`
+    // delegates to the driver-specific provider, provisioning a shadow user.
+    // Credential failures collapse to INVALID_CREDENTIALS; a provider that
+    // can't complete verification surfaces as EXTERNAL_AUTH_UNAVAILABLE.
+    let provider = match providers::provider_for(&state, &org) {
+        Ok(provider) => provider,
+        Err(AuthProviderError::InvalidCredentials) => return Err(ApiError::InvalidCredentials),
+        Err(AuthProviderError::Unavailable(_)) => return Err(ApiError::ExternalAuthUnavailable),
+    };
+    let user = match provider.authenticate(&req.username, &req.password).await {
+        Ok(user) => user,
+        Err(AuthProviderError::InvalidCredentials) => return Err(ApiError::InvalidCredentials),
+        Err(AuthProviderError::Unavailable(_)) => return Err(ApiError::ExternalAuthUnavailable),
+    };
 
     // Disabled AppUser — same generic error as wrong password / unknown user.
     if !matches!(user.status, AppUserStatus::Active) {
@@ -135,7 +138,11 @@ pub async fn change_password(
         .await?
         .ok_or(ApiError::Unauthorized)?;
 
-    if !password::verify(&req.current_password, &user.password_hash)? {
+    let password_hash = user
+        .password_hash
+        .as_deref()
+        .ok_or(ApiError::InvalidPassword)?;
+    if !password::verify(&req.current_password, password_hash)? {
         return Err(ApiError::InvalidPassword);
     }
 

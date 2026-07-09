@@ -81,6 +81,8 @@ impl TestApp {
             cookie_domain: None,
             cookie_secure: false,
             allowed_origin: None,
+            // Deterministic key so external-auth tests can encrypt/decrypt.
+            secret_key: Some([7u8; 32]),
         };
         tweak(&mut config);
 

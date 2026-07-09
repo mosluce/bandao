@@ -12,6 +12,10 @@ const items = ref<AppUserDto[]>([])
 const loading = ref(true)
 const loadError = ref('')
 
+// External-auth mode: users come from the external DB (no create / reset here);
+// the roster only shows shadow identities that have logged in at least once.
+const isExternal = computed(() => auth.currentOrg.value?.auth_source === 'external_db')
+
 const showCreateForm = ref(false)
 const newUsername = ref('')
 const newDisplayName = ref('')
@@ -238,7 +242,24 @@ else {
         </div>
       </header>
 
-      <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section
+        v-if="isExternal"
+        class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
+        <p class="text-sm text-slate-500">
+          此組織使用<strong class="text-slate-700">外部資料庫</strong>驗證，使用者由外部系統管理。
+          帳號與密碼在
+          <NuxtLink to="/settings/auth" class="text-slate-900 underline">
+            驗證來源設定
+          </NuxtLink>
+          調整；此處僅顯示曾登入過的使用者，可停用以在本地封鎖登入。
+        </p>
+      </section>
+
+      <section
+        v-else
+        class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
         <div
           v-if="!showCreateForm"
           class="flex items-center justify-between"
@@ -345,7 +366,9 @@ else {
           v-else-if="items.length === 0"
           class="px-6 py-8 text-center text-sm text-slate-500"
         >
-          目前沒有 App 使用者。點上方「新增 App 使用者」開始。
+          {{ isExternal
+            ? '目前沒有使用者。使用者需先用外部帳號登入一次，才會出現在此。'
+            : '目前沒有 App 使用者。點上方「新增 App 使用者」開始。' }}
         </p>
 
         <table
@@ -355,7 +378,7 @@ else {
           <thead class="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th class="px-6 py-3 font-medium">
-                Username
+                {{ isExternal ? '唯一識別' : 'Username' }}
               </th>
               <th class="px-6 py-3 font-medium">
                 顯示名稱
@@ -381,7 +404,7 @@ else {
               :class="u.status === 'disabled' ? 'opacity-60' : ''"
             >
               <td class="px-6 py-3 font-mono font-medium text-slate-900">
-                {{ u.username }}
+                {{ u.username ?? u.external_key }}
               </td>
               <td class="px-6 py-3 text-slate-700">
                 {{ u.display_name }}
@@ -410,6 +433,7 @@ else {
               <td class="px-6 py-3">
                 <div class="flex flex-wrap gap-2">
                   <button
+                    v-if="!isExternal"
                     type="button"
                     :disabled="pendingId === u.id"
                     class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"

@@ -4,13 +4,19 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{AppUser, AppUserStatus};
+use crate::domain::{AppUser, AppUserAuthSource, AppUserStatus};
 use crate::handlers::auth::OrgDto;
 
 #[derive(Debug, Serialize)]
 pub struct AppUserDto {
     pub id: String,
-    pub username: String,
+    pub auth_source: AppUserAuthSource,
+    /// Present for internal users; `null` for external shadow users.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    /// Present for external shadow users; `null` for internal users.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external_key: Option<String>,
     pub display_name: String,
     pub status: AppUserStatus,
     pub needs_password_change: bool,
@@ -24,7 +30,9 @@ impl AppUserDto {
     pub fn from_app_user(u: &AppUser) -> Self {
         Self {
             id: u.id.to_hex(),
+            auth_source: u.auth_source,
             username: u.username.clone(),
+            external_key: u.external_key.clone(),
             display_name: u.display_name.clone(),
             status: u.status,
             needs_password_change: u.needs_password_change,

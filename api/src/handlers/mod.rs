@@ -5,6 +5,7 @@ pub mod app_users;
 pub mod auth;
 pub mod checkin;
 pub mod checkin_dto;
+pub mod external_auth;
 pub mod join_requests;
 pub mod location_tracking;
 pub mod me;
@@ -51,6 +52,11 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/orgs/me/owner", post(orgs::transfer_owner))
         .route("/orgs/me/settings", patch(checkin::update_settings))
+        .route("/orgs/me/external-auth", post(external_auth::configure))
+        .route(
+            "/orgs/me/external-auth/test-login",
+            post(external_auth::test_login),
+        )
         .route("/orgs/me/join-requests", get(join_requests::list_for_org))
         .route(
             "/orgs/me/join-requests/{id}/approve",

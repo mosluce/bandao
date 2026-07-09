@@ -60,12 +60,31 @@ env vars, or operational procedures should land here in the same PR.
 | `BANDAO_COOKIE_DOMAIN` | no | _(unset)_ | Leave unset → host-only cookie on `bandao-api.ccmos.tw`. |
 | `BANDAO_ALLOWED_ORIGIN` | yes | `https://bandao-admin.ccmos.tw` | Single origin. CORS reflects this exact value. |
 | `BANDAO_SESSION_TTL_SECONDS` | no | `1209600` (14 days) | Adjust per security policy. |
+| `BANDAO_SECRET_KEY` | no† | _(base64 of 32 random bytes)_ | AEAD key for encrypting external-auth DB connection passwords at rest. †Required only if any Org uses external-database auth; without it, saving/using an external-auth config fails with `EXTERNAL_AUTH_UNAVAILABLE`. Generate: `openssl rand -base64 32`. No rotation support — changing it invalidates all stored external-auth passwords (re-enter them). |
 | `TS_AUTHKEY` | yes | _(reusable Tailscale auth key)_ | Tagged `tag:bandao-api`. Rotate on operator's schedule. |
 | `TS_HOSTNAME` | no | `bandao-api` | Container's tailnet hostname. |
 
 The api refuses to start if `BANDAO_LISTEN_ADDR` cannot parse. Other vars
 fall back to the dev defaults baked into `api/src/config.rs` — production
 SHOULD set every row above explicitly.
+
+#### External-database App-user auth
+
+An Org can authenticate its App users against its own external MSSQL instead of
+the built-in `app_users`. Admins configure it under admin-web → 驗證來源
+(`PUT /orgs/me/external-auth`): connection details + a parameterized query
+(`… WHERE acct=@account AND pwd=@password`) + the identity columns. First
+successful login just-in-time provisions a local shadow user. Operational notes:
+
+- **`BANDAO_SECRET_KEY` must be set** before any Org enables this (see table).
+- **Dependency**: the MSSQL driver (`tiberius`) is compiled in — it noticeably
+  lengthens the first `cargo build`. Nothing to configure.
+- **Known limitation — network reachability**: the api must be able to open a
+  TCP connection to the customer's MSSQL. In the current Tailscale topology the
+  prod api may NOT reach an on-prem/customer-LAN database; there is no tunneling
+  story yet. Verify reachability (or arrange a route/VPN) before promising a
+  customer external auth. Misconfig/unreachable surfaces as
+  `EXTERNAL_AUTH_UNAVAILABLE`; admins can self-diagnose via the 試登入 button.
 
 ### `admin-web` service on Zeabur
 
