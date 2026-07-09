@@ -49,11 +49,11 @@ Because release only accepts `https`, the app SHALL NOT require any iOS App Tran
 
 ## REMOVED Requirements
 
-### Requirement: Release build excludes the override path
+### Requirement: Debug-only dev menu allows runtime API URL override
 
-**Reason**: The override path is now a first-class release feature (self-hosted server). Release builds consult the stored override subject to https-only validation, so the release stub / dead-code-elimination of `dev_overrides.dart` is intentionally removed.
+**Reason**: Superseded by the self-hosted-server feature. The override screen is no longer debug-only, no longer hidden behind a 5-tap logo gesture, and release builds now include it (subject to https-only validation). Its behavior is now specified by the added "Server configuration screen is reachable in all builds" and "Login screen surfaces server configuration and current connection" requirements. The old "Release build excludes the override path" scenario is likewise dropped — folded into the modified base-URL requirement.
 
-**Migration**: Behavior is unchanged for users who never set an override — the effective base URL remains `Env.compileTimeDefault()` (the official server). See the modified "API base URL resolves via dart-define with platform-aware default" requirement for the new release behavior.
+**Migration**: The 5-tap gesture is replaced by a visible "伺服器設定" entry; the storage key moved from `dev.api_base_url_override` to `server.api_base_url`. Behavior is unchanged for users who never set an override — the effective base URL remains `Env.compileTimeDefault()`.
 
 ## ADDED Requirements
 
