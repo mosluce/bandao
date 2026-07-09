@@ -260,6 +260,28 @@ recovery source. **Practice this monthly** via the drill script — see
 The repository runs three GitHub Actions workflows on PR + push to main:
 `api`, `admin-web`, `app`. They are the gate enforced by branch protection.
 
+**Per-component path scoping (PRs).** Each workflow triggers on every PR, but
+its job first detects — using git only (`git diff --name-only <base>...HEAD`,
+no third-party action) — whether that component's paths changed. The heavy
+steps (build / lint / test) are gated on that result; when the component is
+untouched the job still concludes success, so its required check reports green
+in seconds without a full build. A PR that touches only `app/` therefore does
+not pay for a Rust or Nuxt build. Each skipped component logs a `::notice::`
+line so a reviewer can see which components were actually verified. The check
+names (`fmt + clippy + test`, `typecheck + test + build`, `analyze + test`)
+are unchanged, so branch protection's required contexts need no edits. On
+push to `main`, the workflows keep their `paths:` filters instead.
+
+**Merge policy.** Branch protection requires all three checks to pass but does
+NOT require branches to be up to date before merging (`strict = false`). With
+the three components code-decoupled (no cross-imports), a stale-base merge
+cannot introduce a cross-component semantic conflict; the only residual risk
+is two parallel same-component PRs, backstopped by the post-merge push CI
+turning `main` red. This avoids forcing every open PR to rebase + re-run CI
+each time another PR lands. Revisit (re-enable `strict`, or adopt a merge
+queue) if the project moves to multi-maintainer / frequent parallel PRs in one
+component. See openspec capability `ci-pipeline`.
+
 **Zeabur** has its own GitHub integration. On a push to `main`, Zeabur
 rebuilds and rolls out whichever service's source path changed (`api/` or
 `admin-web/`). There is no `deploy.yml` workflow in this repo and no

@@ -18,21 +18,47 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Detect whether this component changed (git only, PR merge-base diff).
+      # Heavy steps are gated; the job still succeeds when admin-web/ is
+      # untouched so the required check reports green without a full build.
+      # See openspec change add-ci-path-scoped-checks.
+      - name: Detect changes
+        id: changed
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "${{ github.event.pull_request.base.sha }}...HEAD" \
+               | grep -qE '^(admin-web/|\.github/workflows/admin-web\.yml)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=admin-web::no admin-web/ changes in this PR — skipping typecheck/test/build"
+          fi
 
       - uses: pnpm/action-setup@v4
+        if: steps.changed.outputs.run == 'true'
         with:
           version: 9
 
       - uses: actions/setup-node@v4
+        if: steps.changed.outputs.run == 'true'
         with:
           node-version: 20
           cache: pnpm
           cache-dependency-path: admin-web/pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
+        if: steps.changed.outputs.run == 'true'
 
       - run: pnpm typecheck
+        if: steps.changed.outputs.run == 'true'
 
       - run: pnpm test
+        if: steps.changed.outputs.run == 'true'
 
       - run: pnpm build
+        if: steps.changed.outputs.run == 'true'
