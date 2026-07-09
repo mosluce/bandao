@@ -222,3 +222,5 @@ not the self-hosted `api/`.)
 ## Provisional bundle id
 
 `tw.ccmos.app.bandao`. Final id is decided pre-store-submit.
+
+<!-- ci path-scoping verification (throwaway) -->
