@@ -18,14 +18,37 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Detect whether this component changed (git only, PR merge-base diff).
+      # Runs at the repo root (the job default working-directory is app/).
+      # Heavy steps are gated; the job still succeeds when app/ is untouched so
+      # the required check reports green without a full build.
+      # See openspec change add-ci-path-scoped-checks.
+      - name: Detect changes
+        id: changed
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "${{ github.event.pull_request.base.sha }}...HEAD" \
+               | grep -qE '^(app/|\.github/workflows/app\.yml)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=app::no app/ changes in this PR — skipping analyze/test"
+          fi
 
       - uses: subosito/flutter-action@v2
+        if: steps.changed.outputs.run == 'true'
         with:
           channel: stable
           flutter-version: '3.29.3'
           cache: true
 
       - name: Cache pub
+        if: steps.changed.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -36,10 +59,14 @@ jobs:
             ${{ runner.os }}-flutter-
 
       - run: flutter pub get
+        if: steps.changed.outputs.run == 'true'
 
       - name: Run codegen
+        if: steps.changed.outputs.run == 'true'
         run: dart run build_runner build --delete-conflicting-outputs
 
       - run: flutter analyze
+        if: steps.changed.outputs.run == 'true'
 
       - run: flutter test
+        if: steps.changed.outputs.run == 'true'
