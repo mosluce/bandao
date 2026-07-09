@@ -41,6 +41,54 @@ fn default_timezone() -> String {
     DEFAULT_ORG_TIMEZONE.to_string()
 }
 
+/// How an Org authenticates its App users. `Internal` (the default when the
+/// field is absent) uses admin-created `app_users` + password hashing;
+/// `ExternalDb` delegates credential verification to an external database via
+/// `settings.external_auth`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OrgAuthSource {
+    Internal,
+    ExternalDb,
+}
+
+/// Connection + query configuration for external-database App-user auth, stored
+/// at `Org.settings.external_auth`. `password_encrypted` is the ciphertext of the
+/// database connection password (never the plaintext, never returned by the API).
+/// `query` is a parameterized template that MUST contain `@account` and
+/// `@password` placeholders; `key_col` / `display_col` name the result columns
+/// that map to the shadow user's `external_key` / `display_name`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalAuthConfig {
+    pub driver: String,
+    pub host: String,
+    pub port: u16,
+    pub database: String,
+    pub username: String,
+    pub password_encrypted: String,
+    pub query: String,
+    pub key_col: String,
+    pub display_col: String,
+}
+
+impl Org {
+    /// Read `Org.settings.auth_source`, defaulting to `Internal` when the field
+    /// is absent (old Orgs predate external auth).
+    pub fn auth_source(&self) -> OrgAuthSource {
+        match self.settings.get_str("auth_source") {
+            Ok("external_db") => OrgAuthSource::ExternalDb,
+            _ => OrgAuthSource::Internal,
+        }
+    }
+
+    /// Parse `Org.settings.external_auth` into a typed config, or `None` when it
+    /// is absent or malformed.
+    pub fn external_auth(&self) -> Option<ExternalAuthConfig> {
+        let doc = self.settings.get_document("external_auth").ok()?;
+        bson::from_document(doc.clone()).ok()
+    }
+}
+
 impl Org {
     /// Read `Org.settings.checkin.transfer_enabled`, defaulting to `true` when
     /// the sub-document or the field is absent (old Orgs predate this change).
@@ -173,24 +221,52 @@ pub enum AppUserStatus {
     Disabled,
 }
 
-/// Mobile-end-user identity. 1:1 with Org via immutable `org_id`. Identifiers
-/// are unique per Org (`(org_id, username_lower)` index). Created by an admin;
-/// no self-registration. `username_lower` is denormalized to make case-insensitive
-/// uniqueness a plain unique-index check.
+/// How an AppUser authenticates. `Internal` users are admin-created and carry a
+/// local `password_hash` + `username`. `External` users are just-in-time shadow
+/// identities provisioned on first successful external-database login; they carry
+/// an `external_key` instead and have no local password. Old AppUser docs predate
+/// this field and default to `Internal`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppUserAuthSource {
+    Internal,
+    External,
+}
+
+fn default_auth_source() -> AppUserAuthSource {
+    AppUserAuthSource::Internal
+}
+
+/// Mobile-end-user identity. 1:1 with Org via immutable `org_id`.
+///
+/// Internal users are unique per Org on `(org_id, username_lower)` and carry a
+/// local `password_hash`; `username_lower` is denormalized to make
+/// case-insensitive uniqueness a plain unique-index check. External shadow users
+/// are unique per Org on `(org_id, external_key)`, have no `username` /
+/// `password_hash` / `created_by_dashboard_user_id`, and are provisioned by the
+/// system on first external login rather than by an admin.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppUser {
     #[serde(rename = "_id")]
     pub id: ObjectId,
     pub org_id: ObjectId,
-    pub username: String,
-    pub username_lower: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub username_lower: Option<String>,
     pub display_name: String,
-    pub password_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password_hash: Option<String>,
+    #[serde(default = "default_auth_source")]
+    pub auth_source: AppUserAuthSource,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_key: Option<String>,
     pub status: AppUserStatus,
     pub needs_password_change: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_login_at: Option<DateTime>,
-    pub created_by_dashboard_user_id: ObjectId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_by_dashboard_user_id: Option<ObjectId>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }

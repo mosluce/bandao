@@ -1,6 +1,8 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use crate::auth::secret_box::{self, SecretBox};
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub mongo_uri: String,
@@ -10,6 +12,22 @@ pub struct Config {
     pub cookie_domain: Option<String>,
     pub cookie_secure: bool,
     pub allowed_origin: Option<String>,
+    /// AEAD key for encrypting external-auth DB connection passwords, decoded
+    /// from `BANDAO_SECRET_KEY` (base64 of 32 bytes). `None` when the env var is
+    /// unset — deployments without external auth don't need it.
+    pub secret_key: Option<[u8; 32]>,
+}
+
+impl Config {
+    /// A [`SecretBox`] built from the configured key, or
+    /// `ExternalAuthUnavailable` when `BANDAO_SECRET_KEY` is not configured —
+    /// external auth cannot encrypt/decrypt connection passwords without it.
+    pub fn secret_box(&self) -> crate::error::ApiResult<SecretBox> {
+        self.secret_key
+            .as_ref()
+            .map(SecretBox::from_key_bytes)
+            .ok_or(crate::error::ApiError::ExternalAuthUnavailable)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -52,6 +70,16 @@ impl Config {
             .ok()
             .filter(|v| !v.is_empty());
 
+        let secret_key = match std::env::var("BANDAO_SECRET_KEY") {
+            Ok(v) if !v.is_empty() => {
+                Some(secret_box::decode_key(&v).ok_or(ConfigError::Invalid {
+                    var: "BANDAO_SECRET_KEY",
+                    message: "expected base64 of exactly 32 bytes".to_string(),
+                })?)
+            }
+            _ => None,
+        };
+
         Ok(Self {
             mongo_uri,
             mongo_db,
@@ -60,6 +88,7 @@ impl Config {
             cookie_domain,
             cookie_secure,
             allowed_origin,
+            secret_key,
         })
     }
 }

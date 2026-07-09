@@ -7,6 +7,22 @@ export interface UserDto {
   email: string
 }
 
+export type OrgAuthSource = 'internal' | 'external_db'
+
+/** Password-free view of an Org's external-auth config (mirrors the server;
+ * the connection password is never sent to the client). */
+export interface ExternalAuthSummaryDto {
+  driver: string
+  host: string
+  port: number
+  database: string
+  username: string
+  query: string
+  key_col: string
+  display_col: string
+  password_set: boolean
+}
+
 export interface OrgDto {
   id: string
   name: string
@@ -14,8 +30,43 @@ export interface OrgDto {
   owner_id: string
   timezone: string
   checkin: { transfer_enabled: boolean, location_tracking_enabled: boolean }
+  auth_source: OrgAuthSource
+  external_auth?: ExternalAuthSummaryDto
   slug?: string
   slug_changed_at?: string
+}
+
+/** Connection + query settings as submitted by an admin. `password` is
+ * write-only: omit it to keep the stored one. */
+export interface ExternalAuthInput {
+  driver: string
+  host: string
+  port: number
+  database: string
+  username: string
+  password?: string
+  query: string
+  key_col: string
+  display_col: string
+}
+
+export interface ConfigureExternalAuthRequest {
+  auth_source: OrgAuthSource
+  external_auth?: ExternalAuthInput
+}
+
+export interface TestLoginRequest {
+  external_auth: ExternalAuthInput
+  test_account: string
+  test_password: string
+}
+
+export interface TestLoginResponse {
+  connected: boolean
+  matched: boolean
+  external_key?: string
+  display_name?: string
+  error?: string
 }
 
 export interface MembershipDto {
@@ -93,9 +144,15 @@ export interface UpdateRoleRequest {
 
 export type AppUserStatus = 'active' | 'disabled'
 
+export type AppUserAuthSource = 'internal' | 'external'
+
 export interface AppUserDto {
   id: string
-  username: string
+  auth_source: AppUserAuthSource
+  /** Present for internal users. */
+  username?: string
+  /** Present for external shadow users. */
+  external_key?: string
   display_name: string
   status: AppUserStatus
   needs_password_change: boolean

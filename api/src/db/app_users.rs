@@ -3,7 +3,7 @@ use bson::{DateTime, doc};
 use mongodb::Collection;
 use mongodb::error::{ErrorKind, WriteFailure};
 
-use crate::domain::{AppUser, AppUserStatus};
+use crate::domain::{AppUser, AppUserAuthSource, AppUserStatus};
 use crate::error::{ApiError, ApiResult};
 
 const MONGO_DUPLICATE_KEY: i32 = 11000;
@@ -49,14 +49,16 @@ impl AppUserRepository {
         let user = AppUser {
             id: ObjectId::new(),
             org_id,
-            username: username.to_string(),
-            username_lower: username_lower.to_string(),
+            username: Some(username.to_string()),
+            username_lower: Some(username_lower.to_string()),
             display_name: display_name.to_string(),
-            password_hash: password_hash.to_string(),
+            password_hash: Some(password_hash.to_string()),
+            auth_source: AppUserAuthSource::Internal,
+            external_key: None,
             status: AppUserStatus::Active,
             needs_password_change: true,
             last_login_at: None,
-            created_by_dashboard_user_id,
+            created_by_dashboard_user_id: Some(created_by_dashboard_user_id),
             created_at: now,
             updated_at: now,
         };
@@ -72,6 +74,77 @@ impl AppUserRepository {
         }
     }
 
+    /// Look up an external shadow user by `(org_id, external_key)` and refresh
+    /// its `display_name` / `last_login_at`, or create it on first login. The
+    /// resulting row carries `auth_source = External`, no `username` /
+    /// `password_hash`, and `needs_password_change = false`. Concurrent first
+    /// logins race on the unique `(org_id, external_key)` index; on a duplicate
+    /// insert we fall back to a refreshing update so both callers succeed.
+    pub async fn upsert_shadow(
+        &self,
+        org_id: ObjectId,
+        external_key: &str,
+        display_name: &str,
+    ) -> ApiResult<AppUser> {
+        let now = DateTime::now();
+        // Refresh-or-nothing first: the common case (repeat login) is a plain
+        // update that also bumps last_login_at.
+        let refreshed = self
+            .coll
+            .find_one_and_update(
+                doc! { "org_id": org_id, "external_key": external_key },
+                doc! { "$set": {
+                    "display_name": display_name,
+                    "last_login_at": now,
+                    "updated_at": now,
+                } },
+            )
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await?;
+        if let Some(user) = refreshed {
+            return Ok(user);
+        }
+
+        // First login: insert a fresh shadow row.
+        let user = AppUser {
+            id: ObjectId::new(),
+            org_id,
+            username: None,
+            username_lower: None,
+            display_name: display_name.to_string(),
+            password_hash: None,
+            auth_source: AppUserAuthSource::External,
+            external_key: Some(external_key.to_string()),
+            status: AppUserStatus::Active,
+            needs_password_change: false,
+            last_login_at: Some(now),
+            created_by_dashboard_user_id: None,
+            created_at: now,
+            updated_at: now,
+        };
+        match self.coll.insert_one(&user).await {
+            Ok(_) => Ok(user),
+            Err(err) if is_duplicate_key(&err) => {
+                // Lost the first-login race — another request just created the
+                // row. Re-run the refreshing update, which now hits it.
+                let user = self
+                    .coll
+                    .find_one_and_update(
+                        doc! { "org_id": org_id, "external_key": external_key },
+                        doc! { "$set": {
+                            "display_name": display_name,
+                            "last_login_at": now,
+                            "updated_at": now,
+                        } },
+                    )
+                    .return_document(mongodb::options::ReturnDocument::After)
+                    .await?;
+                user.ok_or(ApiError::NotFound)
+            }
+            Err(err) => Err(err.into()),
+        }
+    }
+
     pub async fn find_by_id(&self, id: ObjectId) -> ApiResult<Option<AppUser>> {
         Ok(self.coll.find_one(doc! { "_id": id }).await?)
     }
@@ -84,6 +157,17 @@ impl AppUserRepository {
         Ok(self
             .coll
             .find_one(doc! { "org_id": org_id, "username_lower": username_lower })
+            .await?)
+    }
+
+    pub async fn find_by_org_and_external_key(
+        &self,
+        org_id: ObjectId,
+        external_key: &str,
+    ) -> ApiResult<Option<AppUser>> {
+        Ok(self
+            .coll
+            .find_one(doc! { "org_id": org_id, "external_key": external_key })
             .await?)
     }
 
