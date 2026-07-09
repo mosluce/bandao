@@ -24,6 +24,13 @@
   "devMenuSave": "儲存",
   "devMenuClear": "清除",
   "devMenuApiPrefix": "API",
+  "serverConfigTitle": "伺服器設定",
+  "serverConfigEntry": "伺服器設定",
+  "serverConfigHelper": "自建伺服器請填 https 網址；留空即使用官方預設",
+  "serverConfigResetDefault": "恢復官方預設",
+  "serverConfigHttpsRequired": "網址必須以 https:// 開頭",
+  "serverConnectionOfficial": "目前連線：官方預設",
+  "serverConnectionCustom": "目前連線：自訂 {host}",
   "splashRetry": "重試",
   "splashLogout": "登出",
   "splashNetworkMessage": "無法連線伺服器，請稍後再試。"

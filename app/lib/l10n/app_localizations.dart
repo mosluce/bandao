@@ -212,6 +212,21 @@ class AppLocalizations {
   String get devMenuPrivacyInputLabel =>
       _isZh ? '覆寫隱私政策網址' : 'Override privacy policy URL';
 
+  // Server configuration (self-hosted server support)
+  String get serverConfigTitle => _isZh ? '伺服器設定' : 'Server settings';
+  String get serverConfigEntry => _isZh ? '伺服器設定' : 'Server settings';
+  String get serverConfigHelper => _isZh
+      ? '自建伺服器請填 https 網址；留空即使用官方預設'
+      : 'Enter your self-hosted https URL, or leave the default';
+  String get serverConfigResetDefault =>
+      _isZh ? '恢復官方預設' : 'Reset to default';
+  String get serverConfigHttpsRequired =>
+      _isZh ? '網址必須以 https:// 開頭' : 'URL must start with https://';
+  String get serverConnectionOfficial =>
+      _isZh ? '目前連線：官方預設' : 'Connected to: official default';
+  String serverConnectionCustom(String host) =>
+      _isZh ? '目前連線：自訂 $host' : 'Connected to: $host (custom)';
+
   // Splash
   String get splashRetry => _isZh ? '重試' : 'Retry';
   String get splashLogout => _isZh ? '登出' : 'Sign out';

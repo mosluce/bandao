@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/auth/presentation/dev_server_config_screen.dart';
+import '../features/auth/presentation/server_config_screen.dart';
 import '../features/auth/presentation/force_password_change_screen.dart';
 import '../features/auth/presentation/home_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -24,7 +24,7 @@ class AppRoutes {
   static const String home = '/';
   static const String history = '/history';
   static const String trajectory = '/trajectory';
-  static const String devServerConfig = '/dev-server-config';
+  static const String serverConfig = '/server-config';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -66,18 +66,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             const ForcePasswordChangeScreen(),
       ),
       GoRoute(
-        path: AppRoutes.devServerConfig,
-        builder: (BuildContext context, GoRouterState state) {
-          // Defensive: even if a release build navigates here, render an
-          // inert "Not available" page. The login screen's tap handler is
-          // the primary gate.
-          if (kReleaseMode) {
-            return const Scaffold(
-              body: Center(child: Text('Not available')),
-            );
-          }
-          return const DevServerConfigScreen();
-        },
+        path: AppRoutes.serverConfig,
+        builder: (BuildContext context, GoRouterState state) =>
+            const ServerConfigScreen(),
       ),
       // Authenticated top-level shell. Three persistent tabs:
       //   /          -> 首頁 (home)
@@ -134,8 +125,9 @@ String? _redirectFor(AuthState auth, GoRouterState state) {
       // Should be caught earlier; treat as splash.
       return loc == AppRoutes.splash ? null : AppRoutes.splash;
     case AuthUnauthenticated():
-      // Allow /login and the dev menu; everything else (including splash) -> /login.
-      if (loc == AppRoutes.login || loc == AppRoutes.devServerConfig) {
+      // Allow /login and the server-config screen; everything else (including
+      // splash) -> /login.
+      if (loc == AppRoutes.login || loc == AppRoutes.serverConfig) {
         return null;
       }
       return AppRoutes.login;
@@ -145,7 +137,7 @@ String? _redirectFor(AuthState auth, GoRouterState state) {
     case AuthAuthenticated(needsPasswordChange: false):
       // /splash is the parking spot during auth bootstrap — once we know the
       // user is authenticated with no flag, send them home. Same for /login
-      // and /force-change-password. Everything else (e.g. /, /dev-server-config)
+      // and /force-change-password. Everything else (e.g. /, /server-config)
       // is fine to stay put.
       if (loc == AppRoutes.login ||
           loc == AppRoutes.forceChange ||
@@ -155,7 +147,7 @@ String? _redirectFor(AuthState auth, GoRouterState state) {
       return null;
     case AuthError():
       // Surface the failure on /login so the user can see the retry.
-      if (loc == AppRoutes.login || loc == AppRoutes.devServerConfig) {
+      if (loc == AppRoutes.login || loc == AppRoutes.serverConfig) {
         return null;
       }
       return AppRoutes.login;

@@ -38,8 +38,25 @@ flutter run -d emulator-5554          # Android emulator
 ```
 
 The default API base URL is `http://localhost:9090` on iOS Simulator and
-`http://10.0.2.2:9090` on Android. Override at runtime via the dev menu —
-tap the 班到 logo five times on `/login` to open `/dev-server-config`.
+`http://10.0.2.2:9090` on Android. Override at runtime from the **伺服器設定**
+link on `/login` (route `/server-config`). In debug the override is loose
+(any `http`/`localhost`/LAN IP is accepted); in release only `https` URLs
+with a host are accepted (see `Self-hosted server` below).
+
+## Self-hosted server
+
+The repo is public: anyone can deploy their own `api/` (+ Mongo) backend and
+point the shipped app at it — no need to publish your own build. On `/login`,
+open **伺服器設定**, enter your `https://` API base URL, and save. The login
+screen shows which server you're connected to (official default vs. a custom
+host). Changing the server clears the stored bearer token, so you re-log in
+against the new backend.
+
+Constraints (v1): release builds accept **https public URLs only** — plain
+`http`, LAN IPs, and self-signed hosts are not supported (this also means no
+iOS ATS / Android cleartext exception is needed). Deploy `api/` behind a TLS
+domain. Native requests carry no CORS, so nothing on the backend needs to
+change for the app to reach it.
 
 ## Testing
 
@@ -181,13 +198,15 @@ id so a different login on the same device gets prompted again. The dialog
 covers cadence / distance / retention / audience and links out to the full
 privacy policy via `url_launcher` (`LaunchMode.inAppBrowserView`).
 
-### Privacy URL override (dev menu)
+### Privacy URL override (server-config screen)
 
-The dev menu adds a parallel "隱私政策網址" override row mirroring the API
-base URL pattern. The compile-time default comes from `--dart-define=PRIVACY_URL=...`
-falling back to `http://localhost:3000/privacy`. The override lives at
-`secureStorage["dev.privacy_url_override"]` — a release build with no
-override falls back to the dart-define default.
+The **伺服器設定** screen adds a parallel "隱私政策網址" override row mirroring
+the API base URL pattern. The compile-time default comes from
+`--dart-define=PRIVACY_URL=...` falling back to `http://localhost:3000/privacy`.
+The override lives at `secureStorage["dev.privacy_url_override"]` — a release
+build with no override falls back to the dart-define default. (Unlike the API
+base URL, the privacy override stays loosely validated; it targets admin-web,
+not the self-hosted `api/`.)
 
 ### iOS / Android specifics
 

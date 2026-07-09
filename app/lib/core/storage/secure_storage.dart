@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Storage keys used by the app. Locked to three for v1 — bearer token,
-/// last successful org_code (prefill on next login), and the debug-only
-/// API base URL override.
+/// last successful org_code (prefill on next login), and the per-device
+/// API base URL override (self-hosted server support, all build modes).
 class SecureStorageKeys {
   const SecureStorageKeys._();
 
   static const String bearerToken = 'auth.bearer_token';
   static const String lastOrgCode = 'auth.last_org_code';
-  static const String apiBaseUrlOverride = 'dev.api_base_url_override';
+  static const String apiBaseUrlOverride = 'server.api_base_url';
   static const String backgroundSyncTipSeen = 'home.background_sync_tip_seen';
   static const String locationTrackingLastCleanStop =
       'bandao.location_tracking.last_clean_stop';

@@ -7,23 +7,26 @@ import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/env/env.dart';
 import '../../../core/storage/api_base_url.dart';
-import '../../../core/storage/dev_overrides.dart';
 import '../../../core/storage/privacy_url.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../../core/storage/server_url_override.dart';
 import '../../../l10n/app_localizations.dart';
+import '../state/auth_provider.dart';
 
-/// Debug-only menu for swapping the API base URL at runtime. Reachable from
-/// the login screen by tapping the logo 5 times within 3 seconds.
-class DevServerConfigScreen extends ConsumerStatefulWidget {
-  const DevServerConfigScreen({super.key});
+/// Server-configuration screen. Lets the user point the app at a self-hosted
+/// `api/` deployment (or back at the official default). Reachable in all build
+/// modes from the login screen. Release builds only accept `https` overrides
+/// (see `validateBaseUrlOverride`); the privacy-URL section and the
+/// Crashlytics self-test remain dev-facing.
+class ServerConfigScreen extends ConsumerStatefulWidget {
+  const ServerConfigScreen({super.key});
 
   @override
-  ConsumerState<DevServerConfigScreen> createState() =>
-      _DevServerConfigScreenState();
+  ConsumerState<ServerConfigScreen> createState() =>
+      _ServerConfigScreenState();
 }
 
-class _DevServerConfigScreenState
-    extends ConsumerState<DevServerConfigScreen> {
+class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   final TextEditingController _input = TextEditingController();
   final TextEditingController _privacyInput = TextEditingController();
   bool _initialized = false;
@@ -37,11 +40,7 @@ class _DevServerConfigScreenState
   }
 
   Future<void> _seed() async {
-    if (kReleaseMode) {
-      setState(() => _initialized = true);
-      return;
-    }
-    final overrides = ref.read(devOverridesProvider);
+    final overrides = ref.read(serverUrlOverrideProvider);
     final saved = await overrides.read();
     final storage = ref.read(secureStorageProvider);
     final savedPrivacy = await storage.readPrivacyUrlOverride();
@@ -63,18 +62,37 @@ class _DevServerConfigScreenState
   }
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
     final url = _input.text.trim();
-    final parsed = Uri.tryParse(url);
-    if (parsed == null || !parsed.hasScheme || !parsed.hasAuthority) {
-      setState(() => _error = AppLocalizations.of(context).errorGeneric);
-      return;
+    switch (validateBaseUrlOverride(url)) {
+      case BaseUrlOverrideError.insecureScheme:
+        setState(() => _error = l10n.serverConfigHttpsRequired);
+        return;
+      case BaseUrlOverrideError.malformed:
+        setState(() => _error = l10n.errorGeneric);
+        return;
+      case null:
+        break;
     }
     setState(() => _error = null);
-    final overrides = ref.read(devOverridesProvider);
+
+    // Changing the server invalidates any session issued by the previous one:
+    // clear the bearer token so the user re-authenticates against the new
+    // server. Compare against the current EFFECTIVE URL, not the raw override,
+    // so switching away from and back to the default is handled too.
+    final current = await ref.read(effectiveBaseUrlProvider.future);
+    if (url != current) {
+      await ref.read(secureStorageProvider).clearToken();
+    }
+
+    final overrides = ref.read(serverUrlOverrideProvider);
     await overrides.write(url);
     // Force the dio client + url resolver to rebuild on next request.
     ref.invalidate(effectiveBaseUrlProvider);
     ref.invalidate(apiClientProvider);
+    if (url != current) {
+      ref.invalidate(authProvider);
+    }
     if (!mounted) return;
     if (context.canPop()) {
       context.pop();
@@ -84,10 +102,19 @@ class _DevServerConfigScreenState
   }
 
   Future<void> _clear() async {
-    final overrides = ref.read(devOverridesProvider);
+    // Reverting to the official default is also a server change — drop the
+    // session bound to the custom server.
+    final current = await ref.read(effectiveBaseUrlProvider.future);
+    if (current != Env.compileTimeDefault()) {
+      await ref.read(secureStorageProvider).clearToken();
+    }
+    final overrides = ref.read(serverUrlOverrideProvider);
     await overrides.clear();
     ref.invalidate(effectiveBaseUrlProvider);
     ref.invalidate(apiClientProvider);
+    if (current != Env.compileTimeDefault()) {
+      ref.invalidate(authProvider);
+    }
     if (!mounted) return;
     if (context.canPop()) {
       context.pop();
@@ -129,7 +156,7 @@ class _DevServerConfigScreenState
     final effectivePrivacyAsync = ref.watch(effectivePrivacyUrlProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.devMenuTitle)),
+      appBar: AppBar(title: Text(l10n.serverConfigTitle)),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -149,9 +176,11 @@ class _DevServerConfigScreenState
                     ),
                     const SizedBox(height: 24),
                     TextField(
+                      key: const Key('server_config.url'),
                       controller: _input,
                       decoration: InputDecoration(
                         labelText: l10n.devMenuInputLabel,
+                        helperText: l10n.serverConfigHelper,
                         border: const OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.url,
@@ -172,10 +201,11 @@ class _DevServerConfigScreenState
                       children: <Widget>[
                         TextButton(
                           onPressed: _clear,
-                          child: Text(l10n.devMenuClear),
+                          child: Text(l10n.serverConfigResetDefault),
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
+                          key: const Key('server_config.save'),
                           onPressed: _save,
                           child: Text(l10n.devMenuSave),
                         ),

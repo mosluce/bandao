@@ -24,6 +24,13 @@
   "devMenuSave": "Save",
   "devMenuClear": "Clear",
   "devMenuApiPrefix": "API",
+  "serverConfigTitle": "Server settings",
+  "serverConfigEntry": "Server settings",
+  "serverConfigHelper": "Enter your self-hosted https URL, or leave the default",
+  "serverConfigResetDefault": "Reset to default",
+  "serverConfigHttpsRequired": "URL must start with https://",
+  "serverConnectionOfficial": "Connected to: official default",
+  "serverConnectionCustom": "Connected to: {host} (custom)",
   "splashRetry": "Retry",
   "splashLogout": "Sign out",
   "splashNetworkMessage": "Could not reach the server. Please retry."
