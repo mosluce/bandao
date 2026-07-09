@@ -12,6 +12,19 @@
 
 ## App
 
+### [0.4.0+1] - 2026-07-08
+
+#### Added
+- 支援自建 API server：登入頁新增「伺服器設定」入口（所有 build 皆可見），可把 app
+  指向自己部署的 `api/` 後端。登入頁顯示目前連線對象（官方預設 / 自訂 host），切換
+  server 會清除舊 session 要求重新登入。
+- release build 只接受 `https://` + 具 host 的伺服器網址（免除 iOS ATS 例外）；debug
+  build 維持寬鬆（`http`/`localhost`/內網 IP）供本機開發。
+
+#### Why
+- 本 repo 為 public，讓想自建後端的使用者能用官方上架 app 指向自己的 server，無需自行
+  上架。詳見 OpenSpec change `add-self-hosted-server-url`。
+
 ### [0.3.1+8] - 2026-05-21
 
 #### Added

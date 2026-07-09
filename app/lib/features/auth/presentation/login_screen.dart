@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
 import '../../../core/api/api_error.dart';
+import '../../../core/env/env.dart';
 import '../../../core/storage/api_base_url.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../l10n/app_localizations.dart';
@@ -101,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const SizedBox(height: 24),
-              _BandaoLogo(onSecretTapped: _onLogoTapped),
+              const _BandaoLogo(),
               const SizedBox(height: 8),
               Text(
                 l10n.loginTitle,
@@ -166,99 +166,81 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       )
                     : Text(l10n.loginSubmit),
               ),
-              if (kDebugMode) ...<Widget>[
-                const SizedBox(height: 24),
-                _DebugApiUrl(prefix: l10n.devMenuApiPrefix),
-              ],
+              const SizedBox(height: 24),
+              const _ServerConnectionInfo(),
             ],
           ),
         ),
       ),
     );
   }
-
-  void _onLogoTapped() {
-    if (!kDebugMode) return;
-    context.go(AppRoutes.devServerConfig);
-  }
 }
 
-/// "Bandao" (班到) logo + title. Tapped 5 times within 3 seconds opens the dev menu
-/// in debug builds; release builds inert (the page itself is gated too).
-class _BandaoLogo extends StatefulWidget {
-  const _BandaoLogo({required this.onSecretTapped});
-
-  final VoidCallback onSecretTapped;
-
-  @override
-  State<_BandaoLogo> createState() => _BandaoLogoState();
-}
-
-class _BandaoLogoState extends State<_BandaoLogo> {
-  static const int _tapsRequired = 5;
-  static const Duration _window = Duration(seconds: 3);
-
-  final List<DateTime> _taps = <DateTime>[];
-
-  void _handleTap() {
-    if (!kDebugMode) return;
-    final now = DateTime.now();
-    _taps
-      ..add(now)
-      ..removeWhere((t) => now.difference(t) > _window);
-    if (_taps.length >= _tapsRequired) {
-      _taps.clear();
-      widget.onSecretTapped();
-    }
-  }
+/// "Bandao" (班到) logo + title.
+class _BandaoLogo extends StatelessWidget {
+  const _BandaoLogo();
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _handleTap,
-      child: Center(
-        child: Column(
-          children: <Widget>[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Image.asset(
-                'assets/icon/icon.png',
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-              ),
+    return Center(
+      child: Column(
+        children: <Widget>[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.asset(
+              'assets/icon/icon.png',
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
             ),
-            const SizedBox(height: 8),
-            Text(
-              '班到',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '班到',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ],
       ),
     );
   }
 }
 
-class _DebugApiUrl extends ConsumerWidget {
-  const _DebugApiUrl({required this.prefix});
-
-  final String prefix;
+/// Shows which server the app is pointed at (official default vs a self-hosted
+/// override) and a low-key entry point to the server-configuration screen.
+/// Visible in all build modes — self-hosting is a first-class feature.
+class _ServerConnectionInfo extends ConsumerWidget {
+  const _ServerConnectionInfo();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final urlAsync = ref.watch(effectiveBaseUrlProvider);
-    return Center(
-      child: urlAsync.maybeWhen(
-        data: (u) => Text(
-          '$prefix: $u',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
+    final outline = Theme.of(context).colorScheme.outline;
+
+    final label = urlAsync.maybeWhen(
+      data: (u) => u == Env.compileTimeDefault()
+          ? l10n.serverConnectionOfficial
+          : l10n.serverConnectionCustom(Uri.tryParse(u)?.host ?? u),
+      orElse: () => null,
+    );
+
+    return Column(
+      children: <Widget>[
+        if (label != null)
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: outline),
+            textAlign: TextAlign.center,
+          ),
+        TextButton(
+          key: const Key('login.server_config'),
+          onPressed: () => context.push(AppRoutes.serverConfig),
+          child: Text(l10n.serverConfigEntry),
         ),
-        orElse: () => const SizedBox.shrink(),
-      ),
+      ],
     );
   }
 }

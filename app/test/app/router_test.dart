@@ -7,7 +7,7 @@ import 'package:bandao_app/app/router.dart';
 import 'package:bandao_app/core/api/models/app_user.dart';
 import 'package:bandao_app/core/api/models/org.dart';
 import 'package:bandao_app/core/storage/secure_storage.dart';
-import 'package:bandao_app/features/auth/presentation/dev_server_config_screen.dart';
+import 'package:bandao_app/features/auth/presentation/server_config_screen.dart';
 import 'package:bandao_app/features/auth/presentation/force_password_change_screen.dart';
 import 'package:bandao_app/features/auth/presentation/home_screen.dart';
 import 'package:bandao_app/features/auth/presentation/login_screen.dart';
@@ -67,14 +67,14 @@ void main() {
       expect(find.byType(LoginScreen), findsOneWidget);
     });
 
-    testWidgets('dev menu route reachable while unauthenticated',
+    testWidgets('server-config route reachable while unauthenticated',
         (tester) async {
       await _pumpWithAuth(
         tester,
         const AuthState.unauthenticated(),
-        startAt: '/dev-server-config',
+        startAt: '/server-config',
       );
-      expect(find.byType(DevServerConfigScreen), findsOneWidget);
+      expect(find.byType(ServerConfigScreen), findsOneWidget);
     });
   });
 }
