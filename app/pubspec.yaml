@@ -2,7 +2,7 @@ name: bandao_app
 description: "Bandao (班到) mobile app for AppUsers."
 publish_to: 'none'
 
-version: 0.4.0+1
+version: 0.4.0+10
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
