@@ -249,6 +249,7 @@ mod tests {
                 manual_label: None,
             },
             reason: None,
+            legacy_source_id: None,
         }
     }
 

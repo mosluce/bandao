@@ -196,6 +196,7 @@ pub async fn submit_location_pings(
                 accuracy_meters: p.accuracy,
                 occurred_at_client: parsed_client_ts,
                 occurred_at_server: now,
+                legacy_source_id: None,
             },
         ));
     }

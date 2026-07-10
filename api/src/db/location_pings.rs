@@ -91,6 +91,31 @@ impl LocationPingRepository {
         }
     }
 
+    /// Idempotent insert for the `legacy_backfill` example script. Upserts
+    /// keyed on `ping.legacy_source_id` (the partial unique index on that
+    /// field is what makes this safe): re-running the script against the
+    /// same legacy document is a no-op. Returns `true` when the document was
+    /// newly inserted, `false` when it already existed.
+    ///
+    /// # Panics
+    /// Panics if `ping.legacy_source_id` is `None` — this method is only for
+    /// legacy-imported rows, never for live-submitted pings.
+    pub async fn upsert_legacy(&self, ping: &LocationPing) -> ApiResult<bool> {
+        let legacy_source_id = ping
+            .legacy_source_id
+            .expect("upsert_legacy requires legacy_source_id");
+        let to_insert = bson::to_document(ping)?;
+        let result = self
+            .coll
+            .update_one(
+                doc! { "legacy_source_id": legacy_source_id },
+                doc! { "$setOnInsert": to_insert },
+            )
+            .upsert(true)
+            .await?;
+        Ok(result.upserted_id.is_some())
+    }
+
     /// Cursor pagination, newest-first by `occurred_at_client`. `before` is
     /// the boundary timestamp (exclusive) supplied by the client; the
     /// `_id` desc tie-break keeps duplicate client times stable. `from` and
