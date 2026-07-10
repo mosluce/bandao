@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::auth::extractor::RequireAdmin;
 use crate::auth::providers::{self, mssql::MssqlProvider};
-use crate::domain::{ExternalAuthConfig, OrgAuthSource};
+use crate::domain::{EncryptMode, ExternalAuthConfig, OrgAuthSource};
 use crate::error::{ApiError, ApiResult};
 use crate::handlers::auth::OrgDto;
 use crate::state::AppState;
@@ -29,6 +29,16 @@ pub struct ExternalAuthInput {
     pub query: String,
     pub key_col: String,
     pub display_col: String,
+    /// Transport encryption; absent → `Optional`.
+    #[serde(default)]
+    pub encrypt: EncryptMode,
+    /// Trust an otherwise-invalid server cert; absent → `true`.
+    #[serde(default = "default_trust_server_certificate")]
+    pub trust_server_certificate: bool,
+}
+
+fn default_trust_server_certificate() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]
@@ -203,5 +213,7 @@ fn build_config(
         query: input.query,
         key_col: input.key_col,
         display_col: input.display_col,
+        encrypt: input.encrypt,
+        trust_server_certificate: input.trust_server_certificate,
     })
 }

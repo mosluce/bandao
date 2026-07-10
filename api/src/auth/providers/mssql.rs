@@ -11,13 +11,14 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bson::oid::ObjectId;
-use tiberius::{AuthMethod, Client, Config as TiberiusConfig, Row};
+use tiberius::{AuthMethod, Client, Config as TiberiusConfig, EncryptionLevel, Row};
 use tokio::net::TcpStream;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
 use super::{AppAuthProvider, AuthProviderError};
 use crate::config::Config;
 use crate::db::app_users::AppUserRepository;
+use crate::domain::EncryptMode;
 use crate::domain::{AppUser, ExternalAuthConfig};
 
 pub struct MssqlProvider {
@@ -69,8 +70,19 @@ impl MssqlProvider {
             &self.config.username,
             &conn_password,
         ));
-        // Legacy MSSQL instances routinely present self-signed certs.
-        cfg.trust_cert();
+        // Transport encryption is per-Org: legacy on-prem MSSQL often can't do
+        // TLS at all (needs Off), so we don't force the tiberius default of
+        // Required.
+        cfg.encryption(match self.config.encrypt {
+            EncryptMode::Off => EncryptionLevel::Off,
+            EncryptMode::Optional => EncryptionLevel::On,
+            EncryptMode::Required => EncryptionLevel::Required,
+        });
+        // Only trust an otherwise-invalid (e.g. self-signed) cert when the Org
+        // opted in. No effect when encryption is Off.
+        if self.config.trust_server_certificate {
+            cfg.trust_cert();
+        }
 
         let tcp = TcpStream::connect(cfg.get_addr())
             .await

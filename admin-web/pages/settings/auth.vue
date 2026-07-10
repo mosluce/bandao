@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ExternalAuthInput, OrgAuthSource, TestLoginResponse } from '~/types/api'
+import type { EncryptMode, ExternalAuthInput, OrgAuthSource, TestLoginResponse } from '~/types/api'
 import { ApiError } from '~/types/api'
 
 definePageMeta({ middleware: 'auth' })
@@ -22,6 +22,8 @@ const query = ref('SELECT emp_id, name FROM staff WHERE acct = @account AND pwd 
 const keyCol = ref('emp_id')
 const displayCol = ref('name')
 const passwordSet = ref(false)
+const encrypt = ref<EncryptMode>('optional')
+const trustServerCertificate = ref(true)
 
 const saving = ref(false)
 const saveError = ref('')
@@ -52,6 +54,8 @@ function hydrate() {
     keyCol.value = ext.key_col
     displayCol.value = ext.display_col
     passwordSet.value = ext.password_set
+    encrypt.value = ext.encrypt
+    trustServerCertificate.value = ext.trust_server_certificate
   }
   password.value = ''
 }
@@ -70,6 +74,8 @@ function buildInput(): ExternalAuthInput {
     query: query.value.trim(),
     key_col: keyCol.value.trim(),
     display_col: displayCol.value.trim(),
+    encrypt: encrypt.value,
+    trust_server_certificate: trustServerCertificate.value,
   }
 }
 
@@ -216,6 +222,21 @@ const switchWarning = computed(() => {
                 class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono"
               >
             </label>
+            <label class="text-sm">
+              <span class="mb-1 block text-slate-600">加密 (Encrypt)</span>
+              <select v-model="encrypt" class="w-full rounded border border-slate-300 px-2 py-1.5">
+                <option value="off">關閉 (off)</option>
+                <option value="optional">選用 (optional)</option>
+                <option value="required">強制 (required)</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2 text-sm sm:col-span-1">
+              <input v-model="trustServerCertificate" type="checkbox" class="rounded border-slate-300">
+              <span class="text-slate-600">信任伺服器憑證</span>
+            </label>
+            <p class="text-xs text-slate-400 sm:col-span-2">
+              舊版地端 MSSQL 常不支援 TLS，連不上時可將加密設為「選用」或「關閉」。憑證為自簽時勾選「信任伺服器憑證」。
+            </p>
           </div>
 
           <label class="block text-sm">
