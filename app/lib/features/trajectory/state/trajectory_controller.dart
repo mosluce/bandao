@@ -6,30 +6,13 @@ import '../../checkin/data/checkin_repository.dart';
 import '../data/my_locations_repository.dart';
 import '../data/trajectory_stats.dart';
 
-/// Start anchor for a day's trajectory: the location + time of the first
-/// `clock_in` event. Lets the screen draw the start marker as soon as the user
-/// has clocked in, without waiting for location pings to accumulate.
-class TrajectoryStart {
-  const TrajectoryStart({
-    required this.lat,
-    required this.lng,
-    required this.time,
-  });
-
-  final double lat;
-  final double lng;
-
-  /// Local wall-clock time of the clock-in (drives the start marker color).
-  final DateTime time;
-}
-
 /// State held by `trajectoryProvider`.
 class TrajectoryDayState {
   const TrajectoryDayState({
     required this.selectedDate,
     required this.pings,
     required this.stats,
-    this.start,
+    this.events = const [],
   });
 
   /// Calendar day in *local* time. The repository call converts to UTC
@@ -38,21 +21,22 @@ class TrajectoryDayState {
   final List<LocationPingDto> pings;
   final TrajectoryStats stats;
 
-  /// The day's clock-in anchor, when the user clocked in that day. Null when
-  /// there was no clock-in (or its location was unavailable).
-  final TrajectoryStart? start;
+  /// The day's check-in events (clock in/out, transfer in/out), drawn as
+  /// event-type markers. The first `clock_in` anchors the start of the day, so
+  /// the map renders as soon as the user has clocked in — before any pings.
+  final List<CheckinEventDto> events;
 
   TrajectoryDayState copyWith({
     DateTime? selectedDate,
     List<LocationPingDto>? pings,
     TrajectoryStats? stats,
-    TrajectoryStart? start,
+    List<CheckinEventDto>? events,
   }) {
     return TrajectoryDayState(
       selectedDate: selectedDate ?? this.selectedDate,
       pings: pings ?? this.pings,
       stats: stats ?? this.stats,
-      start: start ?? this.start,
+      events: events ?? this.events,
     );
   }
 }
@@ -86,45 +70,32 @@ class TrajectoryController extends AsyncNotifier<TrajectoryDayState> {
     final repo = await ref.read(myLocationsRepositoryProvider.future);
     final next = startOfDay.add(const Duration(days: 1));
     final pings = await repo.listForRange(from: startOfDay, to: next);
-    final start = await _fetchStartAnchor(startOfDay);
+    final events = await _fetchDayEvents(startOfDay, next);
     return TrajectoryDayState(
       selectedDate: startOfDay,
       pings: pings,
       stats: computeTrajectoryStats(pings),
-      start: start,
+      events: events,
     );
   }
 
-  /// Fetch the day's first `clock_in` event to anchor the start marker.
-  /// Best-effort: any failure degrades to `null` so the ping path still
-  /// renders. The events endpoint is cursor-paginated (no from/to); one page
-  /// comfortably covers the trajectory's 8-day date range for typical users.
-  Future<TrajectoryStart?> _fetchStartAnchor(DateTime startOfDay) async {
+  /// Fetch the day's check-in events (for event markers + the clock-in start
+  /// anchor). Best-effort: any failure degrades to an empty list so the ping
+  /// path still renders. The events endpoint is cursor-paginated (no from/to);
+  /// one page comfortably covers the trajectory's 8-day range for typical use.
+  Future<List<CheckinEventDto>> _fetchDayEvents(
+    DateTime startOfDay,
+    DateTime next,
+  ) async {
     try {
       final checkin = await ref.read(checkinRepositoryProvider.future);
       final events = await checkin.events(limit: 100);
-      final next = startOfDay.add(const Duration(days: 1));
-      CheckinEventDto? firstClockIn;
-      DateTime? firstClockInAt;
-      for (final e in events) {
-        if (e.eventType != CheckinEventType.clockIn) continue;
-        final t = DateTime.tryParse(e.occurredAtClient);
-        if (t == null) continue;
-        final local = t.toLocal();
-        if (local.isBefore(startOfDay) || !local.isBefore(next)) continue;
-        if (firstClockInAt == null || local.isBefore(firstClockInAt)) {
-          firstClockIn = e;
-          firstClockInAt = local;
-        }
-      }
-      if (firstClockIn == null || firstClockInAt == null) return null;
-      return TrajectoryStart(
-        lat: firstClockIn.location.coordinates.lat,
-        lng: firstClockIn.location.coordinates.lng,
-        time: firstClockInAt,
-      );
+      return events.where((e) {
+        final t = DateTime.tryParse(e.occurredAtClient)?.toLocal();
+        return t != null && !t.isBefore(startOfDay) && t.isBefore(next);
+      }).toList(growable: false);
     } catch (_) {
-      return null;
+      return const [];
     }
   }
 

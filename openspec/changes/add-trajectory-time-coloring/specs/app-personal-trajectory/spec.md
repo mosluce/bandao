@@ -31,14 +31,13 @@ The ramp SHALL pass through the red–purple side (never green/rainbow) and SHAL
 The `/trajectory` screen SHALL fetch the caller's own pings for the active date via `GET /app/checkin/me/locations?from=&to=` (range = one calendar day in the Org's timezone) and the caller's own events for the same day via `GET /app/checkin/events`. When there is renderable location data the screen SHALL render:
 
 - A `flutter_map` map view with OSM/CARTO Positron tiles (matching admin-web's tile choice) and the required `© OpenStreetMap contributors © CARTO` attribution string.
-- A polyline drawn through pings ordered ascending by `occurred_at_client`, **colored per point by the Time-of-day trajectory color scale** applied to each ping's local `occurred_at_client`, interpolated along the line.
-- A **start marker anchored to the day's first `clock_in` event location** (not the first ping), colored by that check-in's time via the scale.
-- An end marker at the last ping.
+- A polyline drawn through pings ordered ascending by `occurred_at_client`, **colored per point by the Time-of-day trajectory color scale** applied to each ping's local `occurred_at_client`, interpolated along the line (drawn as consecutive per-segment polylines since a single stroke cannot follow a winding path with a per-point color).
+- **Event markers** at each of the day's check-in events (clock in/out, transfer in/out), styled by event type (visually distinct from the time-colored path). The first `clock_in` marker anchors the start of the day.
 - A **legend** mapping color to time (a horizontal gradient bar labeled at `6:00 / 12:00 / 18:00 / 22:00`) overlaid on the map.
-- Auto-fit map bounds to encompass all rendered points (pings + the start anchor) on initial load.
+- Auto-fit map bounds to encompass all rendered points (pings + event markers) on initial load.
 - Three summary stats below the map: **走動距離** (geodesic sum, km to one decimal), **在班時長** (first→last ping elapsed, `H 小時 M 分`), **位置點** (integer ping count).
 
-When there is a `clock_in` event for the date but zero pings, the screen SHALL still render the map and draw only the colored start marker (no line). When there are neither pings nor a `clock_in` event, the screen SHALL render the text `該日無軌跡資料` and SHALL NOT instantiate the map.
+When there are check-in events for the date but zero pings, the screen SHALL still render the map and draw the event markers (no line). When there are neither pings nor any check-in events, the screen SHALL render the text `該日無軌跡資料` and SHALL NOT instantiate the map.
 
 #### Scenario: Path is colored by time of day
 
@@ -46,19 +45,20 @@ When there is a `clock_in` event for the date but zero pings, the screen SHALL s
 - **THEN** the polyline transitions from the warm (`06:00`) end of the scale toward the cool (`22:00`) end following each point's local time
 - **AND** a legend shows the color→time mapping
 
-#### Scenario: Start marker follows the clock-in, not the first ping
+#### Scenario: Event markers are drawn per type; clock-in anchors the start
 
-- **WHEN** the day has a `clock_in` event with a location
-- **THEN** the start marker is drawn at the clock-in location, colored by the check-in time
+- **WHEN** the day has check-in events (clock in/out, transfer in/out) with locations
+- **THEN** a marker is drawn at each event, styled by event type
+- **AND** the first `clock_in` marker sits at the start of the day's path
 
-#### Scenario: Clock-in with no pings still renders the start
+#### Scenario: Events with no pings still render the map
 
-- **WHEN** the server returns a `clock_in` event but zero pings for the date
-- **THEN** the map renders with only the colored start marker and no polyline
+- **WHEN** the server returns check-in events but zero pings for the date
+- **THEN** the map renders with the event markers and no polyline
 
-#### Scenario: Neither pings nor clock-in shows text, no map
+#### Scenario: Neither pings nor events shows text, no map
 
-- **WHEN** the server returns zero pings and no `clock_in` event for the date
+- **WHEN** the server returns zero pings and no check-in events for the date
 - **THEN** the screen shows the text `該日無軌跡資料`
 - **AND** no map widget is instantiated
 
@@ -70,4 +70,4 @@ When there is a `clock_in` event for the date but zero pings, the screen SHALL s
 #### Scenario: Auto fit bounds on initial render
 
 - **WHEN** the map renders for the first time
-- **THEN** the viewport encompasses every plotted coordinate including the start anchor
+- **THEN** the viewport encompasses every plotted coordinate including the event markers

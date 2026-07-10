@@ -86,10 +86,15 @@ async function loadDay() {
     pings.value = [...pingsRes].sort((a, b) =>
       a.occurred_at_client.localeCompare(b.occurred_at_client),
     )
-    // Filter events to the same day-range.
+    // Filter events to the same day-range. Compare instants (not strings):
+    // occurred_at_client and range bounds can use different offset
+    // representations (UTC "Z" vs "+08:00"), so a lexical compare drops
+    // early-morning events.
+    const fromMs = Date.parse(range.from)
+    const toMs = Date.parse(range.to)
     events.value = eventsRes.filter((e) => {
-      const t = e.occurred_at_client
-      return t >= range.from && t < range.to
+      const ms = Date.parse(e.occurred_at_client)
+      return ms >= fromMs && ms < toMs
     })
   }
   catch (err) {

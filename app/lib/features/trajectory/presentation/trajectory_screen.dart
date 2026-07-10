@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/api/models/checkin_event.dart';
 import '../../../core/api/models/location_ping.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../checkin/state/location_permission_provider.dart';
@@ -125,10 +126,10 @@ class _Body extends StatelessWidget {
         ),
       ),
       data: (day) {
-        // Render the map when there is anything to show: a ping path OR just a
-        // clock-in start anchor. Only fall back to the empty text when neither
-        // exists.
-        if (day.pings.isEmpty && day.start == null) {
+        // Render the map when there is anything to show: a ping path OR at
+        // least one check-in event (e.g. clocked in but no pings yet). Only
+        // fall back to the empty text when neither exists.
+        if (day.pings.isEmpty && day.events.isEmpty) {
           return Center(
             child: Text(
               l10n.trajectoryEmpty,
@@ -141,7 +142,7 @@ class _Body extends StatelessWidget {
             Expanded(
               child: _Map(
                 pings: day.pings,
-                start: day.start,
+                events: day.events,
                 attribution: l10n.trajectoryAttribution,
               ),
             ),
@@ -156,12 +157,12 @@ class _Body extends StatelessWidget {
 class _Map extends StatelessWidget {
   const _Map({
     required this.pings,
-    required this.start,
+    required this.events,
     required this.attribution,
   });
 
   final List<LocationPingDto> pings;
-  final TrajectoryStart? start;
+  final List<CheckinEventDto> events;
   final String attribution;
 
   @override
@@ -172,14 +173,6 @@ class _Map extends StatelessWidget {
     final times = sorted
         .map((p) => DateTime.parse(p.occurredAtClient).toLocal())
         .toList();
-
-    // Start anchor: the clock-in when present, otherwise the first ping.
-    final LatLng? startPoint = start != null
-        ? LatLng(start!.lat, start!.lng)
-        : (points.isNotEmpty ? points.first : null);
-    final Color? startColor = start != null
-        ? timeOfDayColor(start!.time)
-        : (times.isNotEmpty ? timeOfDayColor(times.first) : null);
 
     // One polyline per consecutive pair, colored by the segment's midpoint
     // time (flutter_map's gradientColors is a straight first→last projection,
@@ -195,11 +188,14 @@ class _Map extends StatelessWidget {
         ),
     ];
 
-    // Everything to keep in view: the path + the start anchor.
-    final allPoints = <LatLng>[
-      ...points,
-      if (startPoint != null) startPoint,
-    ];
+    // Event markers (clock in/out, transfer in/out), colored by type. The
+    // clock-in marker anchors the start of the day.
+    final eventPoints = events
+        .map((e) => LatLng(e.location.coordinates.lat, e.location.coordinates.lng))
+        .toList();
+
+    // Everything to keep in view: the path + the event markers.
+    final allPoints = <LatLng>[...points, ...eventPoints];
 
     return Stack(
       children: [
@@ -230,19 +226,12 @@ class _Map extends StatelessWidget {
             if (segments.isNotEmpty) PolylineLayer(polylines: segments),
             MarkerLayer(
               markers: [
-                if (startPoint != null)
+                for (var i = 0; i < events.length; i++)
                   Marker(
-                    point: startPoint,
-                    width: 24,
-                    height: 24,
-                    child: _Dot(color: startColor!),
-                  ),
-                if (points.length > 1)
-                  Marker(
-                    point: points.last,
-                    width: 24,
-                    height: 24,
-                    child: _Dot(color: timeOfDayColor(times.last)),
+                    point: eventPoints[i],
+                    width: 22,
+                    height: 22,
+                    child: _Dot(color: _eventColor(events[i].eventType)),
                   ),
               ],
             ),
@@ -261,6 +250,19 @@ class _Map extends StatelessWidget {
   }
 
   static int _minuteOfDay(DateTime t) => t.hour * 60 + t.minute;
+
+  /// Event-type marker colors — matches admin-web's trajectory markers.
+  static Color _eventColor(CheckinEventType type) {
+    switch (type) {
+      case CheckinEventType.clockIn:
+        return const Color(0xFF15803D); // green — start of day
+      case CheckinEventType.clockOut:
+        return const Color(0xFF475569); // slate
+      case CheckinEventType.transferIn:
+      case CheckinEventType.transferOut:
+        return const Color(0xFFB45309); // amber
+    }
+  }
 }
 
 /// "Color → time" legend: a horizontal warm→cool gradient bar with clock
