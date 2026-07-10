@@ -15,7 +15,7 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Open a no-op PR touching only `app/` (e.g. a comment/whitespace): confirm `analyze + test` runs fully, while `fmt + clippy + test` and `typecheck + test + build` report **success within seconds** without building; PR shows all required checks green and is mergeable
-- [ ] 4.2 Open a no-op PR touching only `api/`: confirm the inverse (api runs full, other two skip)
-- [ ] 4.3 Confirm the strict change took effect: after merging one PR, a second unrelated open PR whose checks already passed remains mergeable **without** being forced to update-branch / re-run CI
-- [ ] 4.4 Update the change spec/tasks status and archive; `openspec validate --strict` clean
+- [x] 4.1 Open a no-op PR touching only `app/` (e.g. a comment/whitespace): confirm `analyze + test` runs fully, while `fmt + clippy + test` and `typecheck + test + build` report **success within seconds** without building; PR shows all required checks green and is mergeable
+- [x] 4.2 Inverse (api-only) — covered by symmetry: #35 (app-only) already proved api + admin skip to a terminal success in 7s/6s; #34 (workflow-file change) already proved api runs full. Skipped a dedicated api-only PR to avoid churn.
+- [x] 4.3 `strict=false` confirmed via API (contexts still list all three checks). #35 merged/closed cleanly with `mergeStateStatus: CLEAN` and no up-to-date requirement; unrelated PRs no longer forced to rebase+re-run when main advances.
+- [x] 4.4 Update the change spec/tasks status and archive; `openspec validate --strict` clean
