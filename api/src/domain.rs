@@ -339,6 +339,10 @@ pub enum EventSource {
     App,
     /// Synthesised by an admin via `/checkin/users/:id/force-checkout`.
     AdminForce,
+    /// Imported by the `legacy_backfill` example script from a customer's
+    /// legacy check-in system. Distinct from `App` so the audit trail is
+    /// honest about where the row actually came from.
+    LegacyBackfill,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -395,6 +399,11 @@ pub struct CheckinEvent {
     /// Free-text reason — only set by force-checkout.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// The legacy source document's `_id` when `source = LegacyBackfill`.
+    /// Backs the partial unique index that makes the `legacy_backfill`
+    /// script's import idempotent across re-runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_source_id: Option<ObjectId>,
 }
 
 /// Denormalised current-state row, one per AppUser. Updated atomically with
@@ -461,8 +470,14 @@ pub struct LocationPing {
     pub accuracy_meters: Option<f64>,
     /// AppUser-supplied wall time at the moment the OS callback fired.
     pub occurred_at_client: DateTime,
-    /// Server-side wall time on receipt. The 90-day TTL index runs against
-    /// THIS field, not `occurred_at_client`, so a forward-jumped client clock
-    /// can't extend the retention window.
+    /// Server-side wall time on receipt. No TTL index runs against this
+    /// collection (see `location-tracking` spec) — retention is unbounded
+    /// pending a future rotation mechanism.
     pub occurred_at_server: DateTime,
+    /// The legacy source document's `_id` when this ping was written by the
+    /// `legacy_backfill` example script rather than submitted live. Backs
+    /// the partial unique index that makes the script's import idempotent
+    /// across re-runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_source_id: Option<ObjectId>,
 }

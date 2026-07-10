@@ -150,17 +150,27 @@ async fn span_over_90_days_returns_invalid_range() {
 }
 
 #[tokio::test]
-async fn from_older_than_90_days_returns_invalid_range() {
+async fn from_older_than_90_days_is_allowed_when_span_fits() {
+    // `location_pings` no longer has a 90-day TTL (see `location-tracking`
+    // spec) — legacy-imported pings can be arbitrarily old, so a `from`
+    // more than 90 days in the past must not be rejected on that basis
+    // alone. The span cap (`to - from <= 90 days`) still applies and is
+    // covered separately by `span_over_90_days_returns_invalid_range`.
     let app = TestApp::spawn().await;
     let (admin, _code, app_user_id, _client, _token, _pw) = app
         .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
         .await;
 
+    // from 100 days ago, to 95 days ago — 5-day span, well within the cap,
+    // but `from` alone would have violated the old 90-day floor.
     let from_t = ::time::OffsetDateTime::now_utc() - ::time::Duration::days(100);
     let from = from_t
         .format(&::time::format_description::well_known::Rfc3339)
         .unwrap();
-    let to = iso_offset(-3600);
+    let to_t = ::time::OffsetDateTime::now_utc() - ::time::Duration::days(95);
+    let to = to_t
+        .format(&::time::format_description::well_known::Rfc3339)
+        .unwrap();
     let r = admin
         .get(app.url(&format!(
             "/checkin/users/{app_user_id}/locations/export?from={from}&to={to}"
@@ -168,9 +178,7 @@ async fn from_older_than_90_days_returns_invalid_range() {
         .send()
         .await
         .unwrap();
-    assert_eq!(r.status(), StatusCode::BAD_REQUEST);
-    let body: Value = r.json().await.unwrap();
-    assert_eq!(body["error"]["code"], "INVALID_RANGE");
+    assert_eq!(r.status(), StatusCode::OK);
 }
 
 #[tokio::test]

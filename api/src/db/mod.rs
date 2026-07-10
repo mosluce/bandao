@@ -416,6 +416,26 @@ impl Db {
                     .build(),
             )
             .await?;
+        // Backs the `legacy_backfill` example script's idempotent upsert: the
+        // same legacy source document can be re-processed on every re-run
+        // without producing a duplicate row. Partial so live-submitted events
+        // (no `legacy_source_id`) are excluded from the constraint.
+        checkin_events
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "legacy_source_id": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .unique(true)
+                            .name("checkin_events_legacy_source_id_unique".to_string())
+                            .partial_filter_expression(
+                                doc! { "legacy_source_id": { "$exists": true } },
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
 
         // checkin_user_status: `_id` is the AppUser id, so uniqueness is
         // intrinsic. The secondary index is `(org_id, status)` for the live
@@ -435,10 +455,12 @@ impl Db {
             )
             .await?;
 
-        // location_pings: per-AppUser pagination, per-Org export, plus a
-        // 90-day TTL keyed on `occurred_at_server` so client-clock drift can't
-        // skew retention. Mongo's TTL monitor runs ~every 60s, so retention is
-        // "90 days ± a minute".
+        // location_pings: per-AppUser pagination, per-Org export. No TTL —
+        // see `location-tracking` spec's "Location pings are persisted with
+        // dual timestamps" requirement: retention was previously a 90-day
+        // TTL on `occurred_at_server`, removed so legacy-imported path data
+        // (see `legacy_backfill` example script) isn't deleted on arrival.
+        // Retention is unbounded pending a future rotation mechanism.
         let location_pings: Collection<LocationPing> = self.database.collection("location_pings");
         location_pings
             .create_index(
@@ -464,14 +486,27 @@ impl Db {
                     .build(),
             )
             .await?;
+        // Drop the old 90-day TTL index from deployments that predate this
+        // change — `create_index` alone won't remove an index that's no
+        // longer declared here. `IndexNotFound` is the common case on fresh
+        // databases; log and continue (same pattern as
+        // `dashboard_users_org_id` above).
+        if let Err(err) = location_pings.drop_index("location_pings_ttl").await {
+            tracing::debug!(?err, "location_pings_ttl drop_index ignored");
+        }
+        // Backs the `legacy_backfill` example script's idempotent upsert —
+        // see the matching index on `checkin_events` above.
         location_pings
             .create_index(
                 IndexModel::builder()
-                    .keys(doc! { "occurred_at_server": 1 })
+                    .keys(doc! { "legacy_source_id": 1 })
                     .options(
                         IndexOptions::builder()
-                            .expire_after(Duration::from_secs(90 * 24 * 3600))
-                            .name("location_pings_ttl".to_string())
+                            .unique(true)
+                            .name("location_pings_legacy_source_id_unique".to_string())
+                            .partial_filter_expression(
+                                doc! { "legacy_source_id": { "$exists": true } },
+                            )
                             .build(),
                     )
                     .build(),

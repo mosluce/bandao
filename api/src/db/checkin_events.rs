@@ -50,6 +50,7 @@ impl CheckinEventRepository {
             initiated_by_id,
             location,
             reason,
+            legacy_source_id: None,
         };
         self.coll.insert_one(&event).await?;
         Ok(event)
@@ -57,6 +58,31 @@ impl CheckinEventRepository {
 
     pub async fn find_by_id(&self, id: ObjectId) -> ApiResult<Option<CheckinEvent>> {
         Ok(self.coll.find_one(doc! { "_id": id }).await?)
+    }
+
+    /// Idempotent insert for the `legacy_backfill` example script. Upserts
+    /// keyed on `event.legacy_source_id` (the partial unique index on that
+    /// field is what makes this safe): re-running the script against the
+    /// same legacy document is a no-op. Returns `true` when the document was
+    /// newly inserted, `false` when it already existed.
+    ///
+    /// # Panics
+    /// Panics if `event.legacy_source_id` is `None` — this method is only
+    /// for legacy-imported rows, never for live submissions.
+    pub async fn upsert_legacy(&self, event: &CheckinEvent) -> ApiResult<bool> {
+        let legacy_source_id = event
+            .legacy_source_id
+            .expect("upsert_legacy requires legacy_source_id");
+        let to_insert = bson::to_document(event)?;
+        let result = self
+            .coll
+            .update_one(
+                doc! { "legacy_source_id": legacy_source_id },
+                doc! { "$setOnInsert": to_insert },
+            )
+            .upsert(true)
+            .await?;
+        Ok(result.upserted_id.is_some())
     }
 
     /// Latest event by client-time for an AppUser. Used for both the

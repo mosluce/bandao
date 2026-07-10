@@ -196,6 +196,7 @@ pub async fn submit_location_pings(
                 accuracy_meters: p.accuracy,
                 occurred_at_client: parsed_client_ts,
                 occurred_at_server: now,
+                legacy_source_id: None,
             },
         ));
     }
@@ -372,19 +373,23 @@ pub async fn list_locations(
 
 /// Shared range validator used by list + export. Each absent side is a
 /// no-op for its corresponding check (single-sided ranges are allowed).
+///
+/// No longer enforces `from >= now - 90 days`: that floor was written
+/// hand-in-hand with `location_pings`' old 90-day TTL (querying further
+/// back was pointless when nothing that old could still exist). The TTL
+/// is gone (see `location-tracking` spec, "Location pings are persisted
+/// with dual timestamps") — legacy-imported pings can be arbitrarily old —
+/// so this floor would otherwise make that data permanently unreachable
+/// through every read surface (self-list, admin list, export) despite
+/// being safely stored. The span cap (`to - from <= 90 days`) stays: it
+/// bounds a single query's result size, which is a real, still-relevant
+/// concern independent of retention.
 fn validate_range(from: Option<DateTime>, to: Option<DateTime>) -> ApiResult<()> {
     let span_max_millis = EXPORT_RANGE_MAX_DAYS * MILLIS_PER_DAY;
-    let now_millis = DateTime::now().timestamp_millis();
     if let (Some(f), Some(t)) = (from, to) {
         let from_ms = f.timestamp_millis();
         let to_ms = t.timestamp_millis();
         if to_ms < from_ms || to_ms - from_ms > span_max_millis {
-            return Err(ApiError::InvalidRange);
-        }
-    }
-    if let Some(f) = from {
-        let from_ms = f.timestamp_millis();
-        if now_millis - from_ms > span_max_millis {
             return Err(ApiError::InvalidRange);
         }
     }
