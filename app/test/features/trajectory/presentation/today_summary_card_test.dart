@@ -6,13 +6,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:bandao_app/core/api/models/checkin_event.dart';
 import 'package:bandao_app/core/api/models/checkin_status.dart';
 import 'package:bandao_app/core/api/models/location_ping.dart';
+import 'package:bandao_app/features/checkin/data/checkin_repository.dart';
 import 'package:bandao_app/features/checkin/data/location_tracking_service.dart';
 import 'package:bandao_app/features/checkin/state/checkin_status_provider.dart';
 import 'package:bandao_app/features/trajectory/data/my_locations_repository.dart';
 import 'package:bandao_app/features/trajectory/presentation/today_summary_card.dart';
 import 'package:bandao_app/l10n/app_localizations.dart';
+
+class _StubCheckinRepo implements CheckinRepository {
+  @override
+  Future<List<CheckinEventDto>> events({String? before, int limit = 50}) async =>
+      const <CheckinEventDto>[];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} not stubbed');
+}
 
 class _StubRepository implements MyLocationsRepository {
   _StubRepository(this._pings);
@@ -93,6 +105,7 @@ Future<void> _pump(
       overrides: [
         myLocationsRepositoryProvider
             .overrideWith((ref) async => _StubRepository(pings)),
+        checkinRepositoryProvider.overrideWith((ref) async => _StubCheckinRepo()),
         checkinStatusProvider
             .overrideWith(() => _StubStatusNotifier(status)),
         locationTrackingServiceProvider

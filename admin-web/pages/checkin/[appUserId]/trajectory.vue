@@ -2,6 +2,7 @@
 import type { CheckinEventDto, LocationPingDto } from '~/types/api'
 import { ApiError } from '~/types/api'
 import { dateToOrgRange } from '~/utils/orgTimeRange'
+import { minuteOfDayInTz, timeOfDayColorForMinute } from '~/utils/timeOfDayColor'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -41,7 +42,24 @@ const mapContainer = ref<HTMLElement | null>(null)
 let mapInstance: any = null
 let leaflet: any = null
 
-const hasData = computed(() => pings.value.length > 0)
+// The day's earliest clock-in with a location — anchors the start of the day
+// (its event marker is drawn below) and lets the map render even before any
+// pings accumulate.
+const clockInEvent = computed<CheckinEventDto | null>(() => {
+  const ins = events.value.filter(e => e.event_type === 'clock_in' && e.location?.coordinates)
+  if (ins.length === 0) return null
+  return ins.reduce((a, b) => (a.occurred_at_client <= b.occurred_at_client ? a : b))
+})
+
+// Render the map when there is a ping path OR at least a clock-in to anchor.
+const hasData = computed(() => pings.value.length > 0 || clockInEvent.value !== null)
+
+// CSS gradient for the "color → time" legend (hourly samples of the scale).
+const legendGradient = computed(() => {
+  const stops: string[] = []
+  for (let h = 6; h <= 22; h++) stops.push(timeOfDayColorForMinute(h * 60))
+  return `linear-gradient(to right, ${stops.join(', ')})`
+})
 
 const exportModalOpen = ref(false)
 const exportFrom = ref<string>(dateInput.value)
@@ -143,8 +161,16 @@ function redrawLayers() {
   })
 
   const points: [number, number][] = pings.value.map(p => [p.lat, p.lng])
-  if (points.length > 0) {
-    L.polyline(points, { color: '#1f2937', weight: 3 }).addTo(mapInstance)
+  // Time-of-day coloring: Leaflet has no gradient polyline, so draw one short
+  // polyline per consecutive pair colored by that segment's midpoint time.
+  const sorted = pings.value
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const mid = (minuteOfDayInTz(sorted[i].occurred_at_client, orgTz.value)
+      + minuteOfDayInTz(sorted[i + 1].occurred_at_client, orgTz.value)) >> 1
+    L.polyline(
+      [[sorted[i].lat, sorted[i].lng], [sorted[i + 1].lat, sorted[i + 1].lng]],
+      { color: timeOfDayColorForMinute(mid), weight: 4 },
+    ).addTo(mapInstance)
   }
 
   const eventColor: Record<string, string> = {
@@ -319,12 +345,25 @@ if (auth.isAdmin.value && auth.currentOrg.value) {
         </button>
       </div>
 
-      <div v-else class="rounded-xl border border-slate-200 overflow-hidden">
+      <div v-else class="relative rounded-xl border border-slate-200 overflow-hidden">
         <div
           ref="mapContainer"
           class="h-[600px] w-full"
           data-testid="trajectory-map"
         />
+        <!-- Color → time legend for the time-of-day path coloring. -->
+        <div
+          class="absolute bottom-3 left-3 z-[1000] rounded-md bg-white/90 px-2 py-1.5 shadow"
+          data-testid="trajectory-legend"
+        >
+          <div
+            class="h-2 w-40 rounded"
+            :style="{ background: legendGradient }"
+          />
+          <div class="mt-0.5 flex w-40 justify-between text-[10px] text-slate-600">
+            <span>6:00</span><span>12:00</span><span>18:00</span><span>22:00</span>
+          </div>
+        </div>
       </div>
     </div>
 
