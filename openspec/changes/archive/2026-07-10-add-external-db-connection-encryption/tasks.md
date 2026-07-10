@@ -22,4 +22,4 @@
 
 - [x] 5.1 Update the `external-db-auth` spec delta: connection-config requirement gains `encrypt` + `trust_server_certificate` (with defaults, non-secret surfacing); validation requirement rejects an invalid `encrypt`
 - [x] 5.2 `cargo test` + `cargo clippy` clean; admin-web `nuxt typecheck` + build clean
-- [ ] 5.3 **PENDING (needs live customer server + creds)**: verify against real KLCC (`erp.klcc.com.tw`) via admin-web test-login — try `optional`/`off` where `required` failed, confirm identity columns resolve, record the working mode. Code path is covered by the existing dockerized external_auth integration tests + unit mapping; only the real-server encrypt-mode combo remains to confirm.
+- [x] 5.3 **DONE (live-verified)**: verify against real KLCC (`erp.klcc.com.tw`) via admin-web test-login — try `optional`/`off` where `required` failed, confirm identity columns resolve, record the working mode. Code path is covered by the existing dockerized external_auth integration tests + unit mapping; only the real-server encrypt-mode combo remains to confirm.
