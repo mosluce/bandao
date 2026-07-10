@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'package:bandao_app/core/api/models/checkin_event.dart';
 import 'package:bandao_app/core/api/models/location_ping.dart';
+import 'package:bandao_app/features/checkin/data/checkin_repository.dart';
 import 'package:bandao_app/features/checkin/data/geolocation_service.dart';
 import 'package:bandao_app/features/trajectory/data/my_locations_repository.dart';
 import 'package:bandao_app/features/trajectory/presentation/trajectory_screen.dart';
@@ -23,6 +25,18 @@ class _FakeGeolocationService implements GeolocationService {
 
   @override
   noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} not stubbed');
+}
+
+/// Start-anchor fetch calls `events()`; stub it to empty so the trajectory
+/// controller settles without hitting the network.
+class _StubCheckinRepo implements CheckinRepository {
+  @override
+  Future<List<CheckinEventDto>> events({String? before, int limit = 50}) async =>
+      const <CheckinEventDto>[];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
       throw UnimplementedError('${invocation.memberName} not stubbed');
 }
 
@@ -56,6 +70,7 @@ Future<void> _pump(
         geolocationServiceProvider
             .overrideWithValue(_FakeGeolocationService(permission)),
         myLocationsRepositoryProvider.overrideWith((ref) async => repo),
+        checkinRepositoryProvider.overrideWith((ref) async => _StubCheckinRepo()),
       ],
       child: const MaterialApp(
         locale: Locale('zh', 'TW'),

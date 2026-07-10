@@ -2,9 +2,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bandao_app/core/api/api_error.dart';
+import 'package:bandao_app/core/api/models/checkin_event.dart';
 import 'package:bandao_app/core/api/models/location_ping.dart';
+import 'package:bandao_app/features/checkin/data/checkin_repository.dart';
 import 'package:bandao_app/features/trajectory/data/my_locations_repository.dart';
 import 'package:bandao_app/features/trajectory/state/trajectory_controller.dart';
+
+/// The controller fetches the day's events for the start anchor; stub to empty.
+class _StubCheckinRepo implements CheckinRepository {
+  @override
+  Future<List<CheckinEventDto>> events({String? before, int limit = 50}) async =>
+      const <CheckinEventDto>[];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} not stubbed');
+}
 
 class _FakeMyLocationsRepository implements MyLocationsRepository {
   _FakeMyLocationsRepository(this._impl);
@@ -43,6 +56,7 @@ ProviderContainer _container(_FakeMyLocationsRepository repo) {
   return ProviderContainer(
     overrides: [
       myLocationsRepositoryProvider.overrideWith((ref) async => repo),
+      checkinRepositoryProvider.overrideWith((ref) async => _StubCheckinRepo()),
     ],
   );
 }

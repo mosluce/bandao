@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/api/models/checkin_event.dart';
 import '../../../core/api/models/location_ping.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../checkin/state/location_permission_provider.dart';
+import '../data/time_of_day_color.dart';
 import '../data/trajectory_stats.dart';
 import '../state/trajectory_controller.dart';
 
@@ -124,7 +126,10 @@ class _Body extends StatelessWidget {
         ),
       ),
       data: (day) {
-        if (day.pings.isEmpty) {
+        // Render the map when there is anything to show: a ping path OR at
+        // least one check-in event (e.g. clocked in but no pings yet). Only
+        // fall back to the empty text when neither exists.
+        if (day.pings.isEmpty && day.events.isEmpty) {
           return Center(
             child: Text(
               l10n.trajectoryEmpty,
@@ -134,7 +139,13 @@ class _Body extends StatelessWidget {
         }
         return Column(
           children: [
-            Expanded(child: _Map(pings: day.pings, attribution: l10n.trajectoryAttribution)),
+            Expanded(
+              child: _Map(
+                pings: day.pings,
+                events: day.events,
+                attribution: l10n.trajectoryAttribution,
+              ),
+            ),
             _StatsPanel(stats: day.stats, l10n: l10n),
           ],
         );
@@ -144,68 +155,165 @@ class _Body extends StatelessWidget {
 }
 
 class _Map extends StatelessWidget {
-  const _Map({required this.pings, required this.attribution});
+  const _Map({
+    required this.pings,
+    required this.events,
+    required this.attribution,
+  });
 
   final List<LocationPingDto> pings;
+  final List<CheckinEventDto> events;
   final String attribution;
 
   @override
   Widget build(BuildContext context) {
     final sorted = [...pings]
       ..sort((a, b) => a.occurredAtClient.compareTo(b.occurredAtClient));
-    final points = sorted
-        .map((p) => LatLng(p.lat, p.lng))
-        .toList(growable: false);
-    final bounds = LatLngBounds.fromPoints(points);
+    final points = sorted.map((p) => LatLng(p.lat, p.lng)).toList();
+    final times = sorted
+        .map((p) => DateTime.parse(p.occurredAtClient).toLocal())
+        .toList();
 
-    return FlutterMap(
-      options: MapOptions(
-        initialCameraFit: CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.all(32),
+    // One polyline per consecutive pair, colored by the segment's midpoint
+    // time (flutter_map's gradientColors is a straight first→last projection,
+    // so it can't follow a winding path — segments are the accurate approach).
+    final segments = <Polyline>[
+      for (var i = 0; i < points.length - 1; i++)
+        Polyline(
+          points: [points[i], points[i + 1]],
+          strokeWidth: 4,
+          color: timeOfDayColorForMinute(
+            (_minuteOfDay(times[i]) + _minuteOfDay(times[i + 1])) ~/ 2,
+          ),
         ),
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-        ),
-      ),
+    ];
+
+    // Event markers (clock in/out, transfer in/out), colored by type. The
+    // clock-in marker anchors the start of the day.
+    final eventPoints = events
+        .map((e) => LatLng(e.location.coordinates.lat, e.location.coordinates.lng))
+        .toList();
+
+    // Everything to keep in view: the path + the event markers.
+    final allPoints = <LatLng>[...points, ...eventPoints];
+
+    return Stack(
       children: [
-        TileLayer(
-          // CARTO Positron — free, OSM-attributed.
-          urlTemplate:
-              'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-          retinaMode: true,
-          userAgentPackageName: 'tw.no8.bandao',
-        ),
-        PolylineLayer(
-          polylines: [
-            Polyline(
-              points: points,
-              strokeWidth: 4,
-              color: Theme.of(context).colorScheme.primary,
+        FlutterMap(
+          options: MapOptions(
+            initialCameraFit: allPoints.length > 1
+                ? CameraFit.bounds(
+                    bounds: LatLngBounds.fromPoints(allPoints),
+                    padding: const EdgeInsets.all(32),
+                  )
+                : null,
+            initialCenter: allPoints.length == 1
+                ? allPoints.first
+                : const LatLng(0, 0),
+            initialZoom: allPoints.length == 1 ? 16 : 3,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+            ),
+          ),
+          children: [
+            TileLayer(
+              // CARTO Positron — free, OSM-attributed.
+              urlTemplate:
+                  'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+              retinaMode: true,
+              userAgentPackageName: 'tw.no8.bandao',
+            ),
+            if (segments.isNotEmpty) PolylineLayer(polylines: segments),
+            MarkerLayer(
+              markers: [
+                for (var i = 0; i < events.length; i++)
+                  Marker(
+                    point: eventPoints[i],
+                    width: 22,
+                    height: 22,
+                    child: _Dot(color: _eventColor(events[i].eventType)),
+                  ),
+              ],
+            ),
+            RichAttributionWidget(
+              attributions: [TextSourceAttribution(attribution)],
             ),
           ],
         ),
-        MarkerLayer(
-          markers: [
-            Marker(
-              point: points.first,
-              width: 24,
-              height: 24,
-              child: _Dot(color: Theme.of(context).colorScheme.secondary),
-            ),
-            if (points.length > 1)
-              Marker(
-                point: points.last,
-                width: 24,
-                height: 24,
-                child: _Dot(color: Theme.of(context).colorScheme.primary),
-              ),
-          ],
-        ),
-        RichAttributionWidget(
-          attributions: [TextSourceAttribution(attribution)],
+        const Positioned(
+          left: 12,
+          bottom: 12,
+          child: _TimeLegend(),
         ),
       ],
+    );
+  }
+
+  static int _minuteOfDay(DateTime t) => t.hour * 60 + t.minute;
+
+  /// Event-type marker colors — matches admin-web's trajectory markers.
+  static Color _eventColor(CheckinEventType type) {
+    switch (type) {
+      case CheckinEventType.clockIn:
+        return const Color(0xFF15803D); // green — start of day
+      case CheckinEventType.clockOut:
+        return const Color(0xFF475569); // slate
+      case CheckinEventType.transferIn:
+      case CheckinEventType.transferOut:
+        return const Color(0xFFB45309); // amber
+    }
+  }
+}
+
+/// "Color → time" legend: a horizontal warm→cool gradient bar with clock
+/// labels, so a viewer can decode the path colors.
+class _TimeLegend extends StatelessWidget {
+  const _TimeLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    // Sample the scale at each hour across the domain for a smooth bar.
+    final stops = <Color>[
+      for (var h = 6; h <= 22; h++) timeOfDayColorForMinute(h * 60),
+    ];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1)),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 160,
+              height: 8,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                gradient: LinearGradient(colors: stops),
+              ),
+            ),
+            const SizedBox(height: 2),
+            const SizedBox(
+              width: 160,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('6:00', style: TextStyle(fontSize: 10)),
+                  Text('12:00', style: TextStyle(fontSize: 10)),
+                  Text('18:00', style: TextStyle(fontSize: 10)),
+                  Text('22:00', style: TextStyle(fontSize: 10)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
