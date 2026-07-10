@@ -7,6 +7,7 @@ pub mod checkin;
 pub mod checkin_dto;
 pub mod external_auth;
 pub mod join_requests;
+pub mod legacy_backfill;
 pub mod location_tracking;
 pub mod me;
 pub mod orgs;
@@ -56,6 +57,15 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/orgs/me/external-auth/test-login",
             post(external_auth::test_login),
+        )
+        .route("/orgs/me/legacy-backfill", post(legacy_backfill::configure))
+        .route(
+            "/orgs/me/legacy-backfill/preview",
+            post(legacy_backfill::preview),
+        )
+        .route(
+            "/orgs/me/legacy-backfill/jobs",
+            get(legacy_backfill::list_jobs),
         )
         .route("/orgs/me/join-requests", get(join_requests::list_for_org))
         .route(

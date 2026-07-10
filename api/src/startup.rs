@@ -81,13 +81,18 @@ async fn repair_inner(db: &Db) -> Result<(), mongodb::error::Error> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum RepairOutcome {
+pub enum RepairOutcome {
     Ok,
     Fixed,
     Initialised,
 }
 
-async fn repair_one(
+/// Derive `checkin_user_status` for one AppUser from their latest event.
+/// Reused by the legacy check-in backfill worker after inserting historical
+/// events — the situation (events exist, no status row yet) lands squarely in
+/// the `(None, Some(latest))` branch below, so no separate status-derivation
+/// logic is needed for backfilled AppUsers.
+pub async fn repair_one(
     db: &Db,
     app_user_id: ObjectId,
     org_id: ObjectId,

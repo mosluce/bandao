@@ -39,6 +39,15 @@ async fn main() -> ExitCode {
 
     let listen_addr = config.listen_addr;
     let state = AppState::new(db, config);
+
+    // Persistent worker for the legacy check-in backfill job queue. Unlike
+    // the one-shot repair above, this runs for the lifetime of the process —
+    // the codebase's first long-running background loop. See
+    // `services::legacy_backfill::worker`.
+    tokio::spawn(bandao_api::services::legacy_backfill::run_worker_loop(
+        state.clone(),
+    ));
+
     let app = handlers::router(state);
 
     let listener = match TcpListener::bind(listen_addr).await {

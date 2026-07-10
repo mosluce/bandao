@@ -132,6 +132,12 @@ pub enum ApiError {
     #[error("operation not available while the org uses external authentication")]
     ExternalAuthMode,
 
+    /// Legacy check-in backfill config could not be saved/previewed — most
+    /// commonly `BANDAO_SECRET_KEY` is not configured on this deployment, so
+    /// the connection string cannot be encrypted/decrypted.
+    #[error("legacy backfill is unavailable")]
+    LegacyBackfillUnavailable,
+
     #[error("password hashing failed")]
     Password,
     #[error("database error")]
@@ -159,6 +165,10 @@ impl ApiError {
                 (StatusCode::SERVICE_UNAVAILABLE, "EXTERNAL_AUTH_UNAVAILABLE")
             }
             ApiError::ExternalAuthMode => (StatusCode::CONFLICT, "EXTERNAL_AUTH_MODE"),
+            ApiError::LegacyBackfillUnavailable => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "LEGACY_BACKFILL_UNAVAILABLE",
+            ),
             ApiError::Validation(_) => (StatusCode::BAD_REQUEST, "VALIDATION"),
             ApiError::InvalidSlugFormat => (StatusCode::BAD_REQUEST, "INVALID_SLUG_FORMAT"),
             ApiError::SlugReserved => (StatusCode::BAD_REQUEST, "SLUG_RESERVED"),

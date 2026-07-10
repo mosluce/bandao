@@ -59,6 +59,7 @@ impl AppUserRepository {
             needs_password_change: true,
             last_login_at: None,
             created_by_dashboard_user_id: Some(created_by_dashboard_user_id),
+            legacy_backfill_done_at: None,
             created_at: now,
             updated_at: now,
         };
@@ -119,6 +120,7 @@ impl AppUserRepository {
             needs_password_change: false,
             last_login_at: Some(now),
             created_by_dashboard_user_id: None,
+            legacy_backfill_done_at: None,
             created_at: now,
             updated_at: now,
         };
@@ -261,6 +263,18 @@ impl AppUserRepository {
             .update_one(
                 doc! { "_id": id },
                 doc! { "$set": { "last_login_at": now } },
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Set the one-shot `legacy_backfill_done_at` marker. Called by the
+    /// legacy backfill worker only after a job completes successfully.
+    pub async fn mark_legacy_backfill_done(&self, id: ObjectId) -> ApiResult<()> {
+        self.coll
+            .update_one(
+                doc! { "_id": id },
+                doc! { "$set": { "legacy_backfill_done_at": DateTime::now() } },
             )
             .await?;
         Ok(())

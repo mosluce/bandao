@@ -96,6 +96,34 @@ pub struct ExternalAuthConfig {
     pub trust_server_certificate: bool,
 }
 
+/// Connection + field-mapping configuration for legacy check-in data backfill,
+/// stored at `Org.settings.legacy_backfill`. Every target-specific quirk
+/// (field names, the action vocabulary) lives in this declarative config, not
+/// in code — different customers' legacy systems shape their documents
+/// differently, so the mapping itself is the only thing that varies per Org.
+/// `connection_string_encrypted` is the ciphertext of a `mongodb://` URI
+/// (never the plaintext, never returned by the API). Field paths are simple
+/// dot-paths into the raw legacy document (e.g. `"signer.username"`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegacyBackfillConfig {
+    pub connection_string_encrypted: String,
+    pub database: String,
+    pub collection: String,
+    /// Dot-path matched against the authenticating `AppUser.username`.
+    pub identity_field: String,
+    pub timestamp_field: String,
+    pub lat_field: String,
+    pub lng_field: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region_name_field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manual_label_field: Option<String>,
+    pub action_field: String,
+    /// Raw action string (e.g. `"上班"`) → `CheckinEventType`. Values with no
+    /// entry here are skipped during backfill, not treated as an error.
+    pub action_map: std::collections::HashMap<String, CheckinEventType>,
+}
+
 impl Org {
     /// Read `Org.settings.auth_source`, defaulting to `Internal` when the field
     /// is absent (old Orgs predate external auth).
@@ -110,6 +138,13 @@ impl Org {
     /// is absent or malformed.
     pub fn external_auth(&self) -> Option<ExternalAuthConfig> {
         let doc = self.settings.get_document("external_auth").ok()?;
+        bson::from_document(doc.clone()).ok()
+    }
+
+    /// Parse `Org.settings.legacy_backfill` into a typed config, or `None` when
+    /// it is absent or malformed. Presence is independent of `auth_source`.
+    pub fn legacy_backfill(&self) -> Option<LegacyBackfillConfig> {
+        let doc = self.settings.get_document("legacy_backfill").ok()?;
         bson::from_document(doc.clone()).ok()
     }
 }
@@ -292,6 +327,12 @@ pub struct AppUser {
     pub last_login_at: Option<DateTime>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created_by_dashboard_user_id: Option<ObjectId>,
+    /// One-shot marker set once a legacy check-in backfill job has completed
+    /// successfully for this AppUser (see `legacy-checkin-backfill`). Absent
+    /// on all AppUsers by default, permanently `None` when the Org has no
+    /// `legacy_backfill` configuration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_backfill_done_at: Option<DateTime>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }
@@ -339,6 +380,10 @@ pub enum EventSource {
     App,
     /// Synthesised by an admin via `/checkin/users/:id/force-checkout`.
     AdminForce,
+    /// Inserted by the legacy check-in backfill worker from a customer's
+    /// legacy system (see `legacy-checkin-backfill`) — distinct from `App` so
+    /// the audit trail is honest about where the row actually came from.
+    LegacyBackfill,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -412,6 +457,44 @@ pub struct CheckinUserStatus {
     pub current_shift_started_at: Option<DateTime>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_event_id: Option<ObjectId>,
+    pub updated_at: DateTime,
+}
+
+/// Status of a `legacy_backfill_jobs` row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LegacyBackfillJobStatus {
+    Pending,
+    Active,
+    Done,
+    Failed,
+}
+
+/// One row per AppUser needing a legacy check-in backfill. Enqueued (upserted,
+/// unique on `app_user_id`) at first login; claimed and processed by a
+/// persistent worker loop rather than run inline on the login request — see
+/// `legacy-checkin-backfill` capability. This is a lightweight Mongo-backed
+/// queue (no Redis / external queue system): `status` transitions are guarded
+/// by the same conditional `find_one_and_update` idiom already used for
+/// `checkin_user_status`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegacyBackfillJob {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub org_id: ObjectId,
+    pub app_user_id: ObjectId,
+    pub status: LegacyBackfillJobStatus,
+    pub attempts: u32,
+    /// Worker only claims `pending` jobs whose `next_attempt_at` has elapsed —
+    /// this is what implements backoff between retries.
+    pub next_attempt_at: DateTime,
+    /// Set when a job transitions to `active`; used to detect and recover
+    /// jobs abandoned by a crashed/restarted worker (see `worker::recover_stale`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locked_at: Option<DateTime>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
+    pub created_at: DateTime,
     pub updated_at: DateTime,
 }
 

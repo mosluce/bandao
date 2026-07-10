@@ -6,6 +6,7 @@ pub mod dashboard_memberships;
 pub mod dashboard_sessions;
 pub mod dashboard_users;
 pub mod join_requests;
+pub mod legacy_backfill_jobs;
 pub mod location_pings;
 pub mod orgs;
 pub mod removed_memberships;
@@ -19,7 +20,8 @@ use mongodb::{Client, Collection, Database, IndexModel};
 
 use crate::domain::{
     AppSession, AppUser, CheckinEvent, CheckinUserStatus, DashboardSession, DashboardUser,
-    JoinRequest, LocationPing, Membership, Org, OrgSlugReservation, RemovedMembership,
+    JoinRequest, LegacyBackfillJob, LocationPing, Membership, Org, OrgSlugReservation,
+    RemovedMembership,
 };
 use crate::error::ApiResult;
 
@@ -31,6 +33,7 @@ pub use dashboard_memberships::{MembershipInsertError, MembershipRepository};
 pub use dashboard_sessions::DashboardSessionRepository;
 pub use dashboard_users::DashboardUserRepository;
 pub use join_requests::{JoinRequestInsertError, JoinRequestRepository};
+pub use legacy_backfill_jobs::{LegacyBackfillJobInsertError, LegacyBackfillJobRepository};
 pub use location_pings::{InsertManyOutcome, LOCATION_PING_BATCH_MAX, LocationPingRepository};
 pub use orgs::OrgRepository;
 pub use removed_memberships::RemovedMembershipRepository;
@@ -51,6 +54,7 @@ pub struct Db {
     pub checkin_user_status: CheckinUserStatusRepository,
     pub location_pings: LocationPingRepository,
     pub join_requests: JoinRequestRepository,
+    pub legacy_backfill_jobs: LegacyBackfillJobRepository,
 }
 
 impl Db {
@@ -98,6 +102,9 @@ impl Db {
             ),
             join_requests: JoinRequestRepository::new(
                 database.collection::<JoinRequest>("join_requests"),
+            ),
+            legacy_backfill_jobs: LegacyBackfillJobRepository::new(
+                database.collection::<LegacyBackfillJob>("legacy_backfill_jobs"),
             ),
             database,
         })
@@ -472,6 +479,37 @@ impl Db {
                         IndexOptions::builder()
                             .expire_after(Duration::from_secs(90 * 24 * 3600))
                             .name("location_pings_ttl".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        // legacy_backfill_jobs: unique on app_user_id so login-time enqueue is
+        // idempotent (a job in any status blocks a duplicate); secondary index
+        // for the worker's claim query.
+        let legacy_backfill_jobs: Collection<LegacyBackfillJob> =
+            self.database.collection("legacy_backfill_jobs");
+        legacy_backfill_jobs
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "app_user_id": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .unique(true)
+                            .name("legacy_backfill_jobs_app_user_unique".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        legacy_backfill_jobs
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "status": 1, "next_attempt_at": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("legacy_backfill_jobs_claim".to_string())
                             .build(),
                     )
                     .build(),

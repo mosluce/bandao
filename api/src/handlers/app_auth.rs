@@ -6,6 +6,7 @@ use axum::response::IntoResponse;
 use crate::auth::app_extractor::AppAuthContext;
 use crate::auth::providers::{self, AuthProviderError};
 use crate::auth::{password, slug as slug_auth};
+use crate::db::LegacyBackfillJobInsertError;
 use crate::domain::AppUserStatus;
 use crate::error::{ApiError, ApiResult};
 use crate::handlers::app_dto::{
@@ -68,7 +69,7 @@ pub async fn login(
     let mut user_for_dto = user.clone();
     user_for_dto.last_login_at = Some(bson::DateTime::now());
 
-    Ok(Json(AppLoginResponse {
+    let response = AppLoginResponse {
         token: session.token,
         expires_at: session
             .expires_at
@@ -77,7 +78,32 @@ pub async fn login(
         user: AppUserDto::from_app_user(&user_for_dto),
         org: OrgDto::from_org(&org),
         needs_password_change: user.needs_password_change,
-    }))
+    };
+
+    // Enqueue a one-time legacy backfill job, if the Org has one configured
+    // and this AppUser hasn't already completed one. This is a single fast
+    // Mongo write (not `tokio::spawn`) — the actual slow work of connecting to
+    // the legacy system happens in a persistent background worker (started at
+    // boot), never inline on this request. See `legacy-checkin-backfill`.
+    if user.legacy_backfill_done_at.is_none() && org.legacy_backfill().is_some() {
+        match state
+            .db
+            .legacy_backfill_jobs
+            .create_pending(org.id, user.id)
+            .await
+        {
+            Ok(()) | Err(LegacyBackfillJobInsertError::Duplicate) => {}
+            Err(LegacyBackfillJobInsertError::Db(db_err)) => {
+                tracing::warn!(
+                    ?db_err,
+                    app_user_id = %user.id,
+                    "failed to enqueue legacy backfill job"
+                );
+            }
+        }
+    }
+
+    Ok(Json(response))
 }
 
 /// `POST /app/auth/logout` — Bearer auth, allow-listed (still reachable when

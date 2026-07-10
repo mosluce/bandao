@@ -36,6 +36,7 @@ export interface OrgDto {
   checkin: { transfer_enabled: boolean, location_tracking_enabled: boolean }
   auth_source: OrgAuthSource
   external_auth?: ExternalAuthSummaryDto
+  legacy_backfill?: LegacyBackfillSummaryDto
   slug?: string
   slug_changed_at?: string
 }
@@ -73,6 +74,74 @@ export interface TestLoginResponse {
   external_key?: string
   display_name?: string
   error?: string
+}
+
+/** Legacy check-in backfill: connection + field-mapping settings for a
+ * customer's legacy MongoDB, and the job-queue status list. Independent of
+ * `auth_source` — see `legacy-checkin-backfill`. */
+export interface LegacyBackfillInput {
+  connection_string?: string
+  database: string
+  collection: string
+  identity_field: string
+  timestamp_field: string
+  lat_field: string
+  lng_field: string
+  region_name_field?: string
+  manual_label_field?: string
+  action_field: string
+  action_map: Record<string, CheckinEventType>
+}
+
+/** Secret-free view — the connection string is never returned, only whether
+ * one is set. */
+export interface LegacyBackfillSummaryDto {
+  database: string
+  collection: string
+  identity_field: string
+  timestamp_field: string
+  lat_field: string
+  lng_field: string
+  region_name_field?: string
+  manual_label_field?: string
+  action_field: string
+  action_map: Record<string, CheckinEventType>
+  connection_configured: boolean
+}
+
+export interface LegacyBackfillPreviewRequest {
+  legacy_backfill: LegacyBackfillInput
+  test_username: string
+  limit?: number
+}
+
+export interface LegacyBackfillPreviewEventDto {
+  event_type: CheckinEventType
+  occurred_at_client: string
+  lat: number
+  lng: number
+  region_name?: string
+  manual_label?: string
+}
+
+export interface LegacyBackfillPreviewResponse {
+  connected: boolean
+  sample: LegacyBackfillPreviewEventDto[]
+  skipped_unmapped_action: number
+  skipped_unparseable: number
+  error?: string
+}
+
+export type LegacyBackfillJobStatus = 'pending' | 'active' | 'done' | 'failed'
+
+export interface LegacyBackfillJobDto {
+  id: string
+  app_user_id: string
+  status: LegacyBackfillJobStatus
+  attempts: number
+  last_error?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface MembershipDto {

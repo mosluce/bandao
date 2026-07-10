@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::db::MembershipInsertError;
 use crate::domain::{DashboardUser, EncryptMode, Membership, Org, Role};
 use crate::error::{ApiError, ApiResult};
+use crate::handlers::legacy_backfill::LegacyBackfillSummaryDto;
 use crate::state::AppState;
 
 const ORG_CODE_RETRIES: usize = 3;
@@ -59,6 +60,11 @@ pub struct OrgDto {
     /// when the Org has an `external_auth` config stored.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub external_auth: Option<ExternalAuthSummaryDto>,
+    /// Legacy check-in backfill configuration WITHOUT the connection string.
+    /// Present only when the Org has a `legacy_backfill` config stored;
+    /// independent of `auth_source`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub legacy_backfill: Option<LegacyBackfillSummaryDto>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slug: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -124,6 +130,10 @@ impl OrgDto {
                 .external_auth()
                 .as_ref()
                 .map(ExternalAuthSummaryDto::from_config),
+            legacy_backfill: org
+                .legacy_backfill()
+                .as_ref()
+                .map(LegacyBackfillSummaryDto::from_config),
             slug: org.slug.clone(),
             slug_changed_at: org
                 .slug_changed_at

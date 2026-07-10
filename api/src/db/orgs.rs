@@ -2,7 +2,9 @@ use bson::oid::ObjectId;
 use bson::{DateTime, doc};
 use mongodb::Collection;
 
-use crate::domain::{DEFAULT_ORG_TIMEZONE, ExternalAuthConfig, Org, OrgAuthSource};
+use crate::domain::{
+    DEFAULT_ORG_TIMEZONE, ExternalAuthConfig, LegacyBackfillConfig, Org, OrgAuthSource,
+};
 use crate::error::{ApiError, ApiResult};
 
 #[derive(Clone)]
@@ -94,6 +96,25 @@ impl OrgRepository {
         let result = self
             .coll
             .find_one_and_update(doc! { "_id": id }, doc! { "$set": set })
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await?;
+        result.ok_or(ApiError::NotFound)
+    }
+
+    /// Save `settings.legacy_backfill`. Independent of `auth_source` — this
+    /// is a separate, optional feature (see `legacy-checkin-backfill`).
+    pub async fn set_legacy_backfill(
+        &self,
+        id: ObjectId,
+        cfg: &LegacyBackfillConfig,
+    ) -> ApiResult<Org> {
+        let cfg_doc = bson::to_document(cfg)?;
+        let result = self
+            .coll
+            .find_one_and_update(
+                doc! { "_id": id },
+                doc! { "$set": { "updated_at": DateTime::now(), "settings.legacy_backfill": cfg_doc } },
+            )
             .return_document(mongodb::options::ReturnDocument::After)
             .await?;
         result.ok_or(ApiError::NotFound)

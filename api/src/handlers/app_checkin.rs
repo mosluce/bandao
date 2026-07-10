@@ -42,8 +42,8 @@ use crate::handlers::checkin_dto::{
 };
 use crate::state::AppState;
 
-const MANUAL_LABEL_MIN: usize = 1;
-const MANUAL_LABEL_MAX: usize = 120;
+pub(crate) const MANUAL_LABEL_MIN: usize = 1;
+pub(crate) const MANUAL_LABEL_MAX: usize = 120;
 const DEFAULT_PAGE_SIZE: i64 = 50;
 const MAX_PAGE_SIZE: i64 = 200;
 
