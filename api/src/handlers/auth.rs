@@ -12,7 +12,7 @@ use crate::auth::extractor::{AuthContext, SESSION_COOKIE, build_clearing_cookie}
 use crate::auth::{org_code, password, slug as slug_auth};
 use crate::config::Config;
 use crate::db::MembershipInsertError;
-use crate::domain::{DashboardUser, Membership, Org, Role};
+use crate::domain::{DashboardUser, EncryptMode, Membership, Org, Role};
 use crate::error::{ApiError, ApiResult};
 use crate::state::AppState;
 
@@ -78,6 +78,9 @@ pub struct ExternalAuthSummaryDto {
     pub key_col: String,
     pub display_col: String,
     pub password_set: bool,
+    /// Non-secret connection settings, surfaced so admins can see/edit them.
+    pub encrypt: EncryptMode,
+    pub trust_server_certificate: bool,
 }
 
 impl ExternalAuthSummaryDto {
@@ -92,6 +95,8 @@ impl ExternalAuthSummaryDto {
             key_col: cfg.key_col.clone(),
             display_col: cfg.display_col.clone(),
             password_set: !cfg.password_encrypted.is_empty(),
+            encrypt: cfg.encrypt,
+            trust_server_certificate: cfg.trust_server_certificate,
         }
     }
 }

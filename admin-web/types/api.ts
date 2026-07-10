@@ -11,6 +11,8 @@ export type OrgAuthSource = 'internal' | 'external_db'
 
 /** Password-free view of an Org's external-auth config (mirrors the server;
  * the connection password is never sent to the client). */
+export type EncryptMode = 'off' | 'optional' | 'required'
+
 export interface ExternalAuthSummaryDto {
   driver: string
   host: string
@@ -21,6 +23,8 @@ export interface ExternalAuthSummaryDto {
   key_col: string
   display_col: string
   password_set: boolean
+  encrypt: EncryptMode
+  trust_server_certificate: boolean
 }
 
 export interface OrgDto {
@@ -48,6 +52,8 @@ export interface ExternalAuthInput {
   query: string
   key_col: string
   display_col: string
+  encrypt: EncryptMode
+  trust_server_certificate: boolean
 }
 
 export interface ConfigureExternalAuthRequest {

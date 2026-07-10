@@ -58,6 +58,24 @@ pub enum OrgAuthSource {
 /// `query` is a parameterized template that MUST contain `@account` and
 /// `@password` placeholders; `key_col` / `display_col` name the result columns
 /// that map to the shadow user's `external_key` / `display_name`.
+/// Transport encryption the driver negotiates with the external database.
+/// Mirrors the MSSQL client's levels: `Off` (no TLS), `Optional` (encrypt when
+/// the server supports it), `Required` (encryption mandatory). Non-secret
+/// configuration. Defaults to `Optional` when absent — friendliest for the
+/// legacy on-prem MSSQL instances common among target customers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EncryptMode {
+    Off,
+    #[default]
+    Optional,
+    Required,
+}
+
+fn default_trust_server_certificate() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExternalAuthConfig {
     pub driver: String,
@@ -69,6 +87,13 @@ pub struct ExternalAuthConfig {
     pub query: String,
     pub key_col: String,
     pub display_col: String,
+    /// Transport encryption level; absent in pre-existing documents → `Optional`.
+    #[serde(default)]
+    pub encrypt: EncryptMode,
+    /// Trust an otherwise-invalid (e.g. self-signed) server certificate; absent
+    /// in pre-existing documents → `true`. No effect when `encrypt == Off`.
+    #[serde(default = "default_trust_server_certificate")]
+    pub trust_server_certificate: bool,
 }
 
 impl Org {
