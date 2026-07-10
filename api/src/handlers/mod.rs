@@ -64,6 +64,10 @@ pub fn router(state: AppState) -> Router {
             post(legacy_backfill::preview),
         )
         .route(
+            "/orgs/me/legacy-backfill/sample",
+            post(legacy_backfill::sample),
+        )
+        .route(
             "/orgs/me/legacy-backfill/jobs",
             get(legacy_backfill::list_jobs),
         )

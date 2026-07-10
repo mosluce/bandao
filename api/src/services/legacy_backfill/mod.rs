@@ -9,6 +9,6 @@ pub mod worker;
 
 pub use provider::{
     BackfillOutcome, LegacyBackfillError, MappedEvent, PreviewOutcome, preview_mapped,
-    run_backfill, validate_config,
+    run_backfill, sample_raw_documents, validate_config,
 };
 pub use worker::run_worker_loop;

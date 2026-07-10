@@ -132,6 +132,26 @@ export interface LegacyBackfillPreviewResponse {
   error?: string
 }
 
+/** Raw connection info + optional query for the sample-before-you-map flow.
+ * No field-mapping required. `connection_string` follows the same
+ * write-only/reuse-stored convention as `LegacyBackfillInput`. */
+export interface LegacyBackfillSampleRequest {
+  connection_string?: string
+  database: string
+  collection: string
+  /** Raw MongoDB query filter, e.g. `{"signer.username": "test_user"}`. */
+  query?: Record<string, unknown>
+  limit?: number
+}
+
+export interface LegacyBackfillSampleResponse {
+  connected: boolean
+  /** Raw, unmapped documents — dates/ObjectIds already rendered as plain
+   * strings so they flatten into leaf dot-paths client-side. */
+  documents: Record<string, unknown>[]
+  error?: string
+}
+
 export type LegacyBackfillJobStatus = 'pending' | 'active' | 'done' | 'failed'
 
 export interface LegacyBackfillJobDto {

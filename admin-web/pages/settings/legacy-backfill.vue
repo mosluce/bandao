@@ -2,6 +2,45 @@
 import type { CheckinEventType, LegacyBackfillInput, LegacyBackfillJobDto, LegacyBackfillPreviewResponse } from '~/types/api'
 import { ApiError } from '~/types/api'
 
+interface FlattenedField { path: string, value: unknown }
+
+/** Recursively flatten a sampled document into dot-path/value pairs, unioned
+ * across all sampled documents (sparse fields may be absent from some).
+ * Arrays are kept as opaque leaf values — not expanded into indexed paths. */
+function flattenInto(value: unknown, prefix: string, out: Map<string, unknown>) {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      flattenInto(child, prefix ? `${prefix}.${key}` : key, out)
+    }
+  }
+  else if (!out.has(prefix) || out.get(prefix) === null || out.get(prefix) === undefined) {
+    out.set(prefix, value)
+  }
+}
+
+function flattenDocuments(docs: Record<string, unknown>[]): FlattenedField[] {
+  const out = new Map<string, unknown>()
+  for (const doc of docs) flattenInto(doc, '', out)
+  return Array.from(out.entries())
+    .map(([path, value]) => ({ path, value }))
+    .sort((a, b) => a.path.localeCompare(b.path))
+}
+
+function formatChipValue(value: unknown): string {
+  if (value === null || value === undefined)
+    return '(空)'
+  if (typeof value === 'string')
+    return value.length > 40 ? `${value.slice(0, 40)}…` : value
+  if (typeof value === 'number' || typeof value === 'boolean')
+    return String(value)
+  try {
+    return JSON.stringify(value)
+  }
+  catch {
+    return String(value)
+  }
+}
+
 definePageMeta({ middleware: 'auth' })
 
 const auth = useAuth()
@@ -31,6 +70,66 @@ const actionMapRows = ref<{ source: string, eventType: CheckinEventType }[]>([])
 const saving = ref(false)
 const saveError = ref('')
 const saved = ref(false)
+
+// --- sample (before-you-map raw document preview) state ---
+const sampleQueryText = ref('') // raw Mongo JSON filter, optional
+const sampling = ref(false)
+const sampleError = ref('')
+const sampleConnected = ref<boolean | null>(null)
+const sampleDocuments = ref<Record<string, unknown>[]>([])
+const flattenedFields = computed(() => flattenDocuments(sampleDocuments.value))
+const dragOverField = ref<string | null>(null)
+
+async function runSample() {
+  sampleError.value = ''
+  sampleConnected.value = null
+  sampling.value = true
+  try {
+    let query: Record<string, unknown> | undefined
+    if (sampleQueryText.value.trim()) {
+      try {
+        const parsed = JSON.parse(sampleQueryText.value)
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+          throw new TypeError('query must be a JSON object')
+        query = parsed
+      }
+      catch {
+        sampleError.value = '查詢條件不是合法的 JSON 物件'
+        return
+      }
+    }
+    const result = await legacyBackfill.sample({
+      ...(connectionString.value ? { connection_string: connectionString.value } : {}),
+      database: database.value.trim(),
+      collection: collection.value.trim(),
+      ...(query ? { query } : {}),
+      limit: 5,
+    })
+    sampleConnected.value = result.connected
+    if (result.connected) {
+      sampleDocuments.value = result.documents
+    }
+    else {
+      sampleDocuments.value = []
+      sampleError.value = result.error ?? '連線失敗'
+    }
+  }
+  catch (err) {
+    sampleConnected.value = false
+    sampleError.value = err instanceof Error ? err.message : '採樣失敗'
+  }
+  finally {
+    sampling.value = false
+  }
+}
+
+function onChipDragStart(event: DragEvent, path: string) {
+  event.dataTransfer?.setData('text/plain', path)
+}
+
+function pathFromDrop(event: DragEvent): string {
+  return event.dataTransfer?.getData('text/plain') ?? ''
+}
 
 // --- preview (config-time dry-run) state ---
 const testUsername = ref('')
@@ -228,31 +327,131 @@ function jobStatusClass(status: string): string {
             <span class="mb-1 block text-slate-600">集合 (collection)</span>
             <input v-model="collection" type="text" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono">
           </label>
-          <label class="text-sm">
+        </div>
+
+        <!-- Sample: connect with connection info only, no field mapping required -->
+        <div class="space-y-3 border-t border-slate-100 pt-4">
+          <div>
+            <p class="text-sm font-medium text-slate-700">
+              採樣
+            </p>
+            <p class="text-xs text-slate-500">
+              用上面的連線資訊實際撈幾筆原始文件，看看欄位長什麼樣子，再把欄位拖到下面的對應欄位。
+            </p>
+          </div>
+          <div class="flex flex-wrap items-end gap-3">
+            <label class="min-w-64 flex-1 text-sm">
+              <span class="mb-1 block text-slate-600">查詢條件（選填，原始 Mongo JSON filter）</span>
+              <input
+                v-model="sampleQueryText"
+                type="text"
+                placeholder='{"signer.username": "test_user"}'
+                class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono text-sm"
+              >
+            </label>
+            <button
+              type="button"
+              :disabled="sampling"
+              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              @click="runSample"
+            >
+              {{ sampling ? '採樣中…' : '採樣' }}
+            </button>
+          </div>
+
+          <div v-if="sampleError" class="text-sm text-red-600">
+            {{ sampleError }}
+          </div>
+          <div v-else-if="sampleConnected && flattenedFields.length === 0" class="text-sm text-slate-500">
+            連線成功，但沒有撈到任何文件。
+          </div>
+          <div v-else-if="flattenedFields.length > 0" class="space-y-2">
+            <p class="text-xs text-slate-500">
+              拖曳下面的欄位到對應的輸入框：
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="field in flattenedFields"
+                :key="field.path"
+                draggable="true"
+                class="cursor-grab select-none rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 font-mono text-xs text-indigo-700 active:cursor-grabbing"
+                @dragstart="onChipDragStart($event, field.path)"
+              >
+                {{ field.path }} · {{ formatChipValue(field.value) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Field mapping: manual text input, or drag a sampled chip above onto the drop target -->
+        <div class="grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
+          <label
+            class="rounded-md text-sm"
+            :class="dragOverField === 'identity' ? 'ring-2 ring-indigo-400' : ''"
+            @dragover.prevent="dragOverField = 'identity'"
+            @dragleave="dragOverField = null"
+            @drop.prevent="identityField = pathFromDrop($event); dragOverField = null"
+          >
             <span class="mb-1 block text-slate-600">身份識別欄位（比對 App 使用者的帳號）</span>
             <input v-model="identityField" type="text" placeholder="signer.username" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono">
           </label>
-          <label class="text-sm">
+          <label
+            class="rounded-md text-sm"
+            :class="dragOverField === 'timestamp' ? 'ring-2 ring-indigo-400' : ''"
+            @dragover.prevent="dragOverField = 'timestamp'"
+            @dragleave="dragOverField = null"
+            @drop.prevent="timestampField = pathFromDrop($event); dragOverField = null"
+          >
             <span class="mb-1 block text-slate-600">發生時間欄位</span>
             <input v-model="timestampField" type="text" placeholder="at" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono">
           </label>
-          <label class="text-sm">
+          <label
+            class="rounded-md text-sm"
+            :class="dragOverField === 'lat' ? 'ring-2 ring-indigo-400' : ''"
+            @dragover.prevent="dragOverField = 'lat'"
+            @dragleave="dragOverField = null"
+            @drop.prevent="latField = pathFromDrop($event); dragOverField = null"
+          >
             <span class="mb-1 block text-slate-600">緯度欄位</span>
             <input v-model="latField" type="text" placeholder="geo.lat" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono">
           </label>
-          <label class="text-sm">
+          <label
+            class="rounded-md text-sm"
+            :class="dragOverField === 'lng' ? 'ring-2 ring-indigo-400' : ''"
+            @dragover.prevent="dragOverField = 'lng'"
+            @dragleave="dragOverField = null"
+            @drop.prevent="lngField = pathFromDrop($event); dragOverField = null"
+          >
             <span class="mb-1 block text-slate-600">經度欄位</span>
             <input v-model="lngField" type="text" placeholder="geo.lng" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono">
           </label>
-          <label class="text-sm">
+          <label
+            class="rounded-md text-sm"
+            :class="dragOverField === 'region' ? 'ring-2 ring-indigo-400' : ''"
+            @dragover.prevent="dragOverField = 'region'"
+            @dragleave="dragOverField = null"
+            @drop.prevent="regionNameField = pathFromDrop($event); dragOverField = null"
+          >
             <span class="mb-1 block text-slate-600">地址欄位（選填，對應顯示地名）</span>
             <input v-model="regionNameField" type="text" placeholder="address" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono">
           </label>
-          <label class="text-sm">
+          <label
+            class="rounded-md text-sm"
+            :class="dragOverField === 'label' ? 'ring-2 ring-indigo-400' : ''"
+            @dragover.prevent="dragOverField = 'label'"
+            @dragleave="dragOverField = null"
+            @drop.prevent="manualLabelField = pathFromDrop($event); dragOverField = null"
+          >
             <span class="mb-1 block text-slate-600">備註欄位（選填）</span>
             <input v-model="manualLabelField" type="text" placeholder="comment" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono">
           </label>
-          <label class="text-sm">
+          <label
+            class="rounded-md text-sm"
+            :class="dragOverField === 'action' ? 'ring-2 ring-indigo-400' : ''"
+            @dragover.prevent="dragOverField = 'action'"
+            @dragleave="dragOverField = null"
+            @drop.prevent="actionField = pathFromDrop($event); dragOverField = null"
+          >
             <span class="mb-1 block text-slate-600">動作欄位</span>
             <input v-model="actionField" type="text" placeholder="action" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono">
           </label>

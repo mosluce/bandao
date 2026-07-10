@@ -3,13 +3,16 @@ import type {
   LegacyBackfillInput,
   LegacyBackfillPreviewRequest,
   LegacyBackfillPreviewResponse,
+  LegacyBackfillSampleRequest,
+  LegacyBackfillSampleResponse,
   LegacyBackfillSummaryDto,
 } from '~/types/api'
 
 /**
  * Wraps the legacy check-in backfill admin endpoints:
  * `POST /orgs/me/legacy-backfill` (save config),
- * `POST /orgs/me/legacy-backfill/preview` (dry-run, no writes), and
+ * `POST /orgs/me/legacy-backfill/preview` (dry-run, no writes),
+ * `POST /orgs/me/legacy-backfill/sample` (raw documents, no field mapping), and
  * `GET /orgs/me/legacy-backfill/jobs` (read-only job status list).
  */
 export function useLegacyBackfill() {
@@ -29,9 +32,16 @@ export function useLegacyBackfill() {
     })
   }
 
+  async function sample(req: LegacyBackfillSampleRequest): Promise<LegacyBackfillSampleResponse> {
+    return api<LegacyBackfillSampleResponse>('/orgs/me/legacy-backfill/sample', {
+      method: 'POST',
+      body: req,
+    })
+  }
+
   async function listJobs(): Promise<LegacyBackfillJobDto[]> {
     return api<LegacyBackfillJobDto[]>('/orgs/me/legacy-backfill/jobs')
   }
 
-  return { configure, preview, listJobs }
+  return { configure, preview, sample, listJobs }
 }

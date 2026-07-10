@@ -193,6 +193,112 @@ pub async fn preview(
     }
 }
 
+/// Raw connection info + optional query for `POST
+/// /orgs/me/legacy-backfill/sample` — no field-mapping required. Mirrors the
+/// `connection_string` write-only/reuse-stored convention used by
+/// `LegacyBackfillInput`.
+#[derive(Debug, Deserialize)]
+pub struct SampleRequest {
+    #[serde(default)]
+    pub connection_string: Option<String>,
+    pub database: String,
+    pub collection: String,
+    /// A raw MongoDB query filter (e.g. `{"signer.username": "test_user"}`).
+    /// Absent means no filter — the first `limit` documents in the
+    /// collection. Rejected before any connection attempt if present but not
+    /// a JSON object.
+    #[serde(default)]
+    pub query: Option<serde_json::Value>,
+    #[serde(default = "default_preview_limit")]
+    pub limit: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SampleResponse {
+    pub connected: bool,
+    pub documents: Vec<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// `POST /orgs/me/legacy-backfill/sample` — connect using only connection
+/// info (no field-mapping config) and return a small set of raw, unmapped
+/// documents. Drives the settings page's sample-before-you-map flow. Never
+/// writes: no `checkin_events`, no AppUser mutation.
+pub async fn sample(
+    State(state): State<AppState>,
+    RequireAdmin(active): RequireAdmin,
+    Json(req): Json<SampleRequest>,
+) -> ApiResult<Json<SampleResponse>> {
+    let org = state
+        .db
+        .orgs
+        .find_by_id(active.org_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+
+    let connection_string = resolve_connection_string(&state, &org, req.connection_string)?;
+
+    let filter = match req.query {
+        None => bson::Document::new(),
+        Some(v) if v.is_object() => bson::to_document(&v)
+            .map_err(|e| ApiError::Validation(format!("invalid query: {e}")))?,
+        Some(_) => {
+            return Err(ApiError::Validation(
+                "query must be a JSON object".to_string(),
+            ));
+        }
+    };
+
+    match provider::sample_raw_documents(
+        &connection_string,
+        &req.database,
+        &req.collection,
+        filter,
+        req.limit as i64,
+    )
+    .await
+    {
+        Ok(documents) => Ok(Json(SampleResponse {
+            connected: true,
+            documents,
+            error: None,
+        })),
+        Err(err) => Ok(Json(SampleResponse {
+            connected: false,
+            documents: Vec::new(),
+            error: Some(err.to_string()),
+        })),
+    }
+}
+
+/// Resolve the plaintext connection string to use: a freshly-submitted
+/// non-empty value, or decrypt the Org's already-stored one. Shared by
+/// `build_config` (via inlined logic there, for the full-config save path)
+/// and `sample` (which has no `LegacyBackfillConfig` to build).
+fn resolve_connection_string(
+    state: &AppState,
+    org: &Org,
+    submitted: Option<String>,
+) -> ApiResult<String> {
+    match submitted {
+        Some(s) if !s.trim().is_empty() => Ok(s),
+        _ => {
+            let secret = state
+                .config
+                .secret_key
+                .map(|k| SecretBox::from_key_bytes(&k))
+                .ok_or(ApiError::LegacyBackfillUnavailable)?;
+            let encrypted = org
+                .legacy_backfill()
+                .map(|c| c.connection_string_encrypted)
+                .filter(|c| !c.is_empty())
+                .ok_or_else(|| ApiError::Validation("connection_string is required".to_string()))?;
+            secret.decrypt(&encrypted).map_err(|_| ApiError::Internal)
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct LegacyBackfillJobDto {
     pub id: String,

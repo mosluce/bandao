@@ -131,6 +131,25 @@ fn as_datetime_path(doc: &bson::Document, path: &str) -> Option<DateTime> {
     }
 }
 
+/// Connect (read-only) to a legacy database and return the target collection
+/// handle. Shared by every code path that talks to a customer's legacy
+/// MongoDB (mapped fetch, raw sample) so connect-timeout/client-setup can't
+/// drift between them.
+async fn connect_collection(
+    connection_string: &str,
+    database: &str,
+    collection: &str,
+) -> Result<mongodb::Collection<bson::Document>, LegacyBackfillError> {
+    let mut options = ClientOptions::parse(connection_string)
+        .await
+        .map_err(|e| LegacyBackfillError(format!("invalid connection string: {e}")))?;
+    options.connect_timeout = Some(CONNECT_TIMEOUT);
+    options.server_selection_timeout = Some(CONNECT_TIMEOUT);
+    let client = Client::with_options(options)
+        .map_err(|e| LegacyBackfillError(format!("cannot construct client: {e}")))?;
+    Ok(client.database(database).collection(collection))
+}
+
 /// Connect (read-only) to the configured legacy database and fetch + map the
 /// documents matching `username` on `identity_field`. Building the query
 /// filter directly from `identity_field` works even though it's a dot-path
@@ -143,16 +162,7 @@ async fn fetch_and_map(
     username: &str,
     limit: Option<i64>,
 ) -> Result<(Vec<MappedEvent>, BackfillOutcome), LegacyBackfillError> {
-    let mut options = ClientOptions::parse(connection_string)
-        .await
-        .map_err(|e| LegacyBackfillError(format!("invalid connection string: {e}")))?;
-    options.connect_timeout = Some(CONNECT_TIMEOUT);
-    options.server_selection_timeout = Some(CONNECT_TIMEOUT);
-    let client = Client::with_options(options)
-        .map_err(|e| LegacyBackfillError(format!("cannot construct client: {e}")))?;
-
-    let coll: mongodb::Collection<bson::Document> =
-        client.database(&cfg.database).collection(&cfg.collection);
+    let coll = connect_collection(connection_string, &cfg.database, &cfg.collection).await?;
 
     let mut find = coll.find(doc! { cfg.identity_field.as_str(): username });
     if let Some(n) = limit {
@@ -324,4 +334,72 @@ pub async fn preview_mapped(
         skipped_unmapped_action: outcome.skipped_unmapped_action,
         skipped_unparseable: outcome.skipped_unparseable,
     })
+}
+
+/// Render a BSON value for display/field-discovery on the admin settings
+/// page — NOT a general extended-JSON conversion. Dates and ObjectIds
+/// collapse to plain strings (rather than the usual `{"$date": ...}"` /
+/// `{"$oid": ...}"` wrapper objects) so a scalar legacy field stays a leaf
+/// value when the frontend flattens the document into draggable dot-paths;
+/// wrapping them would make e.g. `at` look like a nested `at.$date` field and
+/// produce a dot-path that doesn't match what `get_by_path` reads at backfill
+/// time.
+fn bson_to_display_json(value: &Bson) -> serde_json::Value {
+    match value {
+        Bson::Document(doc) => serde_json::Value::Object(
+            doc.iter()
+                .map(|(k, v)| (k.clone(), bson_to_display_json(v)))
+                .collect(),
+        ),
+        Bson::Array(items) => {
+            serde_json::Value::Array(items.iter().map(bson_to_display_json).collect())
+        }
+        Bson::String(s) => serde_json::Value::String(s.clone()),
+        Bson::Double(n) => serde_json::json!(n),
+        Bson::Int32(n) => serde_json::json!(n),
+        Bson::Int64(n) => serde_json::json!(n),
+        Bson::Boolean(b) => serde_json::Value::Bool(*b),
+        Bson::ObjectId(id) => serde_json::Value::String(id.to_hex()),
+        Bson::DateTime(dt) => serde_json::Value::String(
+            dt.try_to_rfc3339_string()
+                .unwrap_or_else(|_| dt.to_string()),
+        ),
+        Bson::Null => serde_json::Value::Null,
+        other => serde_json::Value::String(other.to_string()),
+    }
+}
+
+/// Connect using raw connection info (no `LegacyBackfillConfig` required —
+/// this drives the settings page's "sample before you know the field
+/// mapping" flow) and return up to `limit` raw documents matching `filter`,
+/// unmodified by any field mapping. Read-only.
+pub async fn sample_raw_documents(
+    connection_string: &str,
+    database: &str,
+    collection: &str,
+    filter: bson::Document,
+    limit: i64,
+) -> Result<Vec<serde_json::Value>, LegacyBackfillError> {
+    let coll = connect_collection(connection_string, database, collection).await?;
+
+    let mut cursor = coll
+        .find(filter)
+        .limit(limit)
+        .await
+        .map_err(|e| LegacyBackfillError(format!("query failed: {e}")))?;
+
+    let mut documents = Vec::new();
+    loop {
+        let advanced = cursor
+            .advance()
+            .await
+            .map_err(|e| LegacyBackfillError(format!("cursor read failed: {e}")))?;
+        if !advanced {
+            break;
+        }
+        if let Ok(raw) = cursor.deserialize_current() {
+            documents.push(bson_to_display_json(&Bson::Document(raw)));
+        }
+    }
+    Ok(documents)
 }
