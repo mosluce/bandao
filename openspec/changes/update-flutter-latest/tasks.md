@@ -33,7 +33,7 @@
 ## 5. 背景同步實測（workmanager 核心功能驗證）
 
 - [x] 5.1（部分驗證，使用者操作）：iOS 模擬器上用真實帳號登入、上班 → 放到背景 3 分鐘（模擬器 Features → Location → Freeway Drive 模擬移動）→ 回前景 → 下班，admin-web 軌跡地圖正確顯示背景期間的完整路徑。確認的是 `UIBackgroundModes: location`（持續背景定位）+ drift 本地佇列 + 批次上傳 + admin-web 渲染這條鏈路端到端正常
-- [ ] 5.2 **仍待驗證**：workmanager 的 `queue-drain` BGProcessingTask（打卡事件送出失敗時的背景重試）沒有被上面的測試直接命中——正常打卡是前景立即送出成功，只有送出失敗才會觸發這條路徑。要驗證需要人為製造送出失敗（例如打卡當下斷網)，確認事件之後真的被背景任務重試送出
+- [x] 5.2（使用者操作 + lldb 強制觸發）：關掉本地 api 模擬斷線 → app 前景點「下班」送出失敗、事件卡在本地 pending（UI 顯示「待送出」+ connection refused）→ app 丟到背景 → api 恢復 → `lldb -p <pid> -o 'expr -l objc -O -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"tw.ccmos.app.bandao.queue-drain"]'` 強制觸發 BGProcessingTask（不必等 iOS 系統排程）→ `clock_out` 事件成功送達 server（`source: "app"`），`checkin_user_status` 正確轉為 `off_duty`。確認 workmanager 0.9.x 新 API（`registerBGProcessingTask` + `AppDelegate.swift` 的原生層遷移）在真實背景執行情境下運作正常
 
 ## 6. SnackBar 行為驗證（Flutter 3.38+ 自動消失行為變更）
 
