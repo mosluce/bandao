@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -56,9 +57,26 @@ class SecureStorage {
   String? _cachedToken;
   bool _tokenLoaded = false;
 
+  /// Reads [key], treating an undecryptable entry as absent rather than
+  /// crashing. On Android the plugin's AES key lives in the Keystore; an OS
+  /// upgrade, a restore to a different device, or a lock-screen credential
+  /// reset can invalidate it while the (now-undecryptable) ciphertext stays
+  /// in SharedPreferences. Every future read of that key then throws a
+  /// `PlatformException` wrapping `BadPaddingException`. We drop the
+  /// corrupted entry so the app can still boot instead of crashing on
+  /// startup screens like `/server-config`.
+  Future<String?> _safeRead(String key) async {
+    try {
+      return await _storage.read(key: key);
+    } on PlatformException {
+      await _storage.delete(key: key);
+      return null;
+    }
+  }
+
   Future<String?> readToken() async {
     if (_tokenLoaded) return _cachedToken;
-    final value = await _storage.read(key: SecureStorageKeys.bearerToken);
+    final value = await _safeRead(SecureStorageKeys.bearerToken);
     _cachedToken = value;
     _tokenLoaded = true;
     return value;
@@ -77,7 +95,7 @@ class SecureStorage {
   }
 
   Future<String?> readLastOrgCode() =>
-      _storage.read(key: SecureStorageKeys.lastOrgCode);
+      _safeRead(SecureStorageKeys.lastOrgCode);
 
   Future<void> writeLastOrgCode(String orgCode) => _storage.write(
         key: SecureStorageKeys.lastOrgCode,
@@ -88,7 +106,7 @@ class SecureStorage {
       _storage.delete(key: SecureStorageKeys.lastOrgCode);
 
   Future<String?> readApiBaseUrlOverride() =>
-      _storage.read(key: SecureStorageKeys.apiBaseUrlOverride);
+      _safeRead(SecureStorageKeys.apiBaseUrlOverride);
 
   Future<void> writeApiBaseUrlOverride(String url) => _storage.write(
         key: SecureStorageKeys.apiBaseUrlOverride,
@@ -99,7 +117,7 @@ class SecureStorage {
       _storage.delete(key: SecureStorageKeys.apiBaseUrlOverride);
 
   Future<bool> readBackgroundSyncTipSeen() async {
-    final v = await _storage.read(key: SecureStorageKeys.backgroundSyncTipSeen);
+    final v = await _safeRead(SecureStorageKeys.backgroundSyncTipSeen);
     return v == 'true';
   }
 
@@ -109,9 +127,7 @@ class SecureStorage {
       );
 
   Future<DateTime?> readLocationTrackingLastCleanStop() async {
-    final v = await _storage.read(
-      key: SecureStorageKeys.locationTrackingLastCleanStop,
-    );
+    final v = await _safeRead(SecureStorageKeys.locationTrackingLastCleanStop);
     if (v == null || v.isEmpty) return null;
     return DateTime.tryParse(v);
   }
@@ -126,8 +142,8 @@ class SecureStorage {
       );
 
   Future<bool> readLocationTrackingConsent(String appUserId) async {
-    final v = await _storage.read(
-      key: SecureStorageKeys.locationTrackingConsentKey(appUserId),
+    final v = await _safeRead(
+      SecureStorageKeys.locationTrackingConsentKey(appUserId),
     );
     return v == 'true';
   }
@@ -138,7 +154,7 @@ class SecureStorage {
       );
 
   Future<String?> readPrivacyUrlOverride() =>
-      _storage.read(key: SecureStorageKeys.privacyUrlOverride);
+      _safeRead(SecureStorageKeys.privacyUrlOverride);
 
   Future<void> writePrivacyUrlOverride(String url) => _storage.write(
         key: SecureStorageKeys.privacyUrlOverride,
