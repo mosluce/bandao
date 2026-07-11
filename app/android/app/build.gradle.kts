@@ -25,17 +25,20 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "tw.ccmos.app.bandao"
     compileSdk = flutter.compileSdkVersion
-    // flutter_secure_storage and path_provider_android require >= 27.0.12077973;
-    // pin explicitly so plugin upgrades don't surprise local builds.
-    ndkVersion = "27.0.12077973"
+    // integration_test and jni (transitive, via workmanager 0.9.x) require
+    // >= 28.2.13676358; pin explicitly so plugin upgrades don't surprise
+    // local builds. NDK versions are backward compatible, so pinning the
+    // highest required version satisfies every plugin.
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        // AGP 8.11 requires JDK 17.
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {

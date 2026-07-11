@@ -16,7 +16,7 @@
 
 - **Rust** — 由 `api/rust-toolchain.toml` 鎖定；建議用 [rustup](https://rustup.rs/) 或 asdf。
 - **Node 20+** — `admin-web/` 開發用；建議用 nvm / asdf / volta。
-- **Flutter `>= 3.24`** — `app/` 開發用（CI 跑 3.29.3）；建議用 asdf 或官方 SDK 安裝器。
+- **Flutter `>= 3.44`** — `app/` 開發用（CI 跑 3.44.6，`app/.tool-versions` 鎖定同版本）；建議用 asdf 或官方 SDK 安裝器。
 - **Docker** — 跑本地 MongoDB 與 `api/` 的整合測試。
 - **MongoDB 7.x** — 透過 `docker-compose.yml` 起本地實例。
 

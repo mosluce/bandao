@@ -44,7 +44,7 @@ jobs:
         if: steps.changed.outputs.run == 'true'
         with:
           channel: stable
-          flutter-version: '3.29.3'
+          flutter-version: '3.44.6'
           cache: true
 
       - name: Cache pub

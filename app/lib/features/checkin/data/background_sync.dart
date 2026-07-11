@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -157,10 +156,7 @@ SubmitCheckinEventRequest _toRequest(QueueRow row) {
 /// Initialize Workmanager. Call once from `main()` after
 /// `WidgetsFlutterBinding.ensureInitialized()`.
 Future<void> initBackgroundSync() async {
-  await Workmanager().initialize(
-    backgroundCallbackDispatcher,
-    isInDebugMode: kDebugMode,
-  );
+  await Workmanager().initialize(backgroundCallbackDispatcher);
 }
 
 /// Schedule a one-off background drain. Called from the enqueue path and on
