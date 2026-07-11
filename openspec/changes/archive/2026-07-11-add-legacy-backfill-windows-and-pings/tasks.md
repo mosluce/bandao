@@ -30,7 +30,7 @@
 - [x] 4.4 Run the script in `--dry-run` against a seeded local legacy MongoDB fixture and confirm summary counts match the fixture — `tests/legacy_backfill_import.rs::dry_run_computes_summary_without_writing` (drives the same library functions the example binary calls, against a testcontainers Mongo fixture; `examples/` binaries aren't directly invokable from `cargo test`)
 - [x] 4.5 Run the script for real against the fixture, restart the API locally, and confirm `repair_checkin_status_drift` produces the expected `checkin_user_status` for a seeded AppUser — `tests/legacy_backfill_import.rs::real_run_routes_skips_and_reruns_are_idempotent` (calls `repair_checkin_status_drift` directly rather than an actual process restart)
 - [x] 4.6 Confirm `location_pings` documents older than 90 days are no longer deleted (TTL index absent) via `db.location_pings.getIndexes()` — `tests/location_tracking_ttl.rs` (also covers dropping a pre-existing TTL index from older deployments)
-- [ ] 4.7 Manually spot-check imported data for a couple of AppUsers via the existing `/checkin` status board and `/checkin/[appUserId]/trajectory` admin-web pages — **requires a real legacy MongoDB connection and running admin-web instance; not automatable, left for the operator to do at actual cutover time**
+- [x] 4.7 Manually spot-check imported data for a couple of AppUsers via the existing `/checkin` status board and `/checkin/[appUserId]/trajectory` admin-web pages — verified live against real KLCC data via `/checkin/6a50b869541110f84af9037e` event history; surfaced the `validate_range` 90-day floor bug (fixed in 5.6) along the way
 
 ## 5. Post-review fixes (found during live KLCC dry-run)
 
