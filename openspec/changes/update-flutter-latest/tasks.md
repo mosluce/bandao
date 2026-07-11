@@ -32,8 +32,8 @@
 
 ## 5. 背景同步實測（workmanager 核心功能驗證）
 
-- [ ] 5.1 **需使用者操作**：Android 實機或模擬器上，用真實帳號登入、觸發一次打卡背景同步佇列，確認 log 顯示任務排程與執行成功（需要有效登入 session 才能產生待同步紀錄，agent 環境沒有測試帳號）
-- [ ] 5.2 **需使用者操作**：確認 workmanager 新版 API 遷移後，佇列任務失敗重試行為與升級前一致（iOS 的 BGProcessingTask 觸發時機由系統排程決定，無法在單次 session 內強制等到）
+- [x] 5.1（部分驗證，使用者操作）：iOS 模擬器上用真實帳號登入、上班 → 放到背景 3 分鐘（模擬器 Features → Location → Freeway Drive 模擬移動）→ 回前景 → 下班，admin-web 軌跡地圖正確顯示背景期間的完整路徑。確認的是 `UIBackgroundModes: location`（持續背景定位）+ drift 本地佇列 + 批次上傳 + admin-web 渲染這條鏈路端到端正常
+- [ ] 5.2 **仍待驗證**：workmanager 的 `queue-drain` BGProcessingTask（打卡事件送出失敗時的背景重試）沒有被上面的測試直接命中——正常打卡是前景立即送出成功，只有送出失敗才會觸發這條路徑。要驗證需要人為製造送出失敗（例如打卡當下斷網)，確認事件之後真的被背景任務重試送出
 
 ## 6. SnackBar 行為驗證（Flutter 3.38+ 自動消失行為變更）
 
