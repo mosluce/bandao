@@ -54,5 +54,5 @@
 ## 8. 收尾
 
 - [x] 8.1 `flutter test` 全過（181 個測試）
-- [ ] 8.2 **需使用者操作**：CI（`app.yml` 的 `analyze + test`）在實際 PR 上綠燈——需要推送分支開 PR 才能驗證
+- [x] 8.2 PR #44（`update-flutter-latest` → `main`）三個 required check 全綠：`analyze + test`、`fmt + clippy + test`、`typecheck + test + build`（後兩者因 path-scoped CI 未動 api/admin-web 直接報 success）
 - [x] 8.3 確認 `app/.tool-versions`、`.github/workflows/app.yml`、`README.md`、`app/pubspec.yaml` 四處版本號彼此一致（`flutter-toolchain` spec 的核心要求）
