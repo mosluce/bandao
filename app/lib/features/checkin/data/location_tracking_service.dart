@@ -39,15 +39,9 @@ class GeolocatorTrackingService implements LocationTrackingService {
   DateTime? _lastEnqueuedAt;
   String? _appUserId;
 
-  /// Disabled (was 60s) while manually testing the trajectory view after
-  /// the Flutter upgrade — denser sampling makes the polyline visibly
-  /// follow the road instead of connecting sparse points as straight
-  /// segments. NOT a production value: at this rate every OS-delivered
-  /// position (gated only by the 100m distance filter) gets enqueued,
-  /// multiplying ping volume/battery/data use well past the ~150K
-  /// pings/day the api/README.md capacity note assumes for 60s sampling.
-  /// Revisit before merging past manual testing.
-  static const Duration _throttle = Duration.zero;
+  /// 60s minimum interval between enqueues — the AND condition with the
+  /// OS-level 100m distance filter.
+  static const Duration _throttle = Duration(seconds: 60);
 
   @override
   bool get isActive => _sub != null;
