@@ -36,7 +36,7 @@ current value from their cached `Org` snapshot.
 - **AND** any AppUser-side ping submission for that Org is rejected with
   `403 LOCATION_TRACKING_DISABLED`
 
-### Requirement: Location pings are persisted with dual timestamps and 90-day server-time TTL
+### Requirement: Location pings are persisted with dual timestamps
 
 The system SHALL persist every accepted location ping in a `location_pings`
 MongoDB collection. Each document SHALL carry `org_id`, `app_user_id`,
@@ -46,10 +46,13 @@ MongoDB collection. Each document SHALL carry `org_id`, `app_user_id`,
 client's wall-clock); `occurred_at_server` SHALL be set by the server at
 the moment of insertion (UTC, monotonic on the server side).
 
-A TTL index SHALL be installed on `occurred_at_server` configured to expire
-documents 90 days after that field's value. The system SHALL NOT install a
-TTL index on `occurred_at_client` (client-clock skew would cause incorrect
-deletion timing).
+The system SHALL NOT install a TTL index on `location_pings`. Location
+pings SHALL be retained indefinitely until a future rotation/archival
+mechanism (not part of this change) is introduced. This is a deliberate,
+temporary state: MongoDB TTL indexes apply to an entire collection, so
+retention could not be relaxed only for legacy-imported pings (see
+`legacy-checkin-backfill`) without also removing the previous 90-day
+expiry for all pings.
 
 #### Scenario: Ping insert sets both timestamps
 
@@ -58,11 +61,11 @@ deletion timing).
 - **AND** `occurred_at_server` is the server's `DateTime::now()` at insert time
 - **AND** the two timestamps are within seconds of each other for clients with correctly-set clocks
 
-#### Scenario: TTL deletes documents 90 days after server time
+#### Scenario: Pings older than 90 days are not deleted
 
 - **GIVEN** a `location_pings` document with `occurred_at_server` set to a moment more than 90 days in the past
-- **WHEN** MongoDB's TTL monitor next runs (approximately every 60 seconds)
-- **THEN** the document is removed from the collection
+- **WHEN** MongoDB's background processes run
+- **THEN** the document remains in the collection (no TTL index removes it)
 
 ### Requirement: AppUser may submit a batch of 1–100 pings via POST /app/checkin/locations
 
@@ -182,10 +185,12 @@ included. When `to` is supplied, only pings with `occurred_at_client < to`
 SHALL be included. Multiple filters compose with AND.
 
 When either `from` or `to` is supplied the system SHALL validate the
-range using the same rules as the export endpoint: parse failures,
-`to < from`, span exceeding 90 days, or `from` older than 90 days from
-the current server time SHALL all return `INVALID_RANGE` (HTTP 400).
-Either side may be omitted; absent sides skip their respective check.
+range using the same rules as the export endpoint: parse failures or
+`to < from` or span exceeding 90 days SHALL return `INVALID_RANGE` (HTTP
+400). `from` being more than 90 days in the past is no longer a rejection
+condition — `location_pings` no longer has a TTL, so legacy-imported pings
+can be older than 90 days and must remain readable. Either side may be
+omitted; absent sides skip their respective check.
 
 The path's `:id` SHALL identify an AppUser whose Org matches the
 caller's `current_org`; mismatches SHALL return `404`.
@@ -207,10 +212,10 @@ caller's `current_org`; mismatches SHALL return `404`.
 - **THEN** the response includes only pings with `occurred_at_client >= from` AND `occurred_at_client < to`
 - **AND** the response is ordered newest-first
 
-#### Scenario: from older than 90 days rejected
+#### Scenario: from older than 90 days is allowed when span fits
 
-- **WHEN** an admin requests `GET /checkin/users/<X>/locations?from=<90+ days ago>&to=<recent>`
-- **THEN** the response is `400 INVALID_RANGE`
+- **WHEN** an admin requests `GET /checkin/users/<X>/locations?from=<91+ days ago>&to=<a point within 90 days of from>`
+- **THEN** the response is `200`, not rejected on the basis of `from` alone
 
 #### Scenario: span exceeding 90 days rejected
 
@@ -251,8 +256,9 @@ file SHALL contain a single sheet with the columns `occurred_at_client`
 `lat`, `lng`, `accuracy_meters`, with a header row at row 1 and the data
 rows ordered ascending by `occurred_at_client`. Range validation SHALL
 enforce: both `from` and `to` MUST be present; `to >= from`; `to - from`
-MUST NOT exceed 90 days; `from` MUST NOT be older than 90 days from
-server time. Range failures SHALL return `400 INVALID_RANGE`.
+MUST NOT exceed 90 days. `from` being more than 90 days before server
+time is no longer a rejection condition, for the same reason as the list
+endpoint above. Range failures SHALL return `400 INVALID_RANGE`.
 
 #### Scenario: Valid export within the 90-day window
 
@@ -266,10 +272,10 @@ server time. Range failures SHALL return `400 INVALID_RANGE`.
 - **WHEN** an admin requests an export with `to - from = 91 days`
 - **THEN** the response is `400` with code `INVALID_RANGE`
 
-#### Scenario: `from` older than 90 days from now
+#### Scenario: `from` older than 90 days from now is allowed when span fits
 
-- **WHEN** an admin requests an export with `from` set to 100 days before server time
-- **THEN** the response is `400` with code `INVALID_RANGE`
+- **WHEN** an admin requests an export with `from` set to 100 days before server time and `to` set to 95 days before server time (5-day span)
+- **THEN** the response is `200`, not rejected on the basis of `from` alone
 
 #### Scenario: Missing `from` or `to`
 
@@ -303,7 +309,7 @@ export SHALL render only raw `lat` / `lng` coordinates plus optional
 
 ### Requirement: AppUser may list their own pings via GET /app/checkin/me/locations
 
-The system SHALL provide `GET /app/checkin/me/locations` accepting Bearer auth. The endpoint SHALL resolve the caller's `app_user_id` from the bearer token (NOT from a path or query parameter) and return only that AppUser's own pings. The endpoint SHALL accept query parameters `before` (optional, RFC3339), `from` (optional, RFC3339), `to` (optional, RFC3339), and `limit` (optional, integer; default 200, max 1000). Range validation, ordering (newest-first by `occurred_at_client`), pagination semantics, and the `INVALID_RANGE` error code SHALL match the admin `GET /checkin/users/:id/locations` endpoint exactly.
+The system SHALL provide `GET /app/checkin/me/locations` accepting Bearer auth. The endpoint SHALL resolve the caller's `app_user_id` from the bearer token (NOT from a path or query parameter) and return only that AppUser's own pings. The endpoint SHALL accept query parameters `before` (optional, RFC3339), `from` (optional, RFC3339), `to` (optional, RFC3339), and `limit` (optional, integer; default 200, max 1000). Range validation, ordering (newest-first by `occurred_at_client`), pagination semantics, and the `INVALID_RANGE` error code SHALL match the admin `GET /checkin/users/:id/locations` endpoint exactly — including that `from` being more than 90 days in the past is not, on its own, a rejection condition.
 
 The endpoint SHALL NOT be gated by `Org.settings.checkin.location_tracking_enabled`. An AppUser SHALL be able to read pings already persisted under their `app_user_id` even after their Org has subsequently set the toggle to `false`. The toggle continues to gate ingest (`POST /app/checkin/locations`) only.
 
@@ -326,10 +332,10 @@ The response body SHALL be the same `LocationPingDto` shape as the admin list en
 - **WHEN** AppUser X calls `GET /app/checkin/me/locations?from=<T>&to=<T + 91 days>`
 - **THEN** the response is `400 INVALID_RANGE`
 
-#### Scenario: from older than 90 days rejected
+#### Scenario: from older than 90 days is allowed when span fits
 
-- **WHEN** AppUser X calls `GET /app/checkin/me/locations?from=<100 days ago>&to=<recent>`
-- **THEN** the response is `400 INVALID_RANGE`
+- **WHEN** AppUser X calls `GET /app/checkin/me/locations?from=<91+ days ago>&to=<a point within 90 days of from>`
+- **THEN** the response is `200`, not rejected on the basis of `from` alone
 
 #### Scenario: Toggle off does not block self-read
 
