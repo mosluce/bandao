@@ -14,11 +14,16 @@
 
 ### [0.4.1+11] - 2026-07-11
 
+#### Added
+- 「我的工作日記」軌跡地圖新增依時段上色 — 路徑從清晨到深夜以暖到冷的漸層呈現，
+  一眼看出當天路線的時間分布；地圖起點錨定在上班打卡時間，即使當下還沒有第一筆
+  定位 ping 也會先顯示起點。
+
 #### Maintenance
 - Flutter 升級到 3.44.6-stable，`workmanager` 從 `<0.8.0` bump 到
   `>=0.9.0 <0.10.0`（連帶處理 Android AGP/Gradle/Kotlin/NDK/JDK、iOS
-  deployment target 13.0→14.0 的原生層 breaking change）。純 toolchain
-  維護，無使用者可見的功能變化。詳見 OpenSpec change `update-flutter-latest`。
+  deployment target 13.0→14.0 的原生層 breaking change）。純 toolchain 維護，
+  使用者無感。詳見 OpenSpec change `update-flutter-latest`。
 
 ### [0.4.0+10] - 2026-07-10
 
