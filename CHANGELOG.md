@@ -12,6 +12,14 @@
 
 ## App
 
+### [0.4.1+11] - 2026-07-11
+
+#### Maintenance
+- Flutter 升級到 3.44.6-stable，`workmanager` 從 `<0.8.0` bump 到
+  `>=0.9.0 <0.10.0`（連帶處理 Android AGP/Gradle/Kotlin/NDK/JDK、iOS
+  deployment target 13.0→14.0 的原生層 breaking change）。純 toolchain
+  維護，無使用者可見的功能變化。詳見 OpenSpec change `update-flutter-latest`。
+
 ### [0.4.0+10] - 2026-07-10
 
 #### Added
