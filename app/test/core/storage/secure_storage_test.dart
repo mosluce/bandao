@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,6 +16,7 @@ class _CountingStorage extends FlutterSecureStorage {
 
   String? initialValue;
   bool throwOnRead = false;
+  bool throwPlatformExceptionOnRead = false;
   int reads = 0;
   int writes = 0;
   int deletes = 0;
@@ -34,6 +36,11 @@ class _CountingStorage extends FlutterSecureStorage {
       throw StateError(
         'underlying storage read should not be reached after the cache is populated',
       );
+    }
+    if (throwPlatformExceptionOnRead) {
+      // Mirrors the Android Keystore BadPaddingException surface: the
+      // plugin wraps the native decrypt failure in a PlatformException.
+      throw PlatformException(code: 'read_error', message: 'BAD_DECRYPT');
     }
     return initialValue;
   }
@@ -131,6 +138,28 @@ void main() {
       // of truth post-write).
       fake.throwOnRead = true;
       expect(await storage.readToken(), 'new');
+    });
+  });
+
+  group('SecureStorage undecryptable entry recovery', () {
+    test('readToken returns null and deletes the corrupted entry instead of throwing',
+        () async {
+      final fake = _CountingStorage(initialValue: 'garbled-ciphertext')
+        ..throwPlatformExceptionOnRead = true;
+      final storage = SecureStorage(fake);
+
+      expect(await storage.readToken(), isNull);
+      expect(fake.deletes, 1);
+    });
+
+    test('readLastOrgCode returns null and deletes the corrupted entry instead of throwing',
+        () async {
+      final fake = _CountingStorage(initialValue: 'garbled-ciphertext')
+        ..throwPlatformExceptionOnRead = true;
+      final storage = SecureStorage(fake);
+
+      expect(await storage.readLastOrgCode(), isNull);
+      expect(fake.deletes, 1);
     });
   });
 
