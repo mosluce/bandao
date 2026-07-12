@@ -5,3 +5,4 @@
 pub mod legacy_backfill;
 pub mod reverse_geocoder;
 pub mod timezone;
+pub mod utc_offset;

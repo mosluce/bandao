@@ -5,6 +5,7 @@ pub mod app_users;
 pub mod auth;
 pub mod checkin;
 pub mod checkin_dto;
+pub mod checkin_export;
 pub mod external_auth;
 pub mod join_requests;
 pub mod location_tracking;
@@ -147,10 +148,25 @@ pub fn router(state: AppState) -> Router {
             app_require_session,
         ));
 
+    // Machine-to-machine surface, gated on an Org API token (see
+    // `auth::api_token`) rather than a dashboard session or AppUser bearer
+    // token. First (and currently only) consumer: the Zhengdan checkin
+    // export. Each handler still checks its own required scope.
+    let api_token_protected = Router::new()
+        .route(
+            "/orgs/me/checkin/events/export",
+            get(checkin_export::export),
+        )
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            crate::auth::api_token::api_token_require_session,
+        ));
+
     Router::new()
         .merge(public)
         .merge(protected)
         .merge(app_protected)
+        .merge(api_token_protected)
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state)
