@@ -66,6 +66,23 @@ git checkout 目錄之外（例如另一個不受版控的資料夾），`export
 
 ### 3. 註冊 Task Scheduler 排程
 
+**選項 A：用 `register-task.ps1` 自動註冊（建議）**
+
+跟 `export.ps1` 放同一個資料夾，下載後直接跑：
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mosluce/bandao/main/integrations/zhengdan-checkin-export/register-task.ps1" -OutFile "register-task.ps1"
+.\register-task.ps1
+```
+
+這支 script 是**可重複執行**的——如果同名的工作已經存在，會先移除再重新建立，不會
+報錯，改路徑或改設定後直接重跑就好。預設用 `SYSTEM` 帳號執行（不用存密碼、沒人登入
+也照跑）；如果 `export.ps1` 之後需要用到必須是互動使用者才能存取的資源（例如網路
+磁碟機），打開 `register-task.ps1` 把 `$RunAsSystem` 改成 `$false`，會改成互動輸入
+密碼的方式註冊。跑完會自動觸發一次測試執行，並印出 `Get-ScheduledTaskInfo` 的結果。
+
+**選項 B：手動用工作排程器 GUI 註冊**
+
 1. 開啟「工作排程器」（Task Scheduler）→ 建立工作。
 2. 觸發程序：每小時執行一次。
 3. 動作：
@@ -76,8 +93,9 @@ git checkout 目錄之外（例如另一個不受版控的資料夾），`export
      ```
      用 `-ExecutionPolicy Bypass` 包在單一排程動作裡，**不要**去改整台機器的系統
      執行原則（`Set-ExecutionPolicy`）——影響範圍只限這個排程工作本身，比較安全。
-4. 存檔後手動執行一次，確認 `TargetFolder` 底下出現一個新的
-   `<yyyyMMddHHmmss>.txt`，且同目錄下的 `export.log` 顯示 `OK`。
+
+**不管用哪個選項**，設定完都手動觸發一次，確認 `TargetFolder` 底下出現一個新的
+`<yyyyMMddHHmmss>.txt`，且同目錄下的 `export.log` 顯示 `OK`。
 
 ## 檔案格式
 
