@@ -53,16 +53,78 @@ async fn cross_org_app_users_excluded_from_board() {
 }
 
 #[tokio::test]
-async fn member_cannot_view_checkin_board() {
+async fn member_views_checkin_board_identically_to_admin() {
     let app = TestApp::spawn().await;
-    let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
-    let code = body["current_org"]["code"].as_str().unwrap().to_string();
+    let (admin, _code, _alice_id, alice_client, alice_token, _pw) = app
+        .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
+        .await;
+    let _ = app
+        .submit_checkin_event(
+            &alice_client,
+            &alice_token,
+            "clock_in",
+            25.04,
+            121.56,
+            &ts(0),
+        )
+        .await;
+
+    let admin_body: Value = admin
+        .get(app.url("/checkin/users"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+
+    let code = admin
+        .get(app.url("/me"))
+        .send()
+        .await
+        .unwrap()
+        .json::<Value>()
+        .await
+        .unwrap()["current_org"]["code"]
+        .as_str()
+        .unwrap()
+        .to_string();
     let (member, _) = app
         .register_member(&admin, "member@example.com", &code)
         .await;
 
-    let r = member.get(app.url("/checkin/users")).send().await.unwrap();
-    assert_eq!(r.status(), StatusCode::FORBIDDEN);
+    let member_resp = member.get(app.url("/checkin/users")).send().await.unwrap();
+    assert_eq!(member_resp.status(), StatusCode::OK);
+    let member_body: Value = member_resp.json().await.unwrap();
+
+    assert_eq!(
+        admin_body, member_body,
+        "member's /checkin/users response should be byte-for-byte identical to admin's"
+    );
+}
+
+#[tokio::test]
+async fn member_cross_org_checkin_board_still_isolated() {
+    let app = TestApp::spawn().await;
+    let (a_admin, a_code, _alice_id, _ac, _at, _pw) = app
+        .seed_app_user_ready_to_checkin("a@example.com", "OrgA", "alice", "Alice")
+        .await;
+    let (_b_admin, _b_code, _bob_id, _bc, _bt, _pw_b) = app
+        .seed_app_user_ready_to_checkin("b@example.com", "OrgB", "bob", "Bob")
+        .await;
+    let (a_member, _) = app
+        .register_member(&a_admin, "a-member@example.com", &a_code)
+        .await;
+
+    let r = a_member
+        .get(app.url("/checkin/users"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::OK);
+    let body: Vec<Value> = r.json().await.unwrap();
+    assert_eq!(body.len(), 1);
+    assert_eq!(body[0]["user"]["username"], "alice");
 }
 
 #[tokio::test]
@@ -117,6 +179,83 @@ async fn cross_org_event_history_returns_not_found() {
     let (b_admin, _) = app.register_admin("b@example.com", "OrgB").await;
 
     let r = b_admin
+        .get(app.url(&format!("/checkin/users/{alice_id}/events")))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn member_views_event_history_identically_to_admin() {
+    let app = TestApp::spawn().await;
+    let (admin, code, alice_id, alice_client, alice_token, _pw) = app
+        .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
+        .await;
+    for (event_type, min) in [("clock_in", 0), ("clock_out", 30)] {
+        let r = app
+            .submit_checkin_event(
+                &alice_client,
+                &alice_token,
+                event_type,
+                25.04,
+                121.56,
+                &ts(min),
+            )
+            .await;
+        assert_eq!(r.status(), StatusCode::CREATED);
+    }
+
+    let admin_body: Value = admin
+        .get(app.url(&format!("/checkin/users/{alice_id}/events")))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+
+    let (member, _) = app
+        .register_member(&admin, "member@example.com", &code)
+        .await;
+    let member_resp = member
+        .get(app.url(&format!("/checkin/users/{alice_id}/events")))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(member_resp.status(), StatusCode::OK);
+    let member_body: Value = member_resp.json().await.unwrap();
+
+    assert_eq!(
+        admin_body, member_body,
+        "member's event history response should be byte-for-byte identical to admin's"
+    );
+}
+
+#[tokio::test]
+async fn member_cross_org_event_history_still_not_found() {
+    let app = TestApp::spawn().await;
+    let (_a_admin, _a_code, alice_id, alice_client, alice_token, _pw) = app
+        .seed_app_user_ready_to_checkin("a@example.com", "OrgA", "alice", "Alice")
+        .await;
+    let _ = app
+        .submit_checkin_event(
+            &alice_client,
+            &alice_token,
+            "clock_in",
+            25.04,
+            121.56,
+            &ts(0),
+        )
+        .await;
+
+    let (b_admin, b_code) = app.register_admin("b@example.com", "OrgB").await;
+    let b_org_code = b_code["current_org"]["code"].as_str().unwrap().to_string();
+    let (b_member, _) = app
+        .register_member(&b_admin, "b-member@example.com", &b_org_code)
+        .await;
+
+    let r = b_member
         .get(app.url(&format!("/checkin/users/{alice_id}/events")))
         .send()
         .await

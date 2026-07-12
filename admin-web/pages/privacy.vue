@@ -3,7 +3,8 @@
 // reachable for authenticated users, unauthenticated users, and external
 // webview / browser launches alike. The Flutter app's location-tracking
 // consent dialog will link to this URL.
-//
+definePageMeta({ layout: false })
+
 // Bump LAST_UPDATED_AT only when the policy text actually changes — NOT
 // on routine redeploys. The date should reflect when the policy itself
 // was edited, not the bundle build time.

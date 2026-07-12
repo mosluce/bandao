@@ -8,10 +8,14 @@
 //! can still read pings that were persisted before the toggle was turned
 //! off (the toggle only gates ingest).
 //!
-//! `/checkin/users/:id/locations` (admin cookie) — paginated query.
+//! `/checkin/users/:id/locations` (dashboard cookie, any active Org member) —
+//! paginated query; feeds the personal-trajectory map, which is open to
+//! `member` on the same terms as the checkin board / event history.
 //!
 //! `/checkin/users/:id/locations/export` (admin cookie) — xlsx export of one
-//! AppUser's pings within a 90-day-capped time range.
+//! AppUser's pings within a 90-day-capped time range. Stays admin-only: bulk
+//! extraction of raw location data is treated as more sensitive than viewing
+//! the map.
 //!
 //! Pings are NOT reverse-geocoded (volume rules out per-ping Nominatim
 //! calls); admin map / xlsx render raw coordinates.
@@ -27,7 +31,7 @@ use rust_xlsxwriter::{Format, FormatBorder, Workbook};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::app_extractor::RequireAppUser;
-use crate::auth::extractor::RequireAdmin;
+use crate::auth::extractor::{RequireActiveOrg, RequireAdmin};
 use crate::db::LOCATION_PING_BATCH_MAX;
 use crate::domain::LocationPing;
 use crate::error::{ApiError, ApiResult};
@@ -326,7 +330,7 @@ pub async fn list_my_locations(
 
 pub async fn list_locations(
     State(state): State<AppState>,
-    RequireAdmin(active): RequireAdmin,
+    active: RequireActiveOrg,
     Path(id_hex): Path<String>,
     Query(q): Query<LocationListQuery>,
 ) -> ApiResult<Json<Vec<LocationPingDto>>> {

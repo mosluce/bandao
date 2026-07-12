@@ -6,7 +6,6 @@ definePageMeta({ middleware: 'auth' })
 
 const auth = useAuth()
 const checkin = useCheckin()
-const router = useRouter()
 
 const rows = ref<CheckinUserBoardRowDto[]>([])
 const loading = ref(true)
@@ -121,48 +120,25 @@ function lastEventSummary(row: CheckinUserBoardRowDto): string {
   return `${type} @ ${place}`
 }
 
-if (auth.isAdmin.value) {
-  await load()
-}
-else {
-  await navigateTo('/')
-}
+await load()
 </script>
 
 <template>
   <main class="min-h-screen px-4 py-10">
     <div class="max-w-5xl mx-auto space-y-6">
-      <header class="flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <h1 class="text-2xl font-semibold text-slate-900">
-            打卡看板
-          </h1>
-          <p class="text-sm text-slate-500 truncate">
-            {{ auth.currentOrg.value?.name }} · 在班 / 移動中 / 下班 即時看板，每 30 秒自動刷新
-            <span
-              v-if="lastRefreshed"
-              class="ml-2 text-slate-400"
-            >
-              （{{ formatInOrgTz(lastRefreshed.toISOString(), orgTz) }} 更新）
-            </span>
-          </p>
-        </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <OrgSwitcher />
-          <NuxtLink
-            to="/app-users"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      <header>
+        <h1 class="text-2xl font-semibold text-slate-900">
+          打卡看板
+        </h1>
+        <p class="text-sm text-slate-500 truncate">
+          {{ auth.currentOrg.value?.name }} · 在班 / 移動中 / 下班 即時看板，每 30 秒自動刷新
+          <span
+            v-if="lastRefreshed"
+            class="ml-2 text-slate-400"
           >
-            App 使用者
-          </NuxtLink>
-          <button
-            type="button"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            @click="router.push('/')"
-          >
-            回首頁
-          </button>
-        </div>
+            （{{ formatInOrgTz(lastRefreshed.toISOString(), orgTz) }} 更新）
+          </span>
+        </p>
       </header>
 
       <p
@@ -242,7 +218,7 @@ else {
                   :class="statusBadgeClass(r.status)"
                 >{{ group.title }}</span>
                 <button
-                  v-if="group.force"
+                  v-if="group.force && auth.isAdmin.value"
                   type="button"
                   class="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
                   @click="openForce(r.user.id)"

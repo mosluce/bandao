@@ -308,15 +308,23 @@ async fn invalid_range_parse_failure() {
 }
 
 #[tokio::test]
-async fn member_role_blocked() {
+async fn member_lists_pings_identically_to_admin() {
     let app = TestApp::spawn().await;
-    let (admin, code, app_user_id, _app_client, _token, _pw) = app
+    let (admin, code, app_user_id, app_client, token, _pw) = app
         .seed_app_user_ready_to_checkin("admin@example.com", "Acme", "alice", "Alice")
         .await;
     enable_tracking(&app, &admin).await;
+    seed_pings(&app, &app_client, &token, 5).await;
 
-    // Register a second dashboard identity that joins the same Org as a
-    // regular member.
+    let admin_body: Value = admin
+        .get(app.url(&format!("/checkin/users/{app_user_id}/locations")))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+
     let (member_client, _) = app
         .register_member(&admin, "member@example.com", &code)
         .await;
@@ -326,5 +334,31 @@ async fn member_role_blocked() {
         .send()
         .await
         .unwrap();
-    assert_eq!(r.status(), StatusCode::FORBIDDEN);
+    assert_eq!(r.status(), StatusCode::OK);
+    let member_body: Value = r.json().await.unwrap();
+    assert_eq!(
+        admin_body, member_body,
+        "member's /locations response should be byte-for-byte identical to admin's"
+    );
+}
+
+#[tokio::test]
+async fn member_cross_org_app_user_id_still_returns_404() {
+    let app = TestApp::spawn().await;
+    let (admin_a, code_a, _id_a, _client_a, _token_a, _pw_a) = app
+        .seed_app_user_ready_to_checkin("admin-a@example.com", "AcmeA", "alice", "Alice")
+        .await;
+    let (_admin_b, _code_b, app_user_b, _client_b, _token_b, _pw_b) = app
+        .seed_app_user_ready_to_checkin("admin-b@example.com", "AcmeB", "bob", "Bob")
+        .await;
+    let (member_a, _) = app
+        .register_member(&admin_a, "member-a@example.com", &code_a)
+        .await;
+
+    let r = member_a
+        .get(app.url(&format!("/checkin/users/{app_user_b}/locations")))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), StatusCode::NOT_FOUND);
 }

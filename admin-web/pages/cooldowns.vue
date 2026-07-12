@@ -6,7 +6,6 @@ definePageMeta({ middleware: 'auth' })
 
 const auth = useAuth()
 const api = useApi()
-const router = useRouter()
 
 const items = ref<CooldownDto[]>([])
 const loading = ref(true)
@@ -97,31 +96,13 @@ else {
 <template>
   <main class="min-h-screen px-4 py-10">
     <div class="max-w-4xl mx-auto space-y-6">
-      <header class="flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <h1 class="text-2xl font-semibold text-slate-900">
-            冷卻管理
-          </h1>
-          <p class="text-sm text-slate-500 truncate">
-            {{ auth.currentOrg.value?.name }} · 列出 7 天內被移除或自離的 email 與其冷卻到期時間
-          </p>
-        </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <OrgSwitcher />
-          <NuxtLink
-            to="/members"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            成員管理
-          </NuxtLink>
-          <button
-            type="button"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            @click="router.push('/')"
-          >
-            回首頁
-          </button>
-        </div>
+      <header>
+        <h1 class="text-2xl font-semibold text-slate-900">
+          冷卻管理
+        </h1>
+        <p class="text-sm text-slate-500 truncate">
+          {{ auth.currentOrg.value?.name }} · 列出 7 天內被移除或自離的 email 與其冷卻到期時間
+        </p>
       </header>
 
       <section class="rounded-xl border border-slate-200 bg-white shadow-sm">

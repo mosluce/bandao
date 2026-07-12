@@ -6,7 +6,6 @@ definePageMeta({ middleware: 'auth' })
 
 const auth = useAuth()
 const appUsers = useAppUsers()
-const router = useRouter()
 
 const items = ref<AppUserDto[]>([])
 const loading = ref(true)
@@ -204,42 +203,19 @@ function friendlyActionError(err: unknown): string {
   }
 }
 
-if (auth.isAdmin.value) {
-  await load()
-}
-else {
-  await navigateTo('/')
-}
+await load()
 </script>
 
 <template>
   <main class="min-h-screen px-4 py-10">
     <div class="max-w-4xl mx-auto space-y-6">
-      <header class="flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <h1 class="text-2xl font-semibold text-slate-900">
-            App 使用者
-          </h1>
-          <p class="text-sm text-slate-500 truncate">
-            {{ auth.currentOrg.value?.name }} · 管理員工 / 終端使用者帳號
-          </p>
-        </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <OrgSwitcher />
-          <NuxtLink
-            to="/members"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            成員管理
-          </NuxtLink>
-          <button
-            type="button"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            @click="router.push('/')"
-          >
-            回首頁
-          </button>
-        </div>
+      <header>
+        <h1 class="text-2xl font-semibold text-slate-900">
+          App 使用者
+        </h1>
+        <p class="text-sm text-slate-500 truncate">
+          {{ auth.currentOrg.value?.name }} · 管理員工 / 終端使用者帳號
+        </p>
       </header>
 
       <section
@@ -253,6 +229,15 @@ else {
             驗證來源設定
           </NuxtLink>
           調整；此處僅顯示曾登入過的使用者，可停用以在本地封鎖登入。
+        </p>
+      </section>
+
+      <section
+        v-else-if="!auth.isAdmin.value"
+        class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
+        <p class="text-sm text-slate-500">
+          App 使用者由管理員建立與管理，無自助註冊。
         </p>
       </section>
 
@@ -368,7 +353,9 @@ else {
         >
           {{ isExternal
             ? '目前沒有使用者。使用者需先用外部帳號登入一次，才會出現在此。'
-            : '目前沒有 App 使用者。點上方「新增 App 使用者」開始。' }}
+            : auth.isAdmin.value
+              ? '目前沒有 App 使用者。點上方「新增 App 使用者」開始。'
+              : '目前沒有 App 使用者。' }}
         </p>
 
         <table
@@ -431,7 +418,10 @@ else {
                 {{ formatDate(u.created_at) }}
               </td>
               <td class="px-6 py-3">
-                <div class="flex flex-wrap gap-2">
+                <div
+                  v-if="auth.isAdmin.value"
+                  class="flex flex-wrap gap-2"
+                >
                   <button
                     v-if="!isExternal"
                     type="button"
@@ -460,6 +450,10 @@ else {
                     啟用
                   </button>
                 </div>
+                <span
+                  v-else
+                  class="text-xs text-slate-400"
+                >—</span>
               </td>
             </tr>
           </tbody>

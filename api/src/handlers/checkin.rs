@@ -15,7 +15,7 @@ use axum::http::StatusCode;
 use bson::DateTime;
 use bson::oid::ObjectId;
 
-use crate::auth::extractor::RequireAdmin;
+use crate::auth::extractor::{RequireActiveOrg, RequireAdmin};
 use crate::domain::{
     AppUser, AppUserCheckinStatus, CheckinEvent, CheckinEventType, CheckinUserStatus,
     EventInitiatorKind, EventLocation, EventSource, GeoPoint,
@@ -33,10 +33,11 @@ const FORCE_CHECKOUT_LABEL: &str = "管理員強制收班";
 const DEFAULT_PAGE_SIZE: i64 = 50;
 const MAX_PAGE_SIZE: i64 = 200;
 
-/// `GET /checkin/users` — admin live status board for `current_org`.
+/// `GET /checkin/users` — live status board for `current_org`, any active Org
+/// member (admin or member); content is identical regardless of role.
 pub async fn list_users(
     State(state): State<AppState>,
-    RequireAdmin(active): RequireAdmin,
+    active: RequireActiveOrg,
 ) -> ApiResult<Json<Vec<CheckinUserBoardRowDto>>> {
     let users = state.db.app_users.list_by_org(active.org_id).await?;
     if users.is_empty() {
@@ -102,10 +103,11 @@ fn build_board_row(
     }
 }
 
-/// `GET /checkin/users/:id/events` — single AppUser's history.
+/// `GET /checkin/users/:id/events` — single AppUser's history, any active
+/// Org member (admin or member); content is identical regardless of role.
 pub async fn list_user_events(
     State(state): State<AppState>,
-    RequireAdmin(active): RequireAdmin,
+    active: RequireActiveOrg,
     Path(id): Path<String>,
     Query(q): Query<crate::handlers::checkin_dto::EventsCursorQuery>,
 ) -> ApiResult<Json<Vec<CheckinEventDto>>> {

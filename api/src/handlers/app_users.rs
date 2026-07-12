@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use bson::oid::ObjectId;
 use serde::Serialize;
 
-use crate::auth::extractor::RequireAdmin;
+use crate::auth::extractor::{RequireActiveOrg, RequireAdmin};
 use crate::auth::{app_password, password};
 use crate::db::{AppUserInsertError, CheckinStatusInsertError};
 use crate::domain::{AppUserStatus, OrgAuthSource};
@@ -28,12 +28,13 @@ pub struct PasswordResetResponse {
     pub initial_password: String,
 }
 
-/// `GET /app-users` — admin-only, scoped to `current_org`. Returns the
-/// AppUsers in the caller's current Org. Members get `FORBIDDEN`; sessions
-/// without `current_org_id` get `NO_ACTIVE_ORG` via `RequireAdmin`.
+/// `GET /app-users` — any active Org member (admin or member), scoped to
+/// `current_org`. Returns the AppUsers in the caller's current Org, content
+/// identical regardless of the caller's role. Sessions without
+/// `current_org_id` get `NO_ACTIVE_ORG` via `RequireActiveOrg`.
 pub async fn list(
     State(state): State<AppState>,
-    RequireAdmin(active): RequireAdmin,
+    active: RequireActiveOrg,
 ) -> ApiResult<Json<Vec<AppUserDto>>> {
     let users = state.db.app_users.list_by_org(active.org_id).await?;
     let mut out: Vec<AppUserDto> = users.iter().map(AppUserDto::from_app_user).collect();

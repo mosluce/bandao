@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ApiError } from '~/types/api'
 
-definePageMeta({ middleware: 'guest' })
+definePageMeta({ middleware: 'guest', layout: false })
 
 const auth = useAuth()
 const route = useRoute()

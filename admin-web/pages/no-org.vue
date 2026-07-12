@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { JoinRequestDto } from '~/types/api'
 
-definePageMeta({ middleware: 'auth' })
+definePageMeta({ middleware: 'auth', layout: false })
 
 const auth = useAuth()
 const joinRequests = useJoinRequests()
