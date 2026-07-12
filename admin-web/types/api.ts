@@ -98,10 +98,6 @@ export interface CooldownDto {
   removal_kind: RemovalKind
 }
 
-export interface RotateCodeResponse {
-  code: string
-}
-
 export interface SetSlugRequest {
   slug: string
 }

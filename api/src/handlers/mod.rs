@@ -47,7 +47,6 @@ pub fn router(state: AppState) -> Router {
         .route("/me/join-requests/{id}", delete(join_requests::cancel))
         .route("/me/current-org", post(me::switch_current_org))
         .route("/me/leave", post(me::leave))
-        .route("/orgs/me/code/rotate", post(orgs::rotate_code))
         .route(
             "/orgs/me/slug",
             post(orgs::set_slug).delete(orgs::clear_slug),
