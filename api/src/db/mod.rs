@@ -7,6 +7,7 @@ pub mod dashboard_sessions;
 pub mod dashboard_users;
 pub mod join_requests;
 pub mod location_pings;
+pub mod org_api_tokens;
 pub mod orgs;
 pub mod removed_memberships;
 pub mod slug_reservations;
@@ -19,7 +20,7 @@ use mongodb::{Client, Collection, Database, IndexModel};
 
 use crate::domain::{
     AppSession, AppUser, CheckinEvent, CheckinUserStatus, DashboardSession, DashboardUser,
-    JoinRequest, LocationPing, Membership, Org, OrgSlugReservation, RemovedMembership,
+    JoinRequest, LocationPing, Membership, Org, OrgApiToken, OrgSlugReservation, RemovedMembership,
 };
 use crate::error::ApiResult;
 
@@ -32,6 +33,7 @@ pub use dashboard_sessions::DashboardSessionRepository;
 pub use dashboard_users::DashboardUserRepository;
 pub use join_requests::{JoinRequestInsertError, JoinRequestRepository};
 pub use location_pings::{InsertManyOutcome, LOCATION_PING_BATCH_MAX, LocationPingRepository};
+pub use org_api_tokens::OrgApiTokenRepository;
 pub use orgs::OrgRepository;
 pub use removed_memberships::RemovedMembershipRepository;
 pub use slug_reservations::{OrgSlugReservationRepository, ReservationInsertError};
@@ -51,6 +53,7 @@ pub struct Db {
     pub checkin_user_status: CheckinUserStatusRepository,
     pub location_pings: LocationPingRepository,
     pub join_requests: JoinRequestRepository,
+    pub org_api_tokens: OrgApiTokenRepository,
 }
 
 impl Db {
@@ -98,6 +101,9 @@ impl Db {
             ),
             join_requests: JoinRequestRepository::new(
                 database.collection::<JoinRequest>("join_requests"),
+            ),
+            org_api_tokens: OrgApiTokenRepository::new(
+                database.collection::<OrgApiToken>("org_api_tokens"),
             ),
             database,
         })
@@ -507,6 +513,35 @@ impl Db {
                             .partial_filter_expression(
                                 doc! { "legacy_source_id": { "$exists": true } },
                             )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        // org_api_tokens: `token_hash` is the auth-path lookup key and must be
+        // unique; `org_id` backs the admin-web list query.
+        let org_api_tokens: Collection<OrgApiToken> = self.database.collection("org_api_tokens");
+        org_api_tokens
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "token_hash": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .unique(true)
+                            .name("org_api_tokens_token_hash_unique".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        org_api_tokens
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "org_id": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("org_api_tokens_org_id".to_string())
                             .build(),
                     )
                     .build(),

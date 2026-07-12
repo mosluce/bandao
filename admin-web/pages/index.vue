@@ -548,6 +548,12 @@ async function confirmLeave() {
               驗證來源
             </NuxtLink>
             <NuxtLink
+              to="/settings/api-tokens"
+              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              API Token
+            </NuxtLink>
+            <NuxtLink
               to="/checkin"
               class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >

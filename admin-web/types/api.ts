@@ -290,6 +290,46 @@ export interface OrgPendingJoinRequestDto {
   decided_at?: string
 }
 
+// --- Org API tokens ---
+
+/** Known, closed set of capabilities an API token can be scoped to — mirrors
+ * the server's `ApiTokenScope` enum. Not free text: the create-token form
+ * renders this list as checkboxes. */
+export type ApiTokenScope = 'checkin:read'
+
+export const API_TOKEN_SCOPES: { value: ApiTokenScope, label: string }[] = [
+  { value: 'checkin:read', label: '打卡紀錄唯讀匯出（震旦雲等外部系統排程呼叫用）' },
+]
+
+export type ApiTokenStatus = 'active' | 'disabled'
+
+export interface ApiTokenDto {
+  id: string
+  name: string
+  scopes: ApiTokenScope[]
+  status: ApiTokenStatus
+  token_prefix: string
+  created_at: string
+  last_used_at?: string
+  rotated_at?: string
+}
+
+export interface CreateApiTokenRequest {
+  name: string
+  scopes: ApiTokenScope[]
+}
+
+export interface UpdateApiTokenStatusRequest {
+  status: ApiTokenStatus
+}
+
+/** Creation/rotation response — `secret` is the plaintext token, present
+ * exactly once. No other endpoint ever returns it again. */
+export interface ApiTokenSecretResponse {
+  token: ApiTokenDto
+  secret: string
+}
+
 export interface SubmitJoinRequestRequest {
   org_code: string
   application_message?: string
