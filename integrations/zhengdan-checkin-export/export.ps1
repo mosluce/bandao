@@ -17,9 +17,13 @@
   to export.log — a bad run must never leave a partial/corrupt file for
   震旦雲 to misread as "no one clocked in today".
 
-  A successful call that legitimately has zero events for the day DOES
-  still write an (empty) file — that's a different signal from "the
-  export itself failed" and 震旦雲 should be able to tell them apart.
+  A successful call that legitimately has zero events for the day ALSO
+  writes nothing (just logs it) — 震旦雲's importer hangs when it reads an
+  empty file, confirmed on the real customer machine, so an empty file is
+  strictly worse than no file. This means "no new file this hour" is now
+  ambiguous between "zero events" and "the pipeline failed" at the
+  filesystem level; export.log is the only place that still distinguishes
+  them (see the OK/ERROR log lines below).
 
 .NOTES
   Written for Windows Server 2016 Datacenter's built-in PowerShell 5.1.
@@ -110,16 +114,26 @@ try {
         "$NamePadded$TimeStamp$EventWord"
     })
 
-    $Content = [string]::Join("`r`n", $Lines)
+    if ($Lines.Count -eq 0) {
+        # Do NOT write an empty file here — 震旦雲's importer hangs when it
+        # reads one (confirmed on the real customer machine). Logging is
+        # the only remaining signal that this run happened and legitimately
+        # found nothing, as opposed to having failed outright (see the
+        # catch block below).
+        Write-Log "OK: 0 events for $($Response.date) (utc_offset=$($Response.utc_offset)) - no file written"
+    }
+    else {
+        $Content = [string]::Join("`r`n", $Lines)
 
-    $RunTimestamp = Get-Date -Format 'yyyyMMddHHmmss'
-    $OutFile = Join-Path $TargetFolder "$RunTimestamp.txt"
+        $RunTimestamp = Get-Date -Format 'yyyyMMddHHmmss'
+        $OutFile = Join-Path $TargetFolder "$RunTimestamp.txt"
 
-    # BOM-safe UTF-8 write — see .NOTES above.
-    $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($OutFile, $Content, $Utf8NoBom)
+        # BOM-safe UTF-8 write — see .NOTES above.
+        $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($OutFile, $Content, $Utf8NoBom)
 
-    Write-Log "OK: wrote $($Lines.Count) row(s) to $OutFile"
+        Write-Log "OK: wrote $($Lines.Count) row(s) to $OutFile"
+    }
 }
 catch {
     Write-Log "ERROR: $($_.Exception.Message)"
