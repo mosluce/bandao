@@ -155,9 +155,9 @@ The system SHALL provide `GET /app/checkin/status` returning `{ status, current_
 - **THEN** the response contains up to 50 of the caller's events ordered by `occurred_at_client` descending
 - **AND** events belonging to other AppUsers are not included
 
-### Requirement: Admin lists AppUser status board
+### Requirement: Any Org member can list the AppUser status board
 
-The system SHALL provide `GET /checkin/users` for dashboard admins, returning every AppUser in `current_org` with their current `checkin_user_status` (including a flag indicating whether the most recent event has `|occurred_at_client - occurred_at_server| > 1 hour`). AppUsers from other Orgs SHALL NOT appear. Members (non-admin) SHALL be rejected with `FORBIDDEN`.
+The system SHALL provide `GET /checkin/users` for any authenticated dashboard user with an active membership in `current_org` (`admin` or `member`), returning every AppUser in `current_org` with their current `checkin_user_status` (including a flag indicating whether the most recent event has `|occurred_at_client - occurred_at_server| > 1 hour`). AppUsers from other Orgs SHALL NOT appear.
 
 #### Scenario: Admin sees current_org AppUsers and their status
 
@@ -175,14 +175,14 @@ The system SHALL provide `GET /checkin/users` for dashboard admins, returning ev
 - **WHEN** an admin sends `GET /checkin/users` while `current_org = Org A`
 - **THEN** AppUsers belonging to Org B are absent regardless of status
 
-#### Scenario: Member cannot view checkin board
+#### Scenario: Member can view the checkin board, identically to admin
 
 - **WHEN** a `member` sends `GET /checkin/users`
-- **THEN** the request is rejected with `FORBIDDEN`
+- **THEN** the response is `200 OK` with the same content a same-Org admin would receive
 
-### Requirement: Admin views one AppUser's event history
+### Requirement: Any Org member can view one AppUser's event history
 
-The system SHALL provide `GET /checkin/users/:id/events` for dashboard admins, returning the target AppUser's events (cursor-paginated, newest first by `occurred_at_client`, default page size 50). The endpoint SHALL be scoped to `current_org`; targeting an AppUser belonging to another Org SHALL return `NOT_FOUND`. Members SHALL be rejected with `FORBIDDEN`.
+The system SHALL provide `GET /checkin/users/:id/events` for any authenticated dashboard user with an active membership in `current_org` (`admin` or `member`), returning the target AppUser's events (cursor-paginated, newest first by `occurred_at_client`, default page size 50). The endpoint SHALL be scoped to `current_org`; targeting an AppUser belonging to another Org SHALL return `NOT_FOUND`.
 
 #### Scenario: Admin views in-org AppUser events
 
@@ -193,6 +193,13 @@ The system SHALL provide `GET /checkin/users/:id/events` for dashboard admins, r
 
 - **WHEN** an admin sends `GET /checkin/users/:id/events` for an AppUser whose `org_id != current_org_id`
 - **THEN** the response is `NOT_FOUND`
+
+#### Scenario: Member can view AppUser event history, identically to admin
+
+- **WHEN** a `member` sends `GET /checkin/users/:id/events` for an AppUser in `current_org`
+- **THEN** the response is `200 OK` with the same content a same-Org admin would receive
+
+Force-checkout (`POST /checkin/users/:id/force-checkout`) and the Org checkin settings update (`PATCH /orgs/me/settings`) are unaffected by this change and remain `admin`-only — see the unmodified "Admin can force checkout an AppUser on shift" requirement.
 
 ### Requirement: Admin can force checkout an AppUser on shift
 
