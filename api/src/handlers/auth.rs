@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -9,7 +11,7 @@ use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::extractor::{AuthContext, SESSION_COOKIE, build_clearing_cookie};
-use crate::auth::{org_code, password, slug as slug_auth};
+use crate::auth::{api_token, org_code, password, session_token, slug as slug_auth};
 use crate::config::Config;
 use crate::db::MembershipInsertError;
 use crate::domain::{DashboardUser, EncryptMode, Membership, Org, Role};
@@ -18,6 +20,12 @@ use crate::state::AppState;
 
 const ORG_CODE_RETRIES: usize = 3;
 const MIN_PASSWORD_LEN: usize = 8;
+/// How long a `POST /auth/forgot-password` token stays valid.
+const RESET_TOKEN_TTL: Duration = Duration::from_secs(60 * 60);
+/// Minimum gap between two token issuances for the same user — see the
+/// `dashboard-auth` spec's "Password-reset requests for the same user are
+/// rate-limited" requirement.
+const RESET_REQUEST_COOLDOWN: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "mode", rename_all = "lowercase")]
@@ -347,6 +355,121 @@ pub async fn logout(
         .await?;
     let cleared = jar.remove(build_clearing_cookie());
     Ok((StatusCode::NO_CONTENT, cleared))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ForgotPasswordRequest {
+    pub email: String,
+}
+
+/// `POST /auth/forgot-password` — public. Always `204`, regardless of
+/// whether `email` matches an account, whether the requester is within the
+/// cooldown, or whether the send itself succeeds — see the `dashboard-auth`
+/// spec's "request a password reset link without revealing whether the
+/// email exists" requirement. Every early-return in this handler funnels to
+/// the same response; do not add a branch that surfaces different status
+/// codes for different cases.
+pub async fn forgot_password(
+    State(state): State<AppState>,
+    Json(req): Json<ForgotPasswordRequest>,
+) -> ApiResult<StatusCode> {
+    if let Some(user) = state
+        .db
+        .dashboard_users
+        .find_by_email(req.email.trim())
+        .await?
+    {
+        let within_cooldown = state
+            .db
+            .password_reset_tokens
+            .find_latest_for_user(user.id)
+            .await?
+            .is_some_and(|t| {
+                let elapsed_ms =
+                    DateTime::now().timestamp_millis() - t.created_at.timestamp_millis();
+                elapsed_ms < RESET_REQUEST_COOLDOWN.as_millis() as i64
+            });
+
+        if !within_cooldown {
+            let raw_token = session_token::generate();
+            let token_hash = api_token::hash_token(&raw_token);
+            state
+                .db
+                .password_reset_tokens
+                .insert(user.id, &token_hash, RESET_TOKEN_TTL)
+                .await?;
+
+            let link = format!(
+                "{}/reset-password?token={}",
+                state.config.admin_web_base_url, raw_token
+            );
+            if let Err(err) = state
+                .email
+                .send(
+                    &user.email,
+                    "重設班到密碼",
+                    &render_reset_password_email(&link),
+                )
+                .await
+            {
+                tracing::warn!(?err, user_id = %user.id, "forgot-password email send failed");
+            }
+        }
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+fn render_reset_password_email(link: &str) -> String {
+    format!(
+        "<p>你好，</p>\
+         <p>我們收到重設班到密碼的請求。點擊下方連結設定新密碼，此連結 60 分鐘內有效：</p>\
+         <p><a href=\"{link}\">{link}</a></p>\
+         <p>如果這不是你本人的操作，請忽略這封信，你的密碼不會被變更。</p>"
+    )
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResetPasswordRequest {
+    pub token: String,
+    pub new_password: String,
+}
+
+/// `POST /auth/reset-password` — public. Unlike `forgot_password`, the
+/// caller here already possesses a value that can only have come from the
+/// email (the token) — there is no anonymous-guessing threat model to
+/// protect against, so a specific `INVALID_RESET_TOKEN` error is fine.
+pub async fn reset_password(
+    State(state): State<AppState>,
+    Json(req): Json<ResetPasswordRequest>,
+) -> ApiResult<StatusCode> {
+    let token_hash = api_token::hash_token(&req.token);
+    let record = state
+        .db
+        .password_reset_tokens
+        .find_by_hash(&token_hash)
+        .await?
+        .filter(|t| {
+            t.used_at.is_none()
+                && t.expires_at.timestamp_millis() > DateTime::now().timestamp_millis()
+        })
+        .ok_or(ApiError::InvalidResetToken)?;
+
+    validate_password(&req.new_password)?;
+
+    let new_hash = password::hash(&req.new_password)?;
+    state
+        .db
+        .dashboard_users
+        .update_password_hash(record.user_id, &new_hash)
+        .await?;
+    state.db.password_reset_tokens.mark_used(record.id).await?;
+    state
+        .db
+        .dashboard_sessions
+        .delete_all_by_user_id(record.user_id)
+        .await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Hydrate `(membership, org)` pairs in `joined_at` order. Memberships whose

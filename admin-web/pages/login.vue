@@ -10,6 +10,7 @@ const email = ref('')
 const password = ref('')
 const errorMessage = ref('')
 const submitting = ref(false)
+const justReset = route.query.reset === '1'
 
 async function onSubmit() {
   errorMessage.value = ''
@@ -41,6 +42,13 @@ async function onSubmit() {
       </h1>
       <p class="text-sm text-slate-500 mb-6">
         使用 dashboard 帳號登入
+      </p>
+
+      <p
+        v-if="justReset"
+        class="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+      >
+        密碼已重設，請用新密碼重新登入。
       </p>
 
       <form
@@ -76,6 +84,12 @@ async function onSubmit() {
             minlength="8"
             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
           >
+          <NuxtLink
+            to="/forgot-password"
+            class="mt-1 inline-block text-xs text-slate-500 hover:text-slate-900"
+          >
+            忘記密碼？
+          </NuxtLink>
         </div>
 
         <p

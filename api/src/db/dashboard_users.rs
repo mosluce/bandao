@@ -58,6 +58,18 @@ impl DashboardUserRepository {
         self.coll.delete_one(doc! { "_id": id }).await?;
         Ok(())
     }
+
+    /// Used by `POST /auth/reset-password`. Bumps `updated_at` alongside the
+    /// hash, same convention as every other mutating repository method here.
+    pub async fn update_password_hash(&self, id: ObjectId, password_hash: &str) -> ApiResult<()> {
+        self.coll
+            .update_one(
+                doc! { "_id": id },
+                doc! { "$set": { "password_hash": password_hash, "updated_at": DateTime::now() } },
+            )
+            .await?;
+        Ok(())
+    }
 }
 
 fn is_duplicate_key(err: &mongodb::error::Error) -> bool {

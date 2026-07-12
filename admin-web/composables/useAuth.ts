@@ -1,11 +1,13 @@
 import type {
   AuthResponse,
   CreateOrgRequest,
+  ForgotPasswordRequest,
   JoinOrgRequest,
   LoginRequest,
   MembershipDto,
   OrgDto,
   RegisterRequest,
+  ResetPasswordRequest,
   Role,
   SwitchOrgRequest,
   TransferOwnerRequest,
@@ -135,6 +137,25 @@ export function useAuth() {
     }
   }
 
+  /**
+   * Always resolves — the endpoint itself never reveals whether `email`
+   * matched an account, so there's nothing meaningful to branch on here.
+   */
+  async function forgotPassword(email: string) {
+    await api('/auth/forgot-password', {
+      method: 'POST',
+      body: { email } satisfies ForgotPasswordRequest,
+    })
+  }
+
+  /** Throws `ApiError` with `code === 'INVALID_RESET_TOKEN'` on a bad/expired/used token. */
+  async function resetPassword(token: string, newPassword: string) {
+    await api('/auth/reset-password', {
+      method: 'POST',
+      body: { token, new_password: newPassword } satisfies ResetPasswordRequest,
+    })
+  }
+
   /** Logged-in user creates a brand-new Org and becomes its owner. */
   async function createOrg(orgName: string) {
     const data = await api<AuthResponse>('/me/orgs', {
@@ -205,6 +226,8 @@ export function useAuth() {
     login,
     register,
     logout,
+    forgotPassword,
+    resetPassword,
     createOrg,
     joinOrg,
     switchOrg,

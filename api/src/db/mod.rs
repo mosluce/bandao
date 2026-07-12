@@ -9,6 +9,7 @@ pub mod join_requests;
 pub mod location_pings;
 pub mod org_api_tokens;
 pub mod orgs;
+pub mod password_reset_tokens;
 pub mod removed_memberships;
 pub mod slug_reservations;
 
@@ -20,7 +21,8 @@ use mongodb::{Client, Collection, Database, IndexModel};
 
 use crate::domain::{
     AppSession, AppUser, CheckinEvent, CheckinUserStatus, DashboardSession, DashboardUser,
-    JoinRequest, LocationPing, Membership, Org, OrgApiToken, OrgSlugReservation, RemovedMembership,
+    JoinRequest, LocationPing, Membership, Org, OrgApiToken, OrgSlugReservation,
+    PasswordResetToken, RemovedMembership,
 };
 use crate::error::ApiResult;
 
@@ -35,6 +37,7 @@ pub use join_requests::{JoinRequestInsertError, JoinRequestRepository};
 pub use location_pings::{InsertManyOutcome, LOCATION_PING_BATCH_MAX, LocationPingRepository};
 pub use org_api_tokens::OrgApiTokenRepository;
 pub use orgs::OrgRepository;
+pub use password_reset_tokens::PasswordResetTokenRepository;
 pub use removed_memberships::RemovedMembershipRepository;
 pub use slug_reservations::{OrgSlugReservationRepository, ReservationInsertError};
 
@@ -54,6 +57,7 @@ pub struct Db {
     pub location_pings: LocationPingRepository,
     pub join_requests: JoinRequestRepository,
     pub org_api_tokens: OrgApiTokenRepository,
+    pub password_reset_tokens: PasswordResetTokenRepository,
 }
 
 impl Db {
@@ -104,6 +108,9 @@ impl Db {
             ),
             org_api_tokens: OrgApiTokenRepository::new(
                 database.collection::<OrgApiToken>("org_api_tokens"),
+            ),
+            password_reset_tokens: PasswordResetTokenRepository::new(
+                database.collection::<PasswordResetToken>("password_reset_tokens"),
             ),
             database,
         })
@@ -542,6 +549,53 @@ impl Db {
                     .options(
                         IndexOptions::builder()
                             .name("org_api_tokens_org_id".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+
+        // password_reset_tokens: `token_hash` is the auth-path lookup key
+        // (unique — collisions are astronomically unlikely with 256-bit
+        // tokens, but the index still documents the intended invariant);
+        // `user_id` backs the cooldown check (`find_latest_for_user`); TTL
+        // on `expires_at` cleans up stale rows automatically, same pattern
+        // as `dashboard_sessions`/`app_sessions`.
+        let password_reset_tokens: Collection<PasswordResetToken> =
+            self.database.collection("password_reset_tokens");
+        password_reset_tokens
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "token_hash": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .unique(true)
+                            .name("password_reset_tokens_token_hash_unique".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        password_reset_tokens
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "user_id": 1, "created_at": -1 })
+                    .options(
+                        IndexOptions::builder()
+                            .name("password_reset_tokens_user_created_at".to_string())
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await?;
+        password_reset_tokens
+            .create_index(
+                IndexModel::builder()
+                    .keys(doc! { "expires_at": 1 })
+                    .options(
+                        IndexOptions::builder()
+                            .expire_after(Duration::from_secs(0))
+                            .name("password_reset_tokens_ttl".to_string())
                             .build(),
                     )
                     .build(),
