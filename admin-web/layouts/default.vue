@@ -1,8 +1,10 @@
 <script setup lang="ts">
 interface NavItem {
-  to: string
+  /** Absent = non-interactive group label (e.g. 進階工具), not a link. */
+  to?: string
   label: string
   badge?: number
+  children?: NavItem[]
 }
 
 const auth = useAuth()
@@ -41,25 +43,38 @@ onBeforeUnmount(() => {
 })
 
 const navItems = computed<NavItem[]>(() => {
-  const base: NavItem[] = [
-    { to: '/members', label: '成員管理' },
-    { to: '/app-users', label: 'App 使用者' },
+  const items: NavItem[] = [
     { to: '/checkin', label: '打卡看板' },
+    {
+      to: '/members',
+      label: '成員管理',
+      children: auth.isAdmin.value
+        ? [{
+            to: '/admin/join-requests',
+            label: '加入申請',
+            badge: pendingJoinCount.value > 0 ? pendingJoinCount.value : undefined,
+          }]
+        : [],
+    },
+    {
+      to: '/app-users',
+      label: 'App 使用者',
+      children: auth.isAdmin.value
+        ? [{ to: '/settings/auth', label: '驗證來源' }]
+        : [],
+    },
   ]
   if (auth.isAdmin.value) {
-    base.push(
-      { to: '/cooldowns', label: '冷卻管理' },
-      {
-        to: '/admin/join-requests',
-        label: '加入申請',
-        badge: pendingJoinCount.value > 0 ? pendingJoinCount.value : undefined,
-      },
-      { to: '/settings/auth', label: '驗證來源' },
-      { to: '/settings/api-tokens', label: 'API Token' },
-    )
+    items.push({
+      label: '進階工具',
+      children: [
+        { to: '/settings/api-tokens', label: 'API Token' },
+        { to: '/cooldowns', label: '冷卻管理' },
+      ],
+    })
   }
-  base.push({ to: '/download', label: '下載 App' })
-  return base
+  items.push({ to: '/download', label: '下載 App' })
+  return items
 })
 
 function closeSidebarOnNavigate() {
@@ -101,22 +116,49 @@ function goHome() {
       </div>
 
       <nav class="flex-1 space-y-1 overflow-y-auto p-4">
-        <NuxtLink
+        <template
           v-for="item in navItems"
-          :key="item.to"
-          :to="item.to"
-          class="relative flex items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          active-class="bg-slate-100 text-slate-900"
-          @click="closeSidebarOnNavigate"
+          :key="item.to ?? item.label"
         >
-          {{ item.label }}
-          <span
-            v-if="item.badge"
-            class="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white"
+          <NuxtLink
+            v-if="item.to"
+            :to="item.to"
+            class="relative flex items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            active-class="bg-slate-100 text-slate-900"
+            @click="closeSidebarOnNavigate"
           >
-            {{ item.badge }}
-          </span>
-        </NuxtLink>
+            {{ item.label }}
+            <span
+              v-if="item.badge"
+              class="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white"
+            >
+              {{ item.badge }}
+            </span>
+          </NuxtLink>
+          <p
+            v-else
+            class="px-3 pt-3 pb-1 text-xs font-medium uppercase tracking-wide text-slate-400"
+          >
+            {{ item.label }}
+          </p>
+
+          <NuxtLink
+            v-for="child in item.children"
+            :key="child.to"
+            :to="child.to!"
+            class="relative flex items-center rounded-md py-2 pl-6 pr-3 text-sm text-slate-600 hover:bg-slate-100"
+            active-class="bg-slate-100 text-slate-900"
+            @click="closeSidebarOnNavigate"
+          >
+            {{ child.label }}
+            <span
+              v-if="child.badge"
+              class="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white"
+            >
+              {{ child.badge }}
+            </span>
+          </NuxtLink>
+        </template>
       </nav>
 
       <div class="border-t border-slate-200 p-4">

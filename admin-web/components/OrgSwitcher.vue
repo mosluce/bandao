@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
   <div
     v-if="auth.currentOrg.value"
     ref="root"
-    class="relative inline-block text-left"
+    class="relative block w-full text-left"
   >
     <button
       type="button"
@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
 
     <div
       v-if="open"
-      class="absolute right-0 z-10 mt-2 w-72 origin-top-right rounded-md border border-slate-200 bg-white shadow-lg"
+      class="absolute left-0 right-0 z-10 mt-2 origin-top rounded-md border border-slate-200 bg-white shadow-lg"
     >
       <div
         v-if="ownedMemberships.length"
