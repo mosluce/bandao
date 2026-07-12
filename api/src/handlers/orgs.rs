@@ -9,19 +9,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::auth::extractor::RequireAdmin;
 use crate::auth::slug::{GRACE_TTL, SlugValidationError};
-use crate::auth::{org_code, password, slug as slug_auth};
+use crate::auth::{password, slug as slug_auth};
 use crate::domain::Role;
 use crate::error::{ApiError, ApiResult};
 use crate::handlers::auth::OrgDto;
 use crate::state::AppState;
 
-const ORG_CODE_RETRIES: usize = 3;
 const RATE_LIMIT_WINDOW: Duration = Duration::from_secs(30 * 24 * 60 * 60);
-
-#[derive(Debug, Serialize)]
-pub struct RotateCodeResponse {
-    pub code: String,
-}
 
 #[derive(Debug, Deserialize)]
 pub struct SetSlugRequest {
@@ -37,34 +31,6 @@ pub struct SetSlugResponse {
 pub struct TransferOwnerRequest {
     pub new_owner_user_id: String,
     pub current_password: String,
-}
-
-pub async fn rotate_code(
-    State(state): State<AppState>,
-    RequireAdmin(active): RequireAdmin,
-) -> ApiResult<Json<RotateCodeResponse>> {
-    use mongodb::error::{ErrorKind, WriteFailure};
-    const DUPLICATE_KEY: i32 = 11000;
-
-    for attempt in 0..ORG_CODE_RETRIES {
-        let new_code = org_code::generate();
-        match state.db.orgs.rotate_code(active.org_id, &new_code).await {
-            Ok(org) => return Ok(Json(RotateCodeResponse { code: org.code })),
-            Err(ApiError::Db(err)) => {
-                let is_dup = matches!(
-                    err.kind.as_ref(),
-                    ErrorKind::Write(WriteFailure::WriteError(we)) if we.code == DUPLICATE_KEY
-                );
-                if is_dup && attempt + 1 < ORG_CODE_RETRIES {
-                    tracing::warn!(?new_code, attempt, "org code collision on rotate; retrying");
-                    continue;
-                }
-                return Err(ApiError::Db(err));
-            }
-            Err(other) => return Err(other),
-        }
-    }
-    Err(ApiError::Internal)
 }
 
 pub async fn set_slug(

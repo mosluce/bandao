@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { RotateCodeResponse } from '~/types/api'
 import { ApiError } from '~/types/api'
 
 definePageMeta({ middleware: 'auth' })
@@ -9,9 +8,6 @@ const api = useApi()
 const orgSlug = useOrgSlug()
 
 const copied = ref(false)
-const rotating = ref(false)
-const rotateError = ref('')
-const showRotateConfirm = ref(false)
 
 const slugInput = ref('')
 const slugEditing = ref(false)
@@ -138,22 +134,6 @@ async function copyInvite() {
   }
   catch {
     // ignore
-  }
-}
-
-async function rotateCode() {
-  rotateError.value = ''
-  rotating.value = true
-  try {
-    await api<RotateCodeResponse>('/orgs/me/code/rotate', { method: 'POST' })
-    await auth.refresh()
-    showRotateConfirm.value = false
-  }
-  catch (err) {
-    rotateError.value = err instanceof Error ? err.message : '輪替失敗'
-  }
-  finally {
-    rotating.value = false
   }
 }
 
@@ -525,7 +505,7 @@ async function confirmLeave() {
               管理員工具
             </h2>
             <p class="text-sm text-slate-500">
-              輪替組織代碼後，舊代碼將無法再加入組織。
+              管理成員、App 使用者與打卡設定。
             </p>
           </div>
           <div class="flex shrink-0 flex-wrap justify-end gap-2">
@@ -584,49 +564,6 @@ async function confirmLeave() {
               下載 App
             </NuxtLink>
           </div>
-        </div>
-
-        <div v-if="!showRotateConfirm">
-          <button
-            type="button"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            @click="showRotateConfirm = true"
-          >
-            輪替組織代碼
-          </button>
-        </div>
-
-        <div
-          v-else
-          class="rounded-md border border-amber-200 bg-amber-50 p-4 space-y-3"
-        >
-          <p class="text-sm text-amber-900">
-            確定要輪替組織代碼嗎？舊代碼將立刻失效，已分享的邀請連結將無法再使用。
-          </p>
-          <div class="flex gap-2">
-            <button
-              type="button"
-              :disabled="rotating"
-              class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-              @click="rotateCode"
-            >
-              {{ rotating ? '輪替中…' : '確認輪替' }}
-            </button>
-            <button
-              type="button"
-              :disabled="rotating"
-              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              @click="showRotateConfirm = false"
-            >
-              取消
-            </button>
-          </div>
-          <p
-            v-if="rotateError"
-            class="text-sm text-red-600"
-          >
-            {{ rotateError }}
-          </p>
         </div>
       </section>
 

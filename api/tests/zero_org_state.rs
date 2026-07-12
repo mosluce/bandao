@@ -49,11 +49,11 @@ async fn org_scoped_endpoints_reject_with_no_active_org() {
 
     // Sample a representative set of org-scoped endpoints. NO_ACTIVE_ORG = 403.
     let r = zero
-        .post(app.url("/orgs/me/code/rotate"))
+        .get(app.url("/orgs/me/join-requests"))
         .send()
         .await
         .unwrap();
-    assert_eq!(r.status(), StatusCode::FORBIDDEN, "rotate code");
+    assert_eq!(r.status(), StatusCode::FORBIDDEN, "list join requests");
     let err: Value = r.json().await.unwrap();
     assert_eq!(err["error"]["code"], "NO_ACTIVE_ORG");
 

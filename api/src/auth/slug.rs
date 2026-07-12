@@ -269,7 +269,7 @@ mod tests {
     /// Source paths (from `crate::handlers::router`):
     ///   /auth/register, /auth/login, /auth/logout
     ///   /me
-    ///   /orgs/me/code/rotate
+    ///   /orgs/me/owner
     ///   /dashboard-users/{id}/role, /dashboard-users
     ///   /app/auth/login, /app/auth/logout, /app/me, /app/me/password
     ///   /app-users, /app-users/{id}, /app-users/{id}/password-reset

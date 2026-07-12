@@ -25,13 +25,14 @@ async fn role_demotion_takes_effect_on_next_request_without_relogin() {
         .unwrap();
     assert_eq!(promote.status(), StatusCode::OK);
 
-    // Verify second is currently admin from their session — they can rotate.
-    let rotate = target
-        .post(app.url("/orgs/me/code/rotate"))
+    // Verify second is currently admin from their session — they can reach
+    // an admin-only, org-scoped, side-effect-free endpoint.
+    let list_join_requests = target
+        .get(app.url("/orgs/me/join-requests"))
         .send()
         .await
         .unwrap();
-    assert_eq!(rotate.status(), StatusCode::OK);
+    assert_eq!(list_join_requests.status(), StatusCode::OK);
 
     // Founder demotes second.
     let demote = founder
@@ -43,12 +44,12 @@ async fn role_demotion_takes_effect_on_next_request_without_relogin() {
     assert_eq!(demote.status(), StatusCode::OK);
 
     // Without re-login, second's NEXT request reflects the demotion.
-    let rotate2 = target
-        .post(app.url("/orgs/me/code/rotate"))
+    let list_join_requests2 = target
+        .get(app.url("/orgs/me/join-requests"))
         .send()
         .await
         .unwrap();
-    assert_eq!(rotate2.status(), StatusCode::FORBIDDEN);
+    assert_eq!(list_join_requests2.status(), StatusCode::FORBIDDEN);
 
     // /me also shows the new role.
     let me: Value = target

@@ -149,19 +149,6 @@ impl OrgRepository {
     }
 
     /// Replace the org's code with `new_code`. Returns `NotFound` if the org id is unknown.
-    pub async fn rotate_code(&self, id: ObjectId, new_code: &str) -> ApiResult<Org> {
-        let now = DateTime::now();
-        let result = self
-            .coll
-            .find_one_and_update(
-                doc! { "_id": id },
-                doc! { "$set": { "code": new_code, "updated_at": now } },
-            )
-            .return_document(mongodb::options::ReturnDocument::After)
-            .await?;
-        result.ok_or(ApiError::NotFound)
-    }
-
     /// Transfer ownership: set `owner_id` to `new_owner_id` and bump
     /// `updated_at`. Caller is expected to have already validated that
     /// `new_owner_id` is currently an admin of this Org.
