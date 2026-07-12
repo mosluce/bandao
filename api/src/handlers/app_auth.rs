@@ -75,7 +75,7 @@ pub async fn login(
             .try_to_rfc3339_string()
             .unwrap_or_default(),
         user: AppUserDto::from_app_user(&user_for_dto),
-        org: OrgDto::from_org(&org),
+        org: OrgDto::from_org_as_non_admin(&org),
         needs_password_change: user.needs_password_change,
     }))
 }
@@ -117,7 +117,7 @@ pub async fn me(
     Ok(Json(AppMeResponse {
         needs_password_change: user.needs_password_change,
         user: AppUserDto::from_app_user(&user),
-        org: OrgDto::from_org(&org),
+        org: OrgDto::from_org_as_non_admin(&org),
     }))
 }
 

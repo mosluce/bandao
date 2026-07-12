@@ -93,7 +93,7 @@ pub async fn configure(
         .orgs
         .set_auth_config(active.org_id, req.auth_source, external_config.as_ref())
         .await?;
-    Ok(Json(OrgDto::from_org(&updated)))
+    Ok(Json(OrgDto::from_org_as_admin(&updated)))
 }
 
 #[derive(Debug, Deserialize)]

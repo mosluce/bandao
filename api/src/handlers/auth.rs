@@ -108,7 +108,22 @@ pub struct OrgCheckinDto {
 }
 
 impl OrgDto {
-    pub fn from_org(org: &Org) -> Self {
+    /// Caller is a confirmed dashboard `admin` of this Org — includes
+    /// `external_auth` (password-free) in the response.
+    pub fn from_org_as_admin(org: &Org) -> Self {
+        Self::build(org, true)
+    }
+
+    /// Caller is anything else: a dashboard `member`, an AppUser session, or
+    /// any context where the caller's role is not a confirmed `admin`.
+    /// `external_auth` is entirely absent from the response, not null/empty
+    /// — see `openspec/specs/external-db-auth/spec.md`'s "External-auth
+    /// configuration is only visible to dashboard admins" requirement.
+    pub fn from_org_as_non_admin(org: &Org) -> Self {
+        Self::build(org, false)
+    }
+
+    fn build(org: &Org, include_external_auth: bool) -> Self {
         Self {
             id: org.id.to_hex(),
             name: org.name.clone(),
@@ -120,10 +135,13 @@ impl OrgDto {
                 location_tracking_enabled: org.checkin_location_tracking_enabled(),
             },
             auth_source: org.auth_source(),
-            external_auth: org
-                .external_auth()
-                .as_ref()
-                .map(ExternalAuthSummaryDto::from_config),
+            external_auth: if include_external_auth {
+                org.external_auth()
+                    .as_ref()
+                    .map(ExternalAuthSummaryDto::from_config)
+            } else {
+                None
+            },
             slug: org.slug.clone(),
             slug_changed_at: org
                 .slug_changed_at
@@ -419,9 +437,13 @@ pub(crate) fn build_auth_response(
 
     let memberships = pairs
         .into_iter()
-        .map(|(m, o)| MembershipDto {
-            org: OrgDto::from_org(&o),
-            role: m.role,
+        .map(|(m, o)| {
+            let org = if matches!(m.role, Role::Admin) {
+                OrgDto::from_org_as_admin(&o)
+            } else {
+                OrgDto::from_org_as_non_admin(&o)
+            };
+            MembershipDto { org, role: m.role }
         })
         .collect();
 
@@ -431,7 +453,13 @@ pub(crate) fn build_auth_response(
             email: user.email,
         },
         memberships,
-        current_org: current_org.as_ref().map(OrgDto::from_org),
+        current_org: current_org.as_ref().map(|o| {
+            if matches!(role, Some(Role::Admin)) {
+                OrgDto::from_org_as_admin(o)
+            } else {
+                OrgDto::from_org_as_non_admin(o)
+            }
+        }),
         role,
     }
 }

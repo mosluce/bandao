@@ -164,7 +164,7 @@ pub async fn transfer_owner(
     }
 
     let updated = state.db.orgs.transfer_owner(org_id, new_owner_id).await?;
-    Ok(Json(OrgDto::from_org(&updated)))
+    Ok(Json(OrgDto::from_org_as_admin(&updated)))
 }
 
 fn enforce_rate_limit(org: &crate::domain::Org, now: DateTime) -> ApiResult<()> {
