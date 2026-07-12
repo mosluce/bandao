@@ -481,3 +481,53 @@ pub struct LocationPing {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub legacy_source_id: Option<ObjectId>,
 }
+
+// --- Org API tokens ---
+
+/// Known, closed set of capabilities an API token can be scoped to. This is
+/// deliberately NOT a free-text field: a mistyped scope would silently
+/// produce a token no endpoint ever accepts, with no error until the first
+/// failed call in production. New scopes are added here as new external
+/// integrations need them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiTokenScope {
+    /// Read-only checkin-events export (`checkin-export-zhengdan` and any
+    /// future export consumer).
+    #[serde(rename = "checkin:read")]
+    CheckinRead,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiTokenStatus {
+    Active,
+    Disabled,
+}
+
+/// Long-lived, Org-scoped credential for machine-to-machine API access
+/// (scheduled scripts, external integrations) — distinct from dashboard
+/// sessions (human, cookie-based) and AppUser sessions (mobile). Never
+/// expires on its own; lifecycle is fully admin-driven (rotate / disable /
+/// enable / delete). `token_hash` is a SHA-256 digest (base64-encoded) of
+/// the full plaintext token — the plaintext itself is never stored and is
+/// only ever returned once, at creation or rotation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrgApiToken {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub org_id: ObjectId,
+    pub name: String,
+    pub token_hash: String,
+    /// Short, non-reconstructable prefix of the plaintext token, kept only
+    /// for UI recognizability (e.g. `bandao_at_xxxxxxxxxxxx`).
+    pub token_prefix: String,
+    pub scopes: Vec<ApiTokenScope>,
+    pub status: ApiTokenStatus,
+    pub created_at: DateTime,
+    pub created_by: ObjectId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_used_at: Option<DateTime>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotated_at: Option<DateTime>,
+}

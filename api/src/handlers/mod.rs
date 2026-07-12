@@ -9,6 +9,7 @@ pub mod external_auth;
 pub mod join_requests;
 pub mod location_tracking;
 pub mod me;
+pub mod org_api_tokens;
 pub mod orgs;
 pub mod users;
 
@@ -99,6 +100,23 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/checkin/users/{id}/locations/export",
             get(location_tracking::export_locations),
+        )
+        // Org API tokens (machine-to-machine credentials) — admin manages
+        // them via a logged-in dashboard session, same as any other
+        // org-scoped admin surface. The tokens themselves authenticate a
+        // *different* class of request (see `auth::api_token`), not these
+        // management endpoints.
+        .route(
+            "/orgs/me/api-tokens",
+            get(org_api_tokens::list).post(org_api_tokens::create),
+        )
+        .route(
+            "/orgs/me/api-tokens/{id}/rotate",
+            post(org_api_tokens::rotate),
+        )
+        .route(
+            "/orgs/me/api-tokens/{id}",
+            patch(org_api_tokens::update_status).delete(org_api_tokens::delete),
         )
         .layer(axum_middleware::from_fn_with_state(
             state.clone(),
