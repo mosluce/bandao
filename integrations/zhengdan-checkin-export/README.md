@@ -97,6 +97,17 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mosluce/bandao/main/in
 **不管用哪個選項**，設定完都手動觸發一次，確認 `TargetFolder` 底下出現一個新的
 `<yyyyMMddHHmmss>.txt`，且同目錄下的 `export.log` 顯示 `OK`。
 
+### 4. 移除排程
+
+用 `unregister-task.ps1`（同樣可重複執行，工作不存在時不會報錯，只會印訊息）：
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mosluce/bandao/main/integrations/zhengdan-checkin-export/unregister-task.ps1" -OutFile "unregister-task.ps1"
+.\unregister-task.ps1
+```
+
+或用 GUI：工作排程器裡找到「Zhengdan Checkin Export」這個工作，右鍵刪除。
+
 ## 檔案格式
 
 ```
