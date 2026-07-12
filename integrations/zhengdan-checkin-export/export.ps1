@@ -30,6 +30,11 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Windows Server 2016's .NET Framework defaults to SSL3/TLS1.0, which most
+# modern HTTPS endpoints (including the production API) refuse — the call
+# below fails with "無法建立 SSL/TLS 的安全通道" until TLS 1.2 is forced on.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ConfigPath = Join-Path $ScriptDir 'config.ps1'
 $LogPath = Join-Path $ScriptDir 'export.log'
