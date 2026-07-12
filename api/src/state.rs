@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::db::Db;
+use crate::services::email::{NoopEmailSender, ResendEmailSender, SharedEmailSender};
 use crate::services::reverse_geocoder::{
     CachedReverseGeocoder, NominatimGeocoder, ReverseGeocoder, SharedReverseGeocoder,
 };
@@ -14,6 +15,11 @@ pub struct AppState {
     /// fail-soft: the event still records with `region_name = null`. Tests
     /// substitute `StaticReverseGeocoder` via [`AppState::with_geocoder`].
     pub geocoder: SharedReverseGeocoder,
+    /// Transactional email sender (password-reset links, and future
+    /// email-based features). Falls back to `NoopEmailSender` when
+    /// `Config::resend_api_key` is unset. Tests substitute
+    /// `RecordingEmailSender` via [`AppState::with_email_sender`].
+    pub email: SharedEmailSender,
 }
 
 impl AppState {
@@ -23,10 +29,18 @@ impl AppState {
         // raw geocoder via `with_geocoder`.
         let geocoder: SharedReverseGeocoder =
             Arc::new(CachedReverseGeocoder::new(NominatimGeocoder::new()));
+        let email: SharedEmailSender = match &config.resend_api_key {
+            Some(key) => Arc::new(ResendEmailSender::new(
+                key.clone(),
+                config.email_from_address.clone(),
+            )),
+            None => Arc::new(NoopEmailSender),
+        };
         Self {
             db: Arc::new(db),
             config: Arc::new(config),
             geocoder,
+            email,
         }
     }
 
@@ -36,10 +50,35 @@ impl AppState {
     where
         G: ReverseGeocoder + 'static,
     {
+        let email: SharedEmailSender = match &config.resend_api_key {
+            Some(key) => Arc::new(ResendEmailSender::new(
+                key.clone(),
+                config.email_from_address.clone(),
+            )),
+            None => Arc::new(NoopEmailSender),
+        };
         Self {
             db: Arc::new(db),
             config: Arc::new(config),
             geocoder: Arc::new(geocoder),
+            email,
+        }
+    }
+
+    /// Construct with a custom email sender — primarily for tests that need
+    /// to assert on sent email (e.g. `RecordingEmailSender`) without hitting
+    /// Resend. Takes an already-`Arc`-wrapped sender (rather than a bare
+    /// generic, unlike `with_geocoder`) so the caller can keep its own
+    /// handle to inspect state recorded on the sender after the request
+    /// completes.
+    pub fn with_email_sender(db: Db, config: Config, email: SharedEmailSender) -> Self {
+        let geocoder: SharedReverseGeocoder =
+            Arc::new(CachedReverseGeocoder::new(NominatimGeocoder::new()));
+        Self {
+            db: Arc::new(db),
+            config: Arc::new(config),
+            geocoder,
+            email,
         }
     }
 }

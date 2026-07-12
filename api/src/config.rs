@@ -16,6 +16,17 @@ pub struct Config {
     /// from `BANDAO_SECRET_KEY` (base64 of 32 bytes). `None` when the env var is
     /// unset — deployments without external auth don't need it.
     pub secret_key: Option<[u8; 32]>,
+    /// Resend API key, from `RESEND_API_KEY`. `None` when unset — `AppState`
+    /// falls back to `NoopEmailSender` (logs, sends nothing) so no code path
+    /// outside production requires a real Resend account.
+    pub resend_api_key: Option<String>,
+    /// From-address for outbound email, e.g. `"班到 <noreply@ccmos.tw>"`.
+    /// From `RESEND_FROM_ADDRESS`; a dev-friendly default so local runs don't
+    /// need it set (the address is irrelevant when `resend_api_key` is `None`).
+    pub email_from_address: String,
+    /// Public base URL of admin-web, used to build links embedded in email
+    /// (e.g. the password-reset link). From `ADMIN_WEB_BASE_URL`.
+    pub admin_web_base_url: String,
 }
 
 impl Config {
@@ -80,6 +91,13 @@ impl Config {
             _ => None,
         };
 
+        let resend_api_key = std::env::var("RESEND_API_KEY")
+            .ok()
+            .filter(|v| !v.is_empty());
+        let email_from_address =
+            env_or_default("RESEND_FROM_ADDRESS", "班到 <onboarding@resend.dev>");
+        let admin_web_base_url = env_or_default("ADMIN_WEB_BASE_URL", "http://localhost:3000");
+
         Ok(Self {
             mongo_uri,
             mongo_db,
@@ -89,6 +107,9 @@ impl Config {
             cookie_secure,
             allowed_origin,
             secret_key,
+            resend_api_key,
+            email_from_address,
+            admin_web_base_url,
         })
     }
 }

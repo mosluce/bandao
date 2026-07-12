@@ -61,6 +61,9 @@ env vars, or operational procedures should land here in the same PR.
 | `BANDAO_ALLOWED_ORIGIN` | yes | `https://bandao-admin.ccmos.tw` | Single origin. CORS reflects this exact value. |
 | `BANDAO_SESSION_TTL_SECONDS` | no | `1209600` (14 days) | Adjust per security policy. |
 | `BANDAO_SECRET_KEY` | no† | _(base64 of 32 random bytes)_ | AEAD key for encrypting external-auth DB connection passwords at rest. †Required only if any Org uses external-database auth; without it, saving/using an external-auth config fails with `EXTERNAL_AUTH_UNAVAILABLE`. Generate: `openssl rand -base64 32`. No rotation support — changing it invalidates all stored external-auth passwords (re-enter them). |
+| `RESEND_API_KEY` | no† | _(Resend API key)_ | †Required for forgot-password email to actually send. Without it, the api falls back to a no-op sender: `POST /auth/forgot-password` still responds `204` and the reset flow is otherwise fully functional, but no email is ever sent — watch logs for `NoopEmailSender: email send skipped` if password resets seem to silently not arrive. The sending domain must be verified in Resend (SPF/DKIM) before this works for real recipients. |
+| `RESEND_FROM_ADDRESS` | no | `班到 <noreply@ccmos.tw>` | From-address for outbound email. Irrelevant when `RESEND_API_KEY` is unset. |
+| `ADMIN_WEB_BASE_URL` | yes | `https://bandao-admin.ccmos.tw` | Used to build the password-reset link embedded in email. Defaults to `http://localhost:3000` for local dev — production must set this explicitly or reset links will point at localhost. |
 | `TS_AUTHKEY` | yes | _(reusable Tailscale auth key)_ | Tagged `tag:bandao-api`. Rotate on operator's schedule. |
 | `TS_HOSTNAME` | no | `bandao-api` | Container's tailnet hostname. |
 

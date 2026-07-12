@@ -50,6 +50,23 @@ impl TestApp {
         .await
     }
 
+    /// Spawn with a custom email sender. Pass an already-`Arc`-wrapped
+    /// `RecordingEmailSender` (from `bandao_api::services::email`) and keep
+    /// your own clone of the `Arc` to inspect `.sent` after the request.
+    pub async fn spawn_with_email_sender(
+        email: bandao_api::services::email::SharedEmailSender,
+    ) -> Self {
+        Self::spawn_inner(
+            |cfg| {
+                cfg.session_ttl = Duration::from_secs(60 * 60);
+            },
+            Some(Box::new(move |db, config| {
+                AppState::with_email_sender(db, config, email)
+            })),
+        )
+        .await
+    }
+
     pub async fn spawn_with<F>(mut tweak: F) -> Self
     where
         F: FnMut(&mut Config),
@@ -83,6 +100,12 @@ impl TestApp {
             allowed_origin: None,
             // Deterministic key so external-auth tests can encrypt/decrypt.
             secret_key: Some([7u8; 32]),
+            // Tests never set RESEND_API_KEY — AppState falls back to a
+            // NoopEmailSender by default; tests that need to assert on sent
+            // email inject a RecordingEmailSender via spawn_with_email_sender.
+            resend_api_key: None,
+            email_from_address: "班到 <onboarding@resend.dev>".to_string(),
+            admin_web_base_url: "http://localhost:3000".to_string(),
         };
         tweak(&mut config);
 
