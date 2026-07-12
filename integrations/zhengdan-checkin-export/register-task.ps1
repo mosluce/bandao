@@ -44,7 +44,12 @@ $Trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Hours 1) `
     -RepetitionDuration ([TimeSpan]::MaxValue)
 
-$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBattery -DontStopIfGoingOnBatteries -StartWhenAvailable
+# No battery-related switches: this targets a server, which doesn't run on
+# battery, so there's nothing to configure there. -StartWhenAvailable lets
+# Task Scheduler still fire a missed hourly run shortly after it was due
+# (e.g. if the machine was rebooting exactly on the hour) instead of
+# skipping straight to the next scheduled time.
+$Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable
 
 if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
     Write-Host "Task '$TaskName' already exists - replacing it."
