@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines Org as the tenant boundary, including unique Org code generation, admin-controlled code rotation, code-based join authorization, and a forward-compatible settings container.
+Defines Org as the tenant boundary, including unique Org code generation, code-based join authorization, and a forward-compatible settings container.
 ## Requirements
 ### Requirement: Org has a unique Org code on creation
 
@@ -18,23 +18,6 @@ When an Org is created, the system SHALL generate a 10-character `org_code` draw
 
 - **WHEN** the random code generator returns a value that already exists for another Org
 - **THEN** the system retries generation until a unique value is produced or the operation fails with a server error after 3 retries
-
-### Requirement: Admin can rotate the Org code
-
-The system SHALL allow a user with role `admin` to rotate the Org code of their own Org. After rotation, the previous code SHALL be invalid immediately and SHALL NOT be usable for joining.
-
-#### Scenario: Admin rotates code successfully
-
-- **WHEN** an authenticated admin sends `POST /orgs/me/code/rotate`
-- **THEN** the response contains a new `org_code` different from the previous one
-- **AND** the Org record is updated with the new code
-- **AND** any subsequent registration attempt using the previous code is rejected with `INVALID_ORG_CODE`
-
-#### Scenario: Member cannot rotate code
-
-- **WHEN** an authenticated user with role `member` sends `POST /orgs/me/code/rotate`
-- **THEN** the request is rejected with `FORBIDDEN`
-- **AND** the Org code is unchanged
 
 ### Requirement: Org has an optional vanity slug
 
@@ -243,7 +226,7 @@ Each Org SHALL hold an `owner_id: ObjectId` field referencing the `dashboard_use
 
 #### Scenario: Owner-transfer is the only mutation path for owner_id
 
-- **WHEN** any non-transfer endpoint (slug operations, code rotation, role changes, removals, self-leave, etc.) is invoked
+- **WHEN** any non-transfer endpoint (slug operations, role changes, removals, self-leave, etc.) is invoked
 - **THEN** `owner_id` is unchanged
 
 ### Requirement: Owner can transfer ownership

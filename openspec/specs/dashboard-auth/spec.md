@@ -372,7 +372,7 @@ The system SHALL define a class of endpoints as **org-scoped** (any endpoint tha
 
 #### Scenario: Org-scoped endpoint rejected when current_org is null
 
-- **WHEN** an authenticated user with `current_org_id == null` sends a request to any org-scoped endpoint (e.g. `POST /orgs/me/code/rotate`, `GET /dashboard-users/cooldowns`)
+- **WHEN** an authenticated user with `current_org_id == null` sends a request to any org-scoped endpoint (e.g. `POST /orgs/me/owner`, `GET /dashboard-users/cooldowns`)
 - **THEN** the request is rejected with `NO_ACTIVE_ORG`
 - **AND** no records are modified
 
