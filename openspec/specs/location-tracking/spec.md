@@ -171,10 +171,9 @@ failures).
 - **AND** `accepted_count = 0`
 - **AND** `rejected` lists every original index
 
-### Requirement: Admin lists pings for one AppUser via cursor pagination
+### Requirement: Any Org member lists pings for one AppUser via cursor pagination
 
-The system SHALL provide `GET /checkin/users/:id/locations` accepting
-dashboard cookie auth and admin role. The endpoint SHALL accept query
+The system SHALL provide `GET /checkin/users/:id/locations` for any authenticated dashboard user with an active membership in `current_org` (`admin` or `member`). The endpoint SHALL accept query
 parameters `before` (optional, RFC3339 timestamp), `limit` (optional,
 integer; default 200, max 1000), and the optional date-range pair
 `from` / `to` (each RFC3339 timestamp). Results SHALL be returned
@@ -193,7 +192,9 @@ can be older than 90 days and must remain readable. Either side may be
 omitted; absent sides skip their respective check.
 
 The path's `:id` SHALL identify an AppUser whose Org matches the
-caller's `current_org`; mismatches SHALL return `404`.
+caller's `current_org`; mismatches SHALL return `404`. Exporting pings as
+xlsx (`GET /checkin/users/:id/locations/export`) remains `admin`-only —
+this requirement only changes read access to the paginated JSON listing.
 
 #### Scenario: First page returns newest pings
 
@@ -238,10 +239,16 @@ caller's `current_org`; mismatches SHALL return `404`.
 - **WHEN** the admin requests `GET /checkin/users/<Y>/locations`
 - **THEN** the response is `404`
 
-#### Scenario: Member without admin role rejected
+#### Scenario: Member can list pings, identically to admin
 
-- **WHEN** a `member` (non-admin) requests `GET /checkin/users/<X>/locations`
-- **THEN** the response is `403`
+- **WHEN** a `member` requests `GET /checkin/users/<X>/locations` for an AppUser X in `current_org`
+- **THEN** the response is `200 OK` with the same content a same-Org admin would receive
+
+#### Scenario: Member cross-org AppUser id still rejected
+
+- **GIVEN** an AppUser Y belongs to a different Org than the caller's `current_org`
+- **WHEN** a `member` requests `GET /checkin/users/<Y>/locations`
+- **THEN** the response is `404`
 
 ### Requirement: Admin exports one AppUser's pings as xlsx
 
