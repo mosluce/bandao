@@ -30,6 +30,16 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Built from Unicode code points, not literal characters, on purpose: Windows
+# PowerShell 5.1 reads a BOM-less UTF-8 .ps1 file using the system codepage,
+# which would corrupt any non-ASCII literal written directly in this source
+# file (independent of, and in addition to, the HTTP response encoding issue
+# handled further down). Code points make this script's correctness
+# independent of how the .ps1 file itself happens to be saved/transferred.
+# 上 U+4E0A, 班 U+73ED, 下 U+4E0B.
+$ClockInWord = [string]([char]0x4E0A + [char]0x73ED)   # 上班
+$ClockOutWord = [string]([char]0x4E0B + [char]0x73ED)  # 下班
+
 # Windows Server 2016's .NET Framework defaults to SSL3/TLS1.0, which most
 # modern HTTPS endpoints (including the production API) refuse — the call
 # below fails with "無法建立 SSL/TLS 的安全通道" until TLS 1.2 is forced on.
@@ -69,7 +79,20 @@ try {
     $Uri = "$ApiBaseUrl/orgs/me/checkin/events/export?utc_offset=%2B08:00"
     $Headers = @{ Authorization = "Bearer $ApiToken" }
 
-    $Response = Invoke-RestMethod -Uri $Uri -Headers $Headers -Method Get -TimeoutSec 30
+    # Deliberately NOT Invoke-RestMethod: on PowerShell 5.1 it decodes the
+    # response body using a guessed (non-UTF-8) encoding whenever the
+    # server's Content-Type doesn't carry an explicit charset, silently
+    # corrupting multi-byte display names before we ever see them. The API
+    # now declares charset=utf-8 explicitly (see api/src/handlers/checkin_export.rs),
+    # but this script doesn't rely on that alone — it reads the raw response
+    # bytes and decodes them as UTF-8 itself, so it's correct regardless of
+    # what any given server (or a future misconfiguration) sends.
+    # -UseBasicParsing avoids a hard dependency on the IE engine, which is
+    # often not initialized on a fresh Windows Server install.
+    $WebResponse = Invoke-WebRequest -Uri $Uri -Headers $Headers -Method Get -TimeoutSec 30 -UseBasicParsing
+    $RawBytes = $WebResponse.RawContentStream.ToArray()
+    $JsonText = [System.Text.Encoding]::UTF8.GetString($RawBytes)
+    $Response = $JsonText | ConvertFrom-Json
 
     # Wrapped in @(...): PowerShell assigns $null (not an empty array) to a
     # variable captured from a foreach loop that emits zero items, which
@@ -77,8 +100,8 @@ try {
     # $Lines is always a real (possibly empty) array.
     $Lines = @(foreach ($evt in $Response.events) {
         $EventWord = $null
-        if ($evt.event_type -eq 'clock_in') { $EventWord = '上班' }
-        elseif ($evt.event_type -eq 'clock_out') { $EventWord = '下班' }
+        if ($evt.event_type -eq 'clock_in') { $EventWord = $ClockInWord }
+        elseif ($evt.event_type -eq 'clock_out') { $EventWord = $ClockOutWord }
         else { continue }  # defensive: the API only ever returns these two
 
         $NamePadded = $evt.app_user_display_name.PadRight(20)

@@ -7,8 +7,9 @@
 
 use std::collections::HashMap;
 
-use axum::Json;
 use axum::extract::{Query, State};
+use axum::http::header::CONTENT_TYPE;
+use axum::response::{IntoResponse, Response};
 use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use time::UtcOffset;
@@ -49,7 +50,7 @@ pub async fn export(
     State(state): State<AppState>,
     token: ApiTokenAuthContext,
     Query(q): Query<ExportQuery>,
-) -> ApiResult<Json<ExportResponse>> {
+) -> ApiResult<Response> {
     token.require_scope(ApiTokenScope::CheckinRead)?;
 
     let offset_raw = q.utc_offset.as_deref().unwrap_or("+00:00");
@@ -90,9 +91,24 @@ pub async fn export(
         })
         .collect();
 
-    Ok(Json(ExportResponse {
+    let body = ExportResponse {
         date: format!("{date}"),
         utc_offset: offset_raw.to_string(),
         events: out_events,
-    }))
+    };
+
+    // Deliberately NOT `axum::Json<T>`: its `Content-Type: application/json`
+    // has no `charset` parameter. JSON is UTF-8 by spec so that's technically
+    // sufficient, but PowerShell 5.1's `Invoke-RestMethod` (the primary
+    // consumer of this endpoint — see `integrations/zhengdan-checkin-export/`)
+    // falls back to a non-UTF-8 default encoding for the response body when
+    // no charset is declared, corrupting multi-byte display names before
+    // this handler's bytes are even involved. Declaring the charset
+    // explicitly fixes that for this client and any other consumer with the
+    // same assumption.
+    let json = serde_json::to_vec(&body).map_err(|err| {
+        tracing::error!(?err, "failed to serialize checkin export response");
+        crate::error::ApiError::Internal
+    })?;
+    Ok(([(CONTENT_TYPE, "application/json; charset=utf-8")], json).into_response())
 }

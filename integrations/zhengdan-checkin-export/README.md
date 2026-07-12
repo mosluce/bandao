@@ -114,6 +114,63 @@ $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 那邊的匯入程式影響多大目前無法確認（可能整行、整批資料匯入失敗），沒有必要冒這個
 風險。
 
+## PowerShell 5.1 的 `Invoke-RestMethod` 中文亂碼陷阱
+
+實測發現：如果用 `Invoke-RestMethod` 打 API，回來的中文姓名會變成一堆重音拉丁字母
+的亂碼（例如「陳聖夫」變成「é³èå¤«」），而且**用記事本手動選 UTF-8 開啟一樣是亂
+碼**——不是顯示問題，是資料在 PowerShell 解析 HTTP 回應那一步就已經解壞了。
+
+原因：PowerShell 5.1 的 `Invoke-RestMethod`（底層是舊版 .NET Framework）如果伺服器
+回應的 `Content-Type` 沒有明確宣告 `charset=utf-8`，會用猜的（通常不是 UTF-8）去把
+回應內容解碼成字串——這一步錯了，後面不管檔案怎麼寫都救不回來。
+
+兩層修法都做了：
+
+1. **API 端**（`api/src/handlers/checkin_export.rs`）明確回傳
+   `Content-Type: application/json; charset=utf-8`，不再讓客戶端用猜的。
+2. **`export.ps1` 端**不用 `Invoke-RestMethod`，改用 `Invoke-WebRequest` 拿
+   `RawContentStream` 原始位元組，自己手動用 `[System.Text.Encoding]::UTF8` 解碼，
+   完全不依賴任何一方的編碼猜測：
+
+   ```powershell
+   $WebResponse = Invoke-WebRequest -Uri $Uri -Headers $Headers -Method Get -UseBasicParsing
+   $RawBytes = $WebResponse.RawContentStream.ToArray()
+   $JsonText = [System.Text.Encoding]::UTF8.GetString($RawBytes)
+   $Response = $JsonText | ConvertFrom-Json
+   ```
+
+   `-UseBasicParsing` 也一併加上——沒有這個參數，`Invoke-WebRequest` 在某些沒初始化
+   過 IE 引擎的乾淨 Windows Server 上會直接報錯。
+
+如果之後要換掉 API 呼叫的方式，這兩層防護（API 明確宣告 charset + script 自己手動
+解碼）都要保留，不要只依賴其中一邊。
+
+## PowerShell 5.1 讀取腳本檔案本身的編碼陷阱（跟上面是不同方向的問題）
+
+這個踩到的地方很細，容易跟上面「輸出檔案不能有 BOM」搞混，務必分清楚：
+
+- **輸出的 txt 檔案**（震旦雲要讀的那個）：不能有 BOM。
+- **`export.ps1` 這個腳本檔案本身**：如果裡面直接寫死中文字面值（例如
+  `$EventWord = '上班'`），Windows PowerShell 5.1 在**沒有 BOM 的情況下讀取 .ps1
+  原始碼**時，是用系統內碼（不是 UTF-8）去解析檔案內容的——這跟輸出檔案的 BOM 規則
+  完全相反的方向：腳本檔案這邊反而是「沒有 BOM 才會壞」。
+
+實測就是在這裡踩到的：用編輯器打開下載下來的 `export.ps1`，程式碼裡原本該是
+「上班」「下班」的地方變成亂碼，這代表 PowerShell 執行這支腳本時，那兩個字面值在
+剛被解析出來的當下就已經是錯的，不管後面 API 或寫檔邏輯多正確都救不回來。
+
+`export.ps1` 現在的寫法完全繞開這個問題——**不在原始碼裡直接寫中文字**，改用
+Unicode 碼位組出來：
+
+```powershell
+$ClockInWord = [string]([char]0x4E0A + [char]0x73ED)   # 上班
+$ClockOutWord = [string]([char]0x4E0B + [char]0x73ED)  # 下班
+```
+
+這樣腳本原始碼本身全部是純 ASCII，不管這個 `.ps1` 檔案將來被誰用什麼工具、什麼編碼
+存過都不會壞。之後如果要新增其他中文字面值到這支腳本裡，**用同樣的碼位寫法，不要
+直接貼中文字**。
+
 ## 已知限制
 
 - **姓名比對，不是員工代號**：震旦雲那邊目前是用姓名比對匯入資料，同名同姓在客戶端
