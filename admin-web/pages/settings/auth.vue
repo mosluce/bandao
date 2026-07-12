@@ -150,10 +150,7 @@ const switchWarning = computed(() => {
 <template>
   <div class="mx-auto max-w-3xl space-y-6 p-6">
     <div>
-      <NuxtLink to="/" class="text-sm text-slate-500 hover:text-slate-900">
-        ← 回儀表板
-      </NuxtLink>
-      <h1 class="mt-2 text-2xl font-semibold text-slate-900">
+      <h1 class="text-2xl font-semibold text-slate-900">
         驗證來源
       </h1>
       <p class="text-sm text-slate-500">

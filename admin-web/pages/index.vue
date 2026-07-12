@@ -137,45 +137,10 @@ async function copyInvite() {
   }
 }
 
-async function onLogout() {
-  await auth.logout()
-  await navigateTo('/login')
-}
-
 const orgSettings = useOrgSettings()
-const joinRequests = useJoinRequests()
 const transferToggleSaving = ref(false)
 const transferToggleError = ref('')
 const stateLockedCount = ref<number | null>(null)
-
-const pendingJoinCount = ref(0)
-let pendingJoinTimer: ReturnType<typeof setInterval> | null = null
-
-async function refreshPendingJoinCount() {
-  if (!auth.isAdmin.value || !auth.currentOrg.value) {
-    pendingJoinCount.value = 0
-    return
-  }
-  try {
-    pendingJoinCount.value = await joinRequests.countOrgPending()
-  }
-  catch {
-    // best-effort badge — don't surface errors here
-  }
-}
-
-watch(
-  [() => auth.currentOrg.value?.id, () => auth.isAdmin.value],
-  () => refreshPendingJoinCount(),
-  { immediate: true },
-)
-
-onMounted(() => {
-  pendingJoinTimer = setInterval(refreshPendingJoinCount, 30_000)
-})
-onBeforeUnmount(() => {
-  if (pendingJoinTimer) clearInterval(pendingJoinTimer)
-})
 
 const locationTrackingToggleSaving = ref(false)
 const locationTrackingToggleError = ref('')
@@ -316,29 +281,9 @@ async function confirmLeave() {
 <template>
   <main class="min-h-screen px-4 py-10">
     <div class="max-w-3xl mx-auto space-y-6">
-      <header class="flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <h1 class="text-2xl font-semibold text-slate-900">
-            班到 admin
-          </h1>
-          <p
-            v-if="auth.user.value"
-            class="text-sm text-slate-500 truncate"
-          >
-            {{ auth.user.value.email }}
-          </p>
-        </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <OrgSwitcher />
-          <button
-            type="button"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            @click="onLogout"
-          >
-            登出
-          </button>
-        </div>
-      </header>
+      <h1 class="text-2xl font-semibold text-slate-900">
+        班到 admin
+      </h1>
 
       <section
         v-if="auth.currentOrg.value"
@@ -492,78 +437,6 @@ async function confirmLeave() {
             {{ slugError }}
             <span v-if="slugRetryAfter">（{{ formatRetryAfter(slugRetryAfter) }} 後可再變更）</span>
           </p>
-        </div>
-      </section>
-
-      <section
-        v-if="auth.isAdmin.value"
-        class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4"
-      >
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <h2 class="text-lg font-semibold text-slate-900">
-              管理員工具
-            </h2>
-            <p class="text-sm text-slate-500">
-              管理成員、App 使用者與打卡設定。
-            </p>
-          </div>
-          <div class="flex shrink-0 flex-wrap justify-end gap-2">
-            <NuxtLink
-              to="/members"
-              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              成員管理
-            </NuxtLink>
-            <NuxtLink
-              to="/app-users"
-              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              App 使用者
-            </NuxtLink>
-            <NuxtLink
-              to="/settings/auth"
-              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              驗證來源
-            </NuxtLink>
-            <NuxtLink
-              to="/settings/api-tokens"
-              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              API Token
-            </NuxtLink>
-            <NuxtLink
-              to="/checkin"
-              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              打卡看板
-            </NuxtLink>
-            <NuxtLink
-              to="/cooldowns"
-              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              冷卻管理
-            </NuxtLink>
-            <NuxtLink
-              to="/admin/join-requests"
-              class="relative rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              加入申請
-              <span
-                v-if="pendingJoinCount > 0"
-                class="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold text-white"
-              >
-                {{ pendingJoinCount }}
-              </span>
-            </NuxtLink>
-            <NuxtLink
-              to="/download"
-              class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              下載 App
-            </NuxtLink>
-          </div>
         </div>
       </section>
 

@@ -36,16 +36,52 @@ async fn admin_lists_only_current_org_app_users() {
 }
 
 #[tokio::test]
-async fn member_cannot_list_app_users() {
+async fn member_lists_app_users_identically_to_admin() {
     let app = TestApp::spawn().await;
     let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
+    let _ = app.create_app_user(&admin, "alice", "Alice").await;
+    let _ = app.create_app_user(&admin, "bob", "Bob").await;
     let code = body["current_org"]["code"].as_str().unwrap().to_string();
     let (member, _) = app
         .register_member(&admin, "member@example.com", &code)
         .await;
 
-    let resp = member.get(app.url("/app-users")).send().await.unwrap();
-    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let admin_resp = admin.get(app.url("/app-users")).send().await.unwrap();
+    assert_eq!(admin_resp.status(), StatusCode::OK);
+    let admin_body: Value = admin_resp.json().await.unwrap();
+
+    let member_resp = member.get(app.url("/app-users")).send().await.unwrap();
+    assert_eq!(member_resp.status(), StatusCode::OK);
+    let member_body: Value = member_resp.json().await.unwrap();
+
+    assert_eq!(
+        admin_body, member_body,
+        "member's /app-users response should be byte-for-byte identical to admin's, not a reduced view"
+    );
+    assert_eq!(member_body.as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn member_cross_org_isolation_still_holds() {
+    let app = TestApp::spawn().await;
+
+    let (admin_a, body_a) = app.register_admin("a@example.com", "OrgA").await;
+    let _ = app.create_app_user(&admin_a, "alice", "Alice").await;
+    let code_a = body_a["current_org"]["code"].as_str().unwrap().to_string();
+    let (member_a, _) = app
+        .register_member(&admin_a, "a-member@example.com", &code_a)
+        .await;
+
+    // Separate Org with its own AppUser; must not bleed into OrgA member's list.
+    let (admin_b, _body_b) = app.register_admin("b@example.com", "OrgB").await;
+    let _ = app.create_app_user(&admin_b, "carol", "Carol").await;
+
+    let resp = member_a.get(app.url("/app-users")).send().await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = resp.json().await.unwrap();
+    let users = body.as_array().expect("array");
+    assert_eq!(users.len(), 1);
+    assert_eq!(users[0]["username"], "alice");
 }
 
 #[tokio::test]

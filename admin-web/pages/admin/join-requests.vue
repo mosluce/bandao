@@ -99,10 +99,7 @@ const statusLabel: Record<JoinRequestStatus, string> = {
   <main class="min-h-screen px-4 py-10">
     <div class="max-w-4xl mx-auto space-y-6">
       <header>
-        <NuxtLink to="/" class="text-xs text-slate-500 hover:text-slate-900">
-          ← 返回首頁
-        </NuxtLink>
-        <h1 class="mt-1 text-2xl font-semibold text-slate-900">
+        <h1 class="text-2xl font-semibold text-slate-900">
           加入申請
         </h1>
         <p class="text-sm text-slate-500">

@@ -6,7 +6,6 @@ definePageMeta({ middleware: 'auth' })
 const auth = useAuth()
 const checkin = useCheckin()
 const route = useRoute()
-const router = useRouter()
 
 const appUserId = computed(() => String(route.params.appUserId))
 const events = ref<CheckinEventDto[]>([])
@@ -74,12 +73,7 @@ function locationDisplay(e: CheckinEventDto): string {
     || `${e.location.coordinates.lat.toFixed(5)}, ${e.location.coordinates.lng.toFixed(5)}`
 }
 
-if (auth.isAdmin.value) {
-  await loadFirstPage()
-}
-else {
-  await navigateTo('/')
-}
+await loadFirstPage()
 </script>
 
 <template>
@@ -100,22 +94,16 @@ else {
             {{ auth.currentOrg.value?.name }} · App 使用者 ID <code class="font-mono">{{ appUserId }}</code>
           </p>
         </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <OrgSwitcher />
+        <div
+          v-if="auth.currentOrg.value?.checkin.location_tracking_enabled"
+          class="flex shrink-0 items-center gap-2"
+        >
           <NuxtLink
-            v-if="auth.currentOrg.value?.checkin.location_tracking_enabled"
             :to="`/checkin/${appUserId}/trajectory`"
             class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             查看軌跡
           </NuxtLink>
-          <button
-            type="button"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            @click="router.push('/')"
-          >
-            回首頁
-          </button>
         </div>
       </header>
 

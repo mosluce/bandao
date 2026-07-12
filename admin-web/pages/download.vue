@@ -10,6 +10,8 @@
 // and a region-specific /us/ path can fail to resolve.
 import QRCode from 'qrcode'
 
+definePageMeta({ layout: false })
+
 const APP_STORE_URL = 'https://apps.apple.com/app/id6767153656'
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=tw.ccmos.app.bandao'
 const PRIVACY_PATH = '/privacy'
