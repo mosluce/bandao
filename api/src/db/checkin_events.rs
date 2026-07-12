@@ -167,6 +167,35 @@ impl CheckinEventRepository {
         Ok(out)
     }
 
+    /// Backs the `checkin-export-zhengdan` capability's day-window export:
+    /// every `clock_in`/`clock_out` event for an Org whose `occurred_at_client`
+    /// falls in the half-open `[day_start, day_end)` range, ascending by
+    /// time. Deliberately excludes `transfer_out`/`transfer_in` (not asked
+    /// for by the export) and is unpaginated (a day's volume for one Org
+    /// doesn't need it).
+    pub async fn list_by_org_in_range_for_export(
+        &self,
+        org_id: ObjectId,
+        day_start: DateTime,
+        day_end: DateTime,
+    ) -> ApiResult<Vec<CheckinEvent>> {
+        let event_types = bson::to_bson(&[CheckinEventType::ClockIn, CheckinEventType::ClockOut])?;
+        let filter = doc! {
+            "org_id": org_id,
+            "event_type": { "$in": event_types },
+            "occurred_at_client": { "$gte": day_start, "$lt": day_end },
+        };
+        let opts = FindOptions::builder()
+            .sort(doc! { "occurred_at_client": 1 })
+            .build();
+        let mut cursor = self.coll.find(filter).with_options(opts).await?;
+        let mut out = Vec::new();
+        while cursor.advance().await? {
+            out.push(cursor.deserialize_current()?);
+        }
+        Ok(out)
+    }
+
     /// Used by the startup repair task to pull every AppUser's latest event
     /// in one query path. Listed in tasks 1.7 as `list_by_app_user_after`
     /// — kept here for parity though the repair task uses `latest_for_app_user`.
