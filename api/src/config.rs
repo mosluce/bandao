@@ -16,6 +16,10 @@ pub struct Config {
     /// from `BANDAO_SECRET_KEY` (base64 of 32 bytes). `None` when the env var is
     /// unset — deployments without external auth don't need it.
     pub secret_key: Option<[u8; 32]>,
+    /// Consecutive failed login attempts (per account) before it is locked.
+    pub login_lockout_threshold: u32,
+    /// How long an account stays locked after crossing `login_lockout_threshold`.
+    pub login_lockout_duration: Duration,
 }
 
 impl Config {
@@ -80,6 +84,20 @@ impl Config {
             _ => None,
         };
 
+        let login_lockout_threshold = env_or_default("LOGIN_LOCKOUT_THRESHOLD", "3")
+            .parse::<u32>()
+            .map_err(|e| ConfigError::Invalid {
+                var: "LOGIN_LOCKOUT_THRESHOLD",
+                message: e.to_string(),
+            })?;
+        let login_lockout_duration_secs = env_or_default("LOGIN_LOCKOUT_DURATION_SECONDS", "3600")
+            .parse::<u64>()
+            .map_err(|e| ConfigError::Invalid {
+                var: "LOGIN_LOCKOUT_DURATION_SECONDS",
+                message: e.to_string(),
+            })?;
+        let login_lockout_duration = Duration::from_secs(login_lockout_duration_secs);
+
         Ok(Self {
             mongo_uri,
             mongo_db,
@@ -89,6 +107,8 @@ impl Config {
             cookie_secure,
             allowed_origin,
             secret_key,
+            login_lockout_threshold,
+            login_lockout_duration,
         })
     }
 }

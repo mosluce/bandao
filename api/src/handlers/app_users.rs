@@ -200,6 +200,21 @@ pub async fn password_reset(
     }))
 }
 
+/// `POST /app-users/:id/unlock` — admin-only, scoped to `current_org`.
+/// Clears `failed_login_attempts` and `locked_until`. A no-op (still `204`)
+/// for an account that isn't currently locked, including any external
+/// shadow user, which is never locked in the first place.
+pub async fn unlock(
+    State(state): State<AppState>,
+    RequireAdmin(active): RequireAdmin,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    let target_id = ObjectId::parse_str(&id).map_err(|_| ApiError::NotFound)?;
+    let user = load_in_org(&state, active.org_id, target_id).await?;
+    state.db.app_users.reset_lockout(user.id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Cross-Org safety check rolled into a single helper. Loads the AppUser
 /// only when its `org_id` matches `current_org`; everything else (unknown
 /// id, valid id but different Org) collapses to `NOT_FOUND`.

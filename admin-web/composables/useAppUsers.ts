@@ -46,5 +46,9 @@ export function useAppUsers() {
     })
   }
 
-  return { list, create, update, disable, enable, resetPassword }
+  async function unlock(id: string): Promise<void> {
+    await api(`/app-users/${id}/unlock`, { method: 'POST' })
+  }
+
+  return { list, create, update, disable, enable, resetPassword, unlock }
 }

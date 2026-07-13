@@ -83,6 +83,8 @@ impl TestApp {
             allowed_origin: None,
             // Deterministic key so external-auth tests can encrypt/decrypt.
             secret_key: Some([7u8; 32]),
+            login_lockout_threshold: 3,
+            login_lockout_duration: Duration::from_secs(3600),
         };
         tweak(&mut config);
 

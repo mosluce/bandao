@@ -40,4 +40,3 @@
 - **[infra]** Staging 環境：MVP 只開 prod，靠 `git revert` 回滾。哪天人多 / risky 變動多，再開 `staging` 分支 + 第二個 Zeabur project。
 - **[infra]** Backup 升級：daily/ 升級成 daily/ + weekly/ + monthly/ 三層保留，需要 S3 replication 規則或 host 上的 cron 把週末 / 月初的 dump 複製到 weekly/ / monthly/ prefix；目前先只留 30 天 daily。
 - **[infra]** 監控與告警：Loki / Grafana / Sentry 任一接 api + Mongo host 的 log 與錯誤；restore drill 失敗自動 page 操作者。動的時候要考慮 secrets 管理跟成本。
-- **[cross]** 登入失敗鎖定：`/auth/login`、`/app/auth/login` 目前都沒有 rate limit，知道 org code 的人可以無限次數猜 AppUser／dashboard 密碼。連續失敗 N 次（例如 3 次）鎖定一段時間（例如 1 小時），admin 可手動解鎖。這個機制做出來之後，才算真正補上「輪替組織代碼」功能被拿掉後留下的風險缺口——`remove-org-code-rotation` 已經套用並移除該功能，是接受這個殘留風險、等這個機制上線來緩解的前提。

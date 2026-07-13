@@ -75,6 +75,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/dashboard-users/{id}", delete(users::remove))
         .route("/dashboard-users/{id}/role", patch(users::update_role))
+        .route("/dashboard-users/{id}/unlock", post(users::unlock))
         // `/app-users/*` lives in dashboard-tenancy world (cookie auth +
         // RequireAdmin). The route handlers themselves enforce admin role
         // and current-Org scoping.
@@ -84,6 +85,7 @@ pub fn router(state: AppState) -> Router {
             "/app-users/{id}/password-reset",
             post(app_users::password_reset),
         )
+        .route("/app-users/{id}/unlock", post(app_users::unlock))
         // Admin-side checkin board / per-user history / force-checkout. All
         // three guard on RequireAdmin and scope to current_org inside the
         // handler.

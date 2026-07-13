@@ -110,6 +110,7 @@ export interface DashboardUserDto {
   id: string
   email: string
   role: Role
+  is_locked: boolean
 }
 
 export type RegisterRequest =
@@ -158,6 +159,7 @@ export interface AppUserDto {
   display_name: string
   status: AppUserStatus
   needs_password_change: boolean
+  is_locked: boolean
   last_login_at?: string
   created_at: string
 }
