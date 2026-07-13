@@ -89,6 +89,8 @@ pub struct ExternalAuthSummaryDto {
     /// Non-secret connection settings, surfaced so admins can see/edit them.
     pub encrypt: EncryptMode,
     pub trust_server_certificate: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub list_query: Option<String>,
 }
 
 impl ExternalAuthSummaryDto {
@@ -105,6 +107,7 @@ impl ExternalAuthSummaryDto {
             password_set: !cfg.password_encrypted.is_empty(),
             encrypt: cfg.encrypt,
             trust_server_certificate: cfg.trust_server_certificate,
+            list_query: cfg.list_query.clone(),
         }
     }
 }

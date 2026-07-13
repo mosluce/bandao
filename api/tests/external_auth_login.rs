@@ -10,6 +10,7 @@ mod common;
 use common::TestApp;
 use reqwest::StatusCode;
 use serde_json::{Value, json};
+use serial_test::serial;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::mssql_server::MssqlServer;
 use tiberius::{AuthMethod, Client, Config as TiberiusConfig};
@@ -31,6 +32,7 @@ async fn mssql_client(host: &str, port: u16) -> Client<tokio_util::compat::Compa
 }
 
 #[tokio::test]
+#[serial(mssql)]
 async fn external_db_login_provisions_shadow_and_gates_internal_ops() {
     // 1. Boot MSSQL and seed a staff table with one plaintext-credential row.
     let mssql = MssqlServer::default()

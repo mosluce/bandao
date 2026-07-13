@@ -68,6 +68,10 @@ serde_json = "1"
 # external-auth integration test seeds a real MSSQL container directly
 tiberius = { version = "0.12", default-features = false, features = ["tds73", "rustls"] }
 tokio-util = { version = "0.7", features = ["compat"] }
+# MSSQL containers each need real RAM to start (see `#[serial(mssql)]` on
+# every MSSQL-backed test) — running several concurrently reliably fails
+# with "Could not allocate initial 5000 lock owner blocks during startup."
+serial_test = "3"
 
 [profile.dev]
 opt-level = 0

@@ -1,14 +1,16 @@
 import type {
   ConfigureExternalAuthRequest,
   OrgDto,
+  SyncExternalUsersResponse,
   TestLoginRequest,
   TestLoginResponse,
 } from '~/types/api'
 
 /**
  * Wraps the external-database auth admin endpoints:
- * `PUT /orgs/me/external-auth` (set auth source + config) and
- * `POST /orgs/me/external-auth/test-login` (dry-run against the external DB).
+ * `PUT /orgs/me/external-auth` (set auth source + config),
+ * `POST /orgs/me/external-auth/test-login` (dry-run against the external DB), and
+ * `POST /orgs/me/external-auth/sync` (bulk-upsert the external user roster).
  */
 export function useExternalAuth() {
   const api = useApi()
@@ -27,5 +29,11 @@ export function useExternalAuth() {
     })
   }
 
-  return { configure, testLogin }
+  async function sync(): Promise<SyncExternalUsersResponse> {
+    return api<SyncExternalUsersResponse>('/orgs/me/external-auth/sync', {
+      method: 'POST',
+    })
+  }
+
+  return { configure, testLogin, sync }
 }

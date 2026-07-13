@@ -94,6 +94,12 @@ pub struct ExternalAuthConfig {
     /// in pre-existing documents → `true`. No effect when `encrypt == Off`.
     #[serde(default = "default_trust_server_certificate")]
     pub trust_server_certificate: bool,
+    /// Unparameterized `SELECT` used by `POST /orgs/me/external-auth/sync` to
+    /// list every external user (as opposed to `query`, which verifies one
+    /// specific account/password pair). `None` when the Org hasn't set one —
+    /// the manual-sync feature is simply unavailable until they do.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub list_query: Option<String>,
 }
 
 impl Org {

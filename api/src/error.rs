@@ -131,6 +131,18 @@ pub enum ApiError {
     /// by the external database rather than by this system.
     #[error("operation not available while the org uses external authentication")]
     ExternalAuthMode,
+    /// The reverse of `ExternalAuthMode`: an external-auth-only operation
+    /// (`POST /orgs/me/external-auth/sync`) was attempted while the Org's
+    /// auth source is NOT `external_db`.
+    #[error("this operation requires the org's auth source to be external_db")]
+    ExternalAuthNotEnabled,
+    /// `POST /orgs/me/external-auth/sync`'s connection/query/column-mapping
+    /// failed — unlike the end-user login path's `ExternalAuthUnavailable`
+    /// (deliberately no diagnostic, to avoid leaking details to a caller who
+    /// might not be trusted), this is an admin-only troubleshooting surface
+    /// where the specific reason is the whole point.
+    #[error("sync failed: {0}")]
+    ExternalAuthSyncFailed(String),
 
     /// Password-reset token doesn't exist, has expired, or was already
     /// used. Deliberately not distinguished — see the `dashboard-auth`
@@ -165,6 +177,10 @@ impl ApiError {
                 (StatusCode::SERVICE_UNAVAILABLE, "EXTERNAL_AUTH_UNAVAILABLE")
             }
             ApiError::ExternalAuthMode => (StatusCode::CONFLICT, "EXTERNAL_AUTH_MODE"),
+            ApiError::ExternalAuthNotEnabled => (StatusCode::CONFLICT, "EXTERNAL_AUTH_NOT_ENABLED"),
+            ApiError::ExternalAuthSyncFailed(_) => {
+                (StatusCode::SERVICE_UNAVAILABLE, "EXTERNAL_AUTH_SYNC_FAILED")
+            }
             ApiError::Validation(_) => (StatusCode::BAD_REQUEST, "VALIDATION"),
             ApiError::InvalidSlugFormat => (StatusCode::BAD_REQUEST, "INVALID_SLUG_FORMAT"),
             ApiError::SlugReserved => (StatusCode::BAD_REQUEST, "SLUG_RESERVED"),

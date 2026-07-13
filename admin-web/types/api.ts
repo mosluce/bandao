@@ -25,6 +25,8 @@ export interface ExternalAuthSummaryDto {
   password_set: boolean
   encrypt: EncryptMode
   trust_server_certificate: boolean
+  /** Unparameterized "list everyone" query for manual sync. Absent → sync unavailable. */
+  list_query?: string
 }
 
 export interface OrgDto {
@@ -54,6 +56,8 @@ export interface ExternalAuthInput {
   display_col: string
   encrypt: EncryptMode
   trust_server_certificate: boolean
+  /** Unparameterized "list everyone" query for manual sync. Omit to leave sync unavailable. */
+  list_query?: string
 }
 
 export interface ConfigureExternalAuthRequest {
@@ -73,6 +77,18 @@ export interface TestLoginResponse {
   external_key?: string
   display_name?: string
   error?: string
+}
+
+export interface SyncSkippedRow {
+  row_index: number
+  reason: string
+}
+
+export interface SyncExternalUsersResponse {
+  total_rows: number
+  created: number
+  updated: number
+  skipped: SyncSkippedRow[]
 }
 
 export interface MembershipDto {

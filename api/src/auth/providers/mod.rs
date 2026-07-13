@@ -74,6 +74,25 @@ pub fn validate_query_settings(
     Ok(())
 }
 
+/// Validate operator-supplied `list_query` settings (`POST
+/// /orgs/me/external-auth/sync`). The rule is the *opposite* of
+/// [`validate_query_settings`]: `list_query` is executed with no bound
+/// parameters, so it must NOT reference the credential placeholders — a
+/// stray `@account`/`@password` would fail at execution time with a
+/// confusing "missing parameter" driver error instead of a clear validation
+/// message at save time.
+pub fn validate_list_query_settings(driver: &str, list_query: &str) -> Result<(), String> {
+    if driver != SUPPORTED_DRIVER {
+        return Err(format!("unsupported driver: {driver}"));
+    }
+    if list_query.contains("@account") || list_query.contains("@password") {
+        return Err(
+            "list_query must not contain the @account or @password placeholders".to_string(),
+        );
+    }
+    Ok(())
+}
+
 /// Build the provider for `org` based on its `auth_source`. Returns
 /// `Unavailable` when an `external_db` Org has missing/malformed config or an
 /// unsupported driver — the login handler maps that to

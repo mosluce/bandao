@@ -27,7 +27,7 @@ use crate::domain::{
 use crate::error::ApiResult;
 
 pub use app_sessions::AppSessionRepository;
-pub use app_users::{AppUserInsertError, AppUserRepository};
+pub use app_users::{AppUserInsertError, AppUserRepository, SyncUpsertOutcome};
 pub use checkin_events::CheckinEventRepository;
 pub use checkin_user_status::{CheckinStatusInsertError, CheckinUserStatusRepository};
 pub use dashboard_memberships::{MembershipInsertError, MembershipRepository};
