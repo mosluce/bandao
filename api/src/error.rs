@@ -132,6 +132,12 @@ pub enum ApiError {
     #[error("operation not available while the org uses external authentication")]
     ExternalAuthMode,
 
+    /// Password-reset token doesn't exist, has expired, or was already
+    /// used. Deliberately not distinguished — see the `dashboard-auth`
+    /// spec's "reset with a valid, unexpired, unused token" requirement.
+    #[error("invalid or expired password reset token")]
+    InvalidResetToken,
+
     #[error("password hashing failed")]
     Password,
     #[error("database error")]
@@ -194,6 +200,7 @@ impl ApiError {
             ApiError::InvalidBatch => (StatusCode::BAD_REQUEST, "INVALID_BATCH"),
             ApiError::JoinRequestPending => (StatusCode::CONFLICT, "JOIN_REQUEST_PENDING"),
             ApiError::InvalidState => (StatusCode::BAD_REQUEST, "INVALID_STATE"),
+            ApiError::InvalidResetToken => (StatusCode::BAD_REQUEST, "INVALID_RESET_TOKEN"),
             ApiError::Password
             | ApiError::Db(_)
             | ApiError::BsonSer(_)

@@ -548,3 +548,21 @@ pub struct OrgApiToken {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rotated_at: Option<DateTime>,
 }
+
+/// A `DashboardUser` password-reset token. `token_hash` is a SHA-256 digest
+/// (base64-encoded, via `auth::api_token::hash_token`) of the raw token
+/// emailed to the user — the raw value is never stored. Single-use
+/// (`used_at`) and time-limited (`expires_at`); `created_at` also doubles as
+/// the basis for the request-cooldown check on `POST /auth/forgot-password`
+/// (no separate cooldown-marker collection).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasswordResetToken {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub user_id: ObjectId,
+    pub token_hash: String,
+    pub expires_at: DateTime,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub used_at: Option<DateTime>,
+    pub created_at: DateTime,
+}
