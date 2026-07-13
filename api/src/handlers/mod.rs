@@ -60,6 +60,7 @@ pub fn router(state: AppState) -> Router {
             "/orgs/me/external-auth/test-login",
             post(external_auth::test_login),
         )
+        .route("/orgs/me/external-auth/sync", post(external_auth::sync))
         .route("/orgs/me/join-requests", get(join_requests::list_for_org))
         .route(
             "/orgs/me/join-requests/{id}/approve",

@@ -29,6 +29,7 @@ fn fixture_config() -> ExternalAuthConfig {
         display_col: "name".to_string(),
         encrypt: EncryptMode::Required,
         trust_server_certificate: false,
+        list_query: None,
     }
 }
 

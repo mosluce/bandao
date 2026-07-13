@@ -35,6 +35,10 @@ pub struct ExternalAuthInput {
     /// Trust an otherwise-invalid server cert; absent → `true`.
     #[serde(default = "default_trust_server_certificate")]
     pub trust_server_certificate: bool,
+    /// Unparameterized "list everyone" query for `POST
+    /// /orgs/me/external-auth/sync`. Absent → manual sync stays unavailable.
+    #[serde(default)]
+    pub list_query: Option<String>,
 }
 
 fn default_trust_server_certificate() -> bool {
@@ -179,6 +183,101 @@ pub async fn test_login(
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct SkippedRow {
+    pub row_index: usize,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SyncResponse {
+    pub total_rows: usize,
+    pub created: usize,
+    pub updated: usize,
+    pub skipped: Vec<SkippedRow>,
+}
+
+/// `POST /orgs/me/external-auth/sync` — admin-only, scoped to `current_org`,
+/// available only when `current_org.auth_source == external_db`. Runs the
+/// Org's stored `list_query` and upserts a shadow `AppUser` per resolved
+/// row — see the `external-db-auth` spec's "Admin can manually sync the
+/// external user roster" requirement for the exact create/update/skip
+/// semantics. Does NOT touch `last_login_at` and does NOT modify or remove
+/// any local user absent from the result.
+pub async fn sync(
+    State(state): State<AppState>,
+    RequireAdmin(active): RequireAdmin,
+) -> ApiResult<Json<SyncResponse>> {
+    let org = state
+        .db
+        .orgs
+        .find_by_id(active.org_id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+
+    if !matches!(org.auth_source(), OrgAuthSource::ExternalDb) {
+        return Err(ApiError::ExternalAuthNotEnabled);
+    }
+    let cfg = org.external_auth().ok_or_else(|| {
+        ApiError::Validation("external_auth configuration is required".to_string())
+    })?;
+    let list_query = cfg
+        .list_query
+        .clone()
+        .filter(|q| !q.trim().is_empty())
+        .ok_or_else(|| ApiError::Validation("list_query is not configured".to_string()))?;
+
+    let provider = MssqlProvider::new(
+        state.db.app_users.clone(),
+        active.org_id,
+        cfg,
+        state.config.clone(),
+    );
+    let rows = provider.list_identities(&list_query).await.map_err(|e| {
+        let msg = match e {
+            providers::AuthProviderError::Unavailable(msg) => msg,
+            // list_identities takes no credentials, so this arm shouldn't be
+            // reachable — handled instead of panicking, in case that ever
+            // changes.
+            providers::AuthProviderError::InvalidCredentials => {
+                "unexpected credential error during sync".to_string()
+            }
+        };
+        ApiError::ExternalAuthSyncFailed(msg)
+    })?;
+
+    let mut created = 0usize;
+    let mut updated = 0usize;
+    let mut skipped = Vec::new();
+    for (row_index, row) in rows.iter().enumerate() {
+        let Some(external_key) = row.external_key.as_deref().filter(|k| !k.trim().is_empty())
+        else {
+            skipped.push(SkippedRow {
+                row_index,
+                reason: "key column is empty or null".to_string(),
+            });
+            continue;
+        };
+        let display_name = row.display_name.as_deref().unwrap_or(external_key);
+        match state
+            .db
+            .app_users
+            .sync_upsert_shadow(active.org_id, external_key, display_name)
+            .await?
+        {
+            crate::db::SyncUpsertOutcome::Created => created += 1,
+            crate::db::SyncUpsertOutcome::Updated => updated += 1,
+        }
+    }
+
+    Ok(Json(SyncResponse {
+        total_rows: rows.len(),
+        created,
+        updated,
+        skipped,
+    }))
+}
+
 /// Validate the submitted settings and resolve an [`ExternalAuthConfig`],
 /// encrypting a freshly-supplied password or reusing the stored ciphertext.
 fn build_config(
@@ -193,6 +292,10 @@ fn build_config(
         &input.display_col,
     )
     .map_err(ApiError::Validation)?;
+    if let Some(list_query) = &input.list_query {
+        providers::validate_list_query_settings(&input.driver, list_query)
+            .map_err(ApiError::Validation)?;
+    }
 
     let password_encrypted = match input.password {
         Some(pw) => state.config.secret_box()?.encrypt(&pw)?,
@@ -215,5 +318,6 @@ fn build_config(
         display_col: input.display_col,
         encrypt: input.encrypt,
         trust_server_certificate: input.trust_server_certificate,
+        list_query: input.list_query,
     })
 }

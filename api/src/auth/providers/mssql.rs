@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use bson::oid::ObjectId;
 use tiberius::{AuthMethod, Client, Config as TiberiusConfig, EncryptionLevel, Row};
 use tokio::net::TcpStream;
-use tokio_util::compat::TokioAsyncWriteCompatExt;
+use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 use super::{AppAuthProvider, AuthProviderError};
 use crate::config::Config;
@@ -43,15 +43,11 @@ impl MssqlProvider {
         }
     }
 
-    /// Run the configured query with the credentials bound as parameters and
-    /// resolve the identity columns. Returns `Ok(None)` when no row matched
-    /// (bad credentials). Errors are `Unavailable` with a diagnostic suitable
-    /// for the admin-facing test-login endpoint.
-    pub async fn resolve_identity(
-        &self,
-        account: &str,
-        password: &str,
-    ) -> Result<Option<ResolvedIdentity>, AuthProviderError> {
+    /// Open a connection using the Org's stored config. Shared by
+    /// `resolve_identity` (per-login, bound credential params) and
+    /// `list_identities` (sync, unparameterized). Errors are `Unavailable`
+    /// with a diagnostic suitable for admin-facing surfaces.
+    async fn connect(&self) -> Result<Client<Compat<TcpStream>>, AuthProviderError> {
         // Decrypt the connection password. Absent key / bad ciphertext surfaces
         // as unavailable rather than leaking anything.
         let secret = self
@@ -90,9 +86,21 @@ impl MssqlProvider {
         tcp.set_nodelay(true)
             .map_err(|e| unavailable(format!("connection setup failed: {e}")))?;
 
-        let mut client = Client::connect(cfg, tcp.compat_write())
+        Client::connect(cfg, tcp.compat_write())
             .await
-            .map_err(|e| unavailable(format!("database handshake failed: {e}")))?;
+            .map_err(|e| unavailable(format!("database handshake failed: {e}")))
+    }
+
+    /// Run the configured query with the credentials bound as parameters and
+    /// resolve the identity columns. Returns `Ok(None)` when no row matched
+    /// (bad credentials). Errors are `Unavailable` with a diagnostic suitable
+    /// for the admin-facing test-login endpoint.
+    pub async fn resolve_identity(
+        &self,
+        account: &str,
+        password: &str,
+    ) -> Result<Option<ResolvedIdentity>, AuthProviderError> {
+        let mut client = self.connect().await?;
 
         // Translate the org's named placeholders to tiberius positional params.
         let query = self
@@ -131,11 +139,62 @@ impl MssqlProvider {
             display_name,
         }))
     }
+
+    /// Run `list_query` (no bound parameters — see the `external-db-auth`
+    /// spec's "sync query is validated as an unparameterized read"
+    /// requirement) and resolve every row's identity columns. `Unavailable`
+    /// when the connection/query itself fails, or when `key_col`/`display_col`
+    /// don't exist as column names anywhere in the result — both are config
+    /// problems, not per-row data problems, so the whole sync should fail
+    /// rather than silently return a partial/misleading list. A NULL or
+    /// empty `key_col` value on an individual row is NOT an error here —
+    /// callers (the `sync` handler) decide how to handle per-row skips,
+    /// this method just reports what it is.
+    pub async fn list_identities(
+        &self,
+        list_query: &str,
+    ) -> Result<Vec<ListedIdentity>, AuthProviderError> {
+        let mut client = self.connect().await?;
+
+        let stream = client
+            .query(list_query, &[])
+            .await
+            .map_err(|e| unavailable(format!("list query failed: {e}")))?;
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| unavailable(format!("reading list query result failed: {e}")))?;
+
+        let mut out = Vec::with_capacity(rows.len());
+        for row in &rows {
+            // "column not found" is a config problem (key_col/display_col
+            // don't match anything the query actually returns) — propagate
+            // as Unavailable so the caller fails the whole sync rather than
+            // writing based on a broken column mapping.
+            let external_key = column_string(row, &self.config.key_col).map_err(unavailable)?;
+            let display_name = column_string(row, &self.config.display_col)
+                .map_err(unavailable)?
+                .or_else(|| external_key.clone());
+            out.push(ListedIdentity {
+                external_key,
+                display_name,
+            });
+        }
+        Ok(out)
+    }
 }
 
 pub struct ResolvedIdentity {
     pub external_key: String,
     pub display_name: String,
+}
+
+/// One row from `list_identities`. `external_key` is `None` when `key_col`
+/// was NULL or absent for that row — a per-row data problem the caller
+/// (the `sync` handler) skips rather than treats as fatal.
+pub struct ListedIdentity {
+    pub external_key: Option<String>,
+    pub display_name: Option<String>,
 }
 
 #[async_trait]

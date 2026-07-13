@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EncryptMode, ExternalAuthInput, OrgAuthSource, TestLoginResponse } from '~/types/api'
+import type { EncryptMode, ExternalAuthInput, OrgAuthSource, SyncExternalUsersResponse, TestLoginResponse } from '~/types/api'
 import { ApiError } from '~/types/api'
 
 definePageMeta({ middleware: 'auth' })
@@ -19,6 +19,7 @@ const database = ref('')
 const username = ref('')
 const password = ref('') // write-only; blank = keep stored
 const query = ref('SELECT emp_id, name FROM staff WHERE acct = @account AND pwd = @password')
+const listQuery = ref('')
 const keyCol = ref('emp_id')
 const displayCol = ref('name')
 const passwordSet = ref(false)
@@ -36,6 +37,11 @@ const testing = ref(false)
 const testResult = ref<TestLoginResponse | null>(null)
 const testError = ref('')
 
+// --- manual sync state ---
+const syncing = ref(false)
+const syncResult = ref<SyncExternalUsersResponse | null>(null)
+const syncError = ref('')
+
 // --- mode-switch confirmation ---
 const showSwitchConfirm = ref(false)
 
@@ -51,6 +57,7 @@ function hydrate() {
     database.value = ext.database
     username.value = ext.username
     query.value = ext.query
+    listQuery.value = ext.list_query ?? ''
     keyCol.value = ext.key_col
     displayCol.value = ext.display_col
     passwordSet.value = ext.password_set
@@ -72,6 +79,9 @@ function buildInput(): ExternalAuthInput {
     // Omit when blank so the stored password is preserved.
     ...(password.value ? { password: password.value } : {}),
     query: query.value.trim(),
+    // Omit when blank so an already-configured list_query isn't cleared by
+    // an unrelated edit, and a brand-new config simply leaves sync unavailable.
+    ...(listQuery.value.trim() ? { list_query: listQuery.value.trim() } : {}),
     key_col: keyCol.value.trim(),
     display_col: displayCol.value.trim(),
     encrypt: encrypt.value,
@@ -136,6 +146,30 @@ async function runTestLogin() {
   }
   finally {
     testing.value = false
+  }
+}
+
+async function runSync() {
+  syncError.value = ''
+  syncResult.value = null
+  syncing.value = true
+  try {
+    syncResult.value = await externalAuth.sync()
+  }
+  catch (err) {
+    if (err instanceof ApiError) {
+      syncError.value = err.code === 'EXTERNAL_AUTH_NOT_ENABLED'
+        ? '目前不是「外部資料庫」驗證模式'
+        : err.code === 'VALIDATION'
+          ? '尚未設定同步查詢'
+          : err.message
+    }
+    else {
+      syncError.value = err instanceof Error ? err.message : '同步失敗'
+    }
+  }
+  finally {
+    syncing.value = false
   }
 }
 
@@ -241,6 +275,11 @@ const switchWarning = computed(() => {
             <textarea v-model="query" rows="3" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono text-xs" />
           </label>
 
+          <label class="block text-sm">
+            <span class="mb-1 block text-slate-600">同步查詢（列出所有使用者；不含 <code>@account</code> / <code>@password</code> 佔位符，留空表示不啟用手動同步）</span>
+            <textarea v-model="listQuery" rows="3" placeholder="SELECT emp_id, name FROM staff" class="w-full rounded border border-slate-300 px-2 py-1.5 font-mono text-xs" />
+          </label>
+
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label class="text-sm">
               <span class="mb-1 block text-slate-600">唯一識別欄</span>
@@ -341,6 +380,48 @@ const switchWarning = computed(() => {
               確認測試帳密正確，或檢查查詢的帳號 / 密碼欄位。
             </p>
           </template>
+        </div>
+      </section>
+
+      <!-- Manual sync -->
+      <section
+        v-if="currentSource === 'external_db'"
+        class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4"
+      >
+        <div>
+          <h2 class="text-lg font-semibold text-slate-900">
+            同步使用者名單
+          </h2>
+          <p class="text-sm text-slate-500">
+            用「同步查詢」把外部資料庫的使用者名單整批新增/更新到 App 使用者清單，不會停用清單中原有、但這次沒同步到的使用者。
+          </p>
+        </div>
+        <div>
+          <button
+            type="button"
+            :disabled="syncing"
+            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            @click="runSync"
+          >
+            {{ syncing ? '同步中…' : '同步使用者名單' }}
+          </button>
+        </div>
+
+        <div v-if="syncError" class="text-sm text-red-600">
+          {{ syncError }}
+        </div>
+        <div v-else-if="syncResult" class="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm space-y-2">
+          <p class="text-slate-700">
+            共 {{ syncResult.total_rows }} 筆，新增 <strong>{{ syncResult.created }}</strong> 筆、更新 <strong>{{ syncResult.updated }}</strong> 筆
+            <template v-if="syncResult.skipped.length">
+              、略過 <strong>{{ syncResult.skipped.length }}</strong> 筆
+            </template>
+          </p>
+          <ul v-if="syncResult.skipped.length" class="list-disc space-y-1 pl-5 text-xs text-amber-700">
+            <li v-for="row in syncResult.skipped" :key="row.row_index">
+              第 {{ row.row_index + 1 }} 筆：{{ row.reason }}
+            </li>
+          </ul>
         </div>
       </section>
     </template>

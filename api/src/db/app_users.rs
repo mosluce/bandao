@@ -23,6 +23,14 @@ impl From<mongodb::error::Error> for AppUserInsertError {
     }
 }
 
+/// Result of one `sync_upsert_shadow` call — whether the row was newly
+/// created or an existing one was refreshed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncUpsertOutcome {
+    Created,
+    Updated,
+}
+
 #[derive(Clone)]
 pub struct AppUserRepository {
     coll: Collection<AppUser>,
@@ -144,6 +152,65 @@ impl AppUserRepository {
                     .return_document(mongodb::options::ReturnDocument::After)
                     .await?;
                 user.ok_or(ApiError::NotFound)
+            }
+            Err(err) => Err(err.into()),
+        }
+    }
+
+    /// Bulk-oriented counterpart to `upsert_shadow`, used by `POST
+    /// /orgs/me/external-auth/sync`. Same identity semantics (external
+    /// shadow user keyed by `(org_id, external_key)`), but deliberately does
+    /// NOT touch `last_login_at` — a synced-but-never-logged-in user must
+    /// not look like they just logged in.
+    pub async fn sync_upsert_shadow(
+        &self,
+        org_id: ObjectId,
+        external_key: &str,
+        display_name: &str,
+    ) -> ApiResult<SyncUpsertOutcome> {
+        let now = DateTime::now();
+        let refreshed = self
+            .coll
+            .find_one_and_update(
+                doc! { "org_id": org_id, "external_key": external_key },
+                doc! { "$set": { "display_name": display_name, "updated_at": now } },
+            )
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await?;
+        if refreshed.is_some() {
+            return Ok(SyncUpsertOutcome::Updated);
+        }
+
+        let user = AppUser {
+            id: ObjectId::new(),
+            org_id,
+            username: None,
+            username_lower: None,
+            display_name: display_name.to_string(),
+            password_hash: None,
+            auth_source: AppUserAuthSource::External,
+            external_key: Some(external_key.to_string()),
+            status: AppUserStatus::Active,
+            needs_password_change: false,
+            failed_login_attempts: 0,
+            locked_until: None,
+            last_login_at: None,
+            created_by_dashboard_user_id: None,
+            created_at: now,
+            updated_at: now,
+        };
+        match self.coll.insert_one(&user).await {
+            Ok(_) => Ok(SyncUpsertOutcome::Created),
+            // Lost a race against a concurrent sync/login — the row exists
+            // now either way, treat it as an update rather than erroring.
+            Err(err) if is_duplicate_key(&err) => {
+                self.coll
+                    .find_one_and_update(
+                        doc! { "org_id": org_id, "external_key": external_key },
+                        doc! { "$set": { "display_name": display_name, "updated_at": now } },
+                    )
+                    .await?;
+                Ok(SyncUpsertOutcome::Updated)
             }
             Err(err) => Err(err.into()),
         }
