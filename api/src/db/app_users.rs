@@ -192,6 +192,8 @@ impl AppUserRepository {
             external_key: Some(external_key.to_string()),
             status: AppUserStatus::Active,
             needs_password_change: false,
+            failed_login_attempts: 0,
+            locked_until: None,
             last_login_at: None,
             created_by_dashboard_user_id: None,
             created_at: now,
