@@ -116,6 +116,22 @@ async function enableUser(id: string) {
   }
 }
 
+async function unlockUser(id: string) {
+  actionError.value = ''
+  pendingId.value = id
+  try {
+    await appUsers.unlock(id)
+    const idx = items.value.findIndex(u => u.id === id)
+    if (idx >= 0) items.value[idx] = { ...items.value[idx], is_locked: false }
+  }
+  catch (err) {
+    actionError.value = friendlyActionError(err)
+  }
+  finally {
+    pendingId.value = null
+  }
+}
+
 async function confirmReset() {
   const id = confirmResetId.value
   if (!id) return
@@ -410,6 +426,11 @@ await load()
                   class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800"
                   title="尚未變更初始密碼"
                 >待改密碼</span>
+                <span
+                  v-if="u.is_locked"
+                  class="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-800"
+                  title="連續登入失敗次數過多，暫時鎖定"
+                >已鎖定</span>
               </td>
               <td class="px-6 py-3 text-slate-700">
                 {{ formatDate(u.last_login_at) }}
@@ -430,6 +451,15 @@ await load()
                     @click="confirmResetId = u.id"
                   >
                     重設密碼
+                  </button>
+                  <button
+                    v-if="u.is_locked"
+                    type="button"
+                    :disabled="pendingId === u.id"
+                    class="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                    @click="unlockUser(u.id)"
+                  >
+                    解鎖
                   </button>
                   <button
                     v-if="u.status === 'active'"

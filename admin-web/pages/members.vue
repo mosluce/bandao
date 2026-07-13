@@ -74,6 +74,27 @@ async function changeRole(user: DashboardUserDto, target: Role) {
   }
 }
 
+async function unlock(user: DashboardUserDto) {
+  actionError.value = ''
+  pendingId.value = user.id
+  try {
+    await api(`/dashboard-users/${user.id}/unlock`, { method: 'POST' })
+    const idx = users.value.findIndex(u => u.id === user.id)
+    if (idx >= 0) users.value[idx] = { ...users.value[idx], is_locked: false }
+  }
+  catch (err) {
+    if (err instanceof ApiError) {
+      actionError.value = friendlyError(err)
+    }
+    else {
+      actionError.value = err instanceof Error ? err.message : '操作失敗'
+    }
+  }
+  finally {
+    pendingId.value = null
+  }
+}
+
 async function confirmRemove() {
   const target = removeTarget.value
   if (!target) return
@@ -216,6 +237,10 @@ await load()
                     v-if="user.id === myId"
                     class="ml-1 text-slate-400"
                   >（你）</span>
+                  <span
+                    v-if="user.is_locked"
+                    class="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-red-800"
+                  >已鎖定</span>
                 </p>
               </div>
 
@@ -223,6 +248,15 @@ await load()
                 v-if="auth.isAdmin.value"
                 class="flex shrink-0 flex-wrap justify-end gap-2"
               >
+                <button
+                  v-if="user.is_locked"
+                  type="button"
+                  :disabled="pendingId === user.id"
+                  class="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                  @click="unlock(user)"
+                >
+                  {{ pendingId === user.id ? '處理中…' : '解鎖' }}
+                </button>
                 <button
                   v-if="user.role === 'member'"
                   type="button"

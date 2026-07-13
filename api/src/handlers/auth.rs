@@ -331,10 +331,38 @@ pub async fn login(
         .find_by_email(&req.email)
         .await?
         .ok_or(ApiError::InvalidCredentials)?;
-    let ok = password::verify(&req.password, &user.password_hash)?;
-    if !ok {
+
+    // Locked accounts are rejected without checking the password, both to
+    // avoid the wasted bcrypt work and — more importantly — so repeated
+    // attempts against a locked account never extend the lock window.
+    if user
+        .locked_until
+        .is_some_and(|until| until > DateTime::now())
+    {
         return Err(ApiError::InvalidCredentials);
     }
+
+    let ok = password::verify(&req.password, &user.password_hash)?;
+    if !ok {
+        let attempts = state
+            .db
+            .dashboard_users
+            .record_failed_attempt(user.id)
+            .await?;
+        if attempts >= state.config.login_lockout_threshold {
+            let until = DateTime::from_millis(
+                DateTime::now().timestamp_millis()
+                    + state.config.login_lockout_duration.as_millis() as i64,
+            );
+            state
+                .db
+                .dashboard_users
+                .set_locked_until(user.id, until)
+                .await?;
+        }
+        return Err(ApiError::InvalidCredentials);
+    }
+    state.db.dashboard_users.reset_lockout(user.id).await?;
 
     let memberships = state.db.dashboard_memberships.list_by_user(user.id).await?;
     let pairs = load_membership_orgs(&state, memberships).await?;

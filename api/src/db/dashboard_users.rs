@@ -31,6 +31,8 @@ impl DashboardUserRepository {
             id,
             email: email.to_string(),
             password_hash: password_hash.to_string(),
+            failed_login_attempts: 0,
+            locked_until: None,
             created_at: now,
             updated_at: now,
         };
@@ -56,6 +58,51 @@ impl DashboardUserRepository {
 
     pub async fn delete_by_id(&self, id: ObjectId) -> ApiResult<()> {
         self.coll.delete_one(doc! { "_id": id }).await?;
+        Ok(())
+    }
+
+    /// Atomically increment `failed_login_attempts` and return the new count.
+    /// Called on a wrong-password login attempt against an account that is
+    /// not currently locked.
+    pub async fn record_failed_attempt(&self, id: ObjectId) -> ApiResult<u32> {
+        let now = DateTime::now();
+        let result = self
+            .coll
+            .find_one_and_update(
+                doc! { "_id": id },
+                doc! { "$inc": { "failed_login_attempts": 1i32 }, "$set": { "updated_at": now } },
+            )
+            .return_document(mongodb::options::ReturnDocument::After)
+            .await?;
+        Ok(result.map(|u| u.failed_login_attempts).unwrap_or(0))
+    }
+
+    /// Lock the account until `until`. Called once `failed_login_attempts`
+    /// crosses the configured threshold.
+    pub async fn set_locked_until(&self, id: ObjectId, until: DateTime) -> ApiResult<()> {
+        let now = DateTime::now();
+        self.coll
+            .update_one(
+                doc! { "_id": id },
+                doc! { "$set": { "locked_until": until, "updated_at": now } },
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Clear `failed_login_attempts` and `locked_until`. Called on a
+    /// successful login and by the admin unlock endpoint.
+    pub async fn reset_lockout(&self, id: ObjectId) -> ApiResult<()> {
+        let now = DateTime::now();
+        self.coll
+            .update_one(
+                doc! { "_id": id },
+                doc! {
+                    "$set": { "failed_login_attempts": 0i32, "updated_at": now },
+                    "$unset": { "locked_until": "" },
+                },
+            )
+            .await?;
         Ok(())
     }
 

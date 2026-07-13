@@ -156,6 +156,14 @@ pub struct DashboardUser {
     pub id: ObjectId,
     pub email: String,
     pub password_hash: String,
+    /// Consecutive failed login attempts since the last success or unlock.
+    /// Resets to 0 on successful login or admin unlock.
+    #[serde(default)]
+    pub failed_login_attempts: u32,
+    /// Set once `failed_login_attempts` crosses the configured threshold;
+    /// logins are rejected without checking the password while in the future.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locked_until: Option<DateTime>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
 }
@@ -288,6 +296,15 @@ pub struct AppUser {
     pub external_key: Option<String>,
     pub status: AppUserStatus,
     pub needs_password_change: bool,
+    /// Consecutive failed login attempts since the last success or unlock.
+    /// Only tracked for `Internal` auth_source; `External` (shadow) users are
+    /// exempt from lockout since their credentials are verified externally.
+    #[serde(default)]
+    pub failed_login_attempts: u32,
+    /// Set once `failed_login_attempts` crosses the configured threshold;
+    /// logins are rejected without checking the password while in the future.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locked_until: Option<DateTime>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_login_at: Option<DateTime>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

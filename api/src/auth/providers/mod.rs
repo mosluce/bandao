@@ -86,6 +86,7 @@ pub fn provider_for(
         OrgAuthSource::Internal => Ok(Box::new(internal::InternalProvider::new(
             state.db.app_users.clone(),
             org.id,
+            state.config.clone(),
         ))),
         OrgAuthSource::ExternalDb => {
             let cfg = org.external_auth().ok_or_else(|| {

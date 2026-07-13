@@ -100,6 +100,8 @@ impl TestApp {
             allowed_origin: None,
             // Deterministic key so external-auth tests can encrypt/decrypt.
             secret_key: Some([7u8; 32]),
+            login_lockout_threshold: 3,
+            login_lockout_duration: Duration::from_secs(3600),
             // Tests never set RESEND_API_KEY — AppState falls back to a
             // NoopEmailSender by default; tests that need to assert on sent
             // email inject a RecordingEmailSender via spawn_with_email_sender.

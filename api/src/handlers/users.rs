@@ -1,6 +1,7 @@
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use bson::DateTime;
 use bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +15,7 @@ pub struct DashboardUserDto {
     pub id: String,
     pub email: String,
     pub role: Role,
+    pub is_locked: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,6 +45,9 @@ pub async fn list_in_org(
                 id: user.id.to_hex(),
                 email: user.email,
                 role: m.role,
+                is_locked: user
+                    .locked_until
+                    .is_some_and(|until| until > DateTime::now()),
             });
         }
     }
@@ -88,11 +93,16 @@ pub async fn update_role(
         return Err(ApiError::OwnerProtected);
     }
 
+    let is_locked = target_user
+        .locked_until
+        .is_some_and(|until| until > DateTime::now());
+
     if membership.role == req.role {
         return Ok(Json(DashboardUserDto {
             id: target_user.id.to_hex(),
             email: target_user.email,
             role: membership.role,
+            is_locked,
         }));
     }
 
@@ -106,6 +116,7 @@ pub async fn update_role(
         id: target_user.id.to_hex(),
         email: target_user.email,
         role: updated.role,
+        is_locked,
     }))
 }
 
@@ -152,6 +163,31 @@ pub async fn remove(
     }
 
     cascade_remove_membership(&state, &target_user, org_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Manually clear a dashboard user's lockout state. A no-op (still `204`) if
+/// the target isn't currently locked. Scoped to `current_org` the same way
+/// as `update_role`/`remove`: cross-Org targets collapse to `NotFound`.
+pub async fn unlock(
+    State(state): State<AppState>,
+    RequireAdmin(active): RequireAdmin,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    let org_id = active.org_id;
+    let target_id = ObjectId::parse_str(&id).map_err(|_| ApiError::NotFound)?;
+
+    if state
+        .db
+        .dashboard_memberships
+        .find_by_user_and_org(target_id, org_id)
+        .await?
+        .is_none()
+    {
+        return Err(ApiError::NotFound);
+    }
+
+    state.db.dashboard_users.reset_lockout(target_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -20,6 +20,9 @@ pub struct AppUserDto {
     pub display_name: String,
     pub status: AppUserStatus,
     pub needs_password_change: bool,
+    /// `true` when `locked_until` is in the future. Always `false` for
+    /// external shadow users, which are exempt from lockout tracking.
+    pub is_locked: bool,
     /// RFC3339-encoded; `null` when the AppUser has never logged in.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_login_at: Option<String>,
@@ -36,6 +39,9 @@ impl AppUserDto {
             display_name: u.display_name.clone(),
             status: u.status,
             needs_password_change: u.needs_password_change,
+            is_locked: u
+                .locked_until
+                .is_some_and(|until| until > bson::DateTime::now()),
             last_login_at: u.last_login_at.and_then(|d| d.try_to_rfc3339_string().ok()),
             created_at: u.created_at.try_to_rfc3339_string().unwrap_or_default(),
         }
