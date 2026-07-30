@@ -3,6 +3,7 @@ import type { CheckinEventDto, LocationPingDto } from '~/types/api'
 import { ApiError } from '~/types/api'
 import { dateToOrgRange } from '~/utils/orgTimeRange'
 import { minuteOfDayInTz, timeOfDayColorForMinute } from '~/utils/timeOfDayColor'
+import { buildMergedSeries } from '~/utils/trajectoryMerge'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -42,17 +43,14 @@ const mapContainer = ref<HTMLElement | null>(null)
 let mapInstance: any = null
 let leaflet: any = null
 
-// The day's earliest clock-in with a location — anchors the start of the day
-// (its event marker is drawn below) and lets the map render even before any
-// pings accumulate.
-const clockInEvent = computed<CheckinEventDto | null>(() => {
-  const ins = events.value.filter(e => e.event_type === 'clock_in' && e.location?.coordinates)
-  if (ins.length === 0) return null
-  return ins.reduce((a, b) => (a.occurred_at_client <= b.occurred_at_client ? a : b))
-})
+// The day's polyline vertices: pings plus genuine checkin coordinates, in
+// contract order. The clock-in needs no special anchor role any more — with
+// events contributing vertices it is simply the first merged point.
+const mergedSeries = computed(() => buildMergedSeries(pings.value, events.value))
 
-// Render the map when there is a ping path OR at least a clock-in to anchor.
-const hasData = computed(() => pings.value.length > 0 || clockInEvent.value !== null)
+// One merged point renders the map (markers only); two or more also draw the
+// line. Zero means there is nothing to show.
+const hasData = computed(() => mergedSeries.value.length > 0)
 
 // CSS gradient for the "color → time" legend (hourly samples of the scale).
 const legendGradient = computed(() => {
@@ -79,23 +77,21 @@ async function loadDay() {
         appUserId: appUserId.value,
         params: { from: range.from, to: range.to, limit: 1000 },
       }),
-      // events list — server returns newest-first, single page covers a day.
-      checkin.listUserEvents(appUserId.value, { limit: 100 }),
+      // Range-scoped server-side. Over-fetching a newest-first page and
+      // filtering here returned nothing for any date beyond the page's reach
+      // (~25 days at 4 events/day), which silently dropped the markers AND —
+      // now that events are vertices — the line's endpoints. Every
+      // legacy-imported day sat outside that window.
+      // 200 is the endpoint's server-side cap; a single day never approaches it.
+      checkin.listUserEvents(appUserId.value, {
+        from: range.from,
+        to: range.to,
+        limit: 200,
+      }),
     ])
-    // Sort pings ascending for the polyline.
-    pings.value = [...pingsRes].sort((a, b) =>
-      a.occurred_at_client.localeCompare(b.occurred_at_client),
-    )
-    // Filter events to the same day-range. Compare instants (not strings):
-    // occurred_at_client and range bounds can use different offset
-    // representations (UTC "Z" vs "+08:00"), so a lexical compare drops
-    // early-morning events.
-    const fromMs = Date.parse(range.from)
-    const toMs = Date.parse(range.to)
-    events.value = eventsRes.filter((e) => {
-      const ms = Date.parse(e.occurred_at_client)
-      return ms >= fromMs && ms < toMs
-    })
+    // Ordering happens in `buildMergedSeries`, which compares instants.
+    pings.value = pingsRes
+    events.value = eventsRes
   }
   catch (err) {
     if (err instanceof ApiError) {
@@ -165,13 +161,13 @@ function redrawLayers() {
     }
   })
 
-  const points: [number, number][] = pings.value.map(p => [p.lat, p.lng])
+  const sorted = mergedSeries.value
+  const points: [number, number][] = sorted.map(p => [p.lat, p.lng])
   // Time-of-day coloring: Leaflet has no gradient polyline, so draw one short
   // polyline per consecutive pair colored by that segment's midpoint time.
-  const sorted = pings.value
   for (let i = 0; i < sorted.length - 1; i++) {
-    const mid = (minuteOfDayInTz(sorted[i].occurred_at_client, orgTz.value)
-      + minuteOfDayInTz(sorted[i + 1].occurred_at_client, orgTz.value)) >> 1
+    const mid = (minuteOfDayInTz(sorted[i].occurredAtClient, orgTz.value)
+      + minuteOfDayInTz(sorted[i + 1].occurredAtClient, orgTz.value)) >> 1
     L.polyline(
       [[sorted[i].lat, sorted[i].lng], [sorted[i + 1].lat, sorted[i + 1].lng]],
       { color: timeOfDayColorForMinute(mid), weight: 4 },
@@ -184,6 +180,9 @@ function redrawLayers() {
     transfer_in: '#b45309',
     transfer_out: '#b45309',
   }
+  // Markers come from the FULL event list, not the merged series: an
+  // `admin_force` clock_out is excluded from the line (its location is copied,
+  // not captured) but must still show where the admin closed the shift.
   const markerLatLngs: [number, number][] = []
   for (const e of events.value) {
     const lat = e.location.coordinates.lat

@@ -35,13 +35,23 @@ class CheckinRepository {
     }
   }
 
-  Future<List<CheckinEventDto>> events({String? before, int limit = 50}) async {
+  /// [from] / [to] scope the page to a half-open `occurred_at_client` range and
+  /// compose with [before] via AND. The trajectory surfaces pass a calendar day
+  /// so history older than the default page's reach still resolves.
+  Future<List<CheckinEventDto>> events({
+    String? before,
+    int limit = 50,
+    DateTime? from,
+    DateTime? to,
+  }) async {
     try {
       final res = await _dio.get<List<dynamic>>(
         '/app/checkin/events',
         queryParameters: <String, dynamic>{
           'limit': limit,
           if (before != null) 'before': before,
+          if (from != null) 'from': from.toUtc().toIso8601String(),
+          if (to != null) 'to': to.toUtc().toIso8601String(),
         },
       );
       return (res.data ?? const <dynamic>[])

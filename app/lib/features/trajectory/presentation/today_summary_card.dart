@@ -12,7 +12,10 @@ import '../state/trajectory_controller.dart';
 
 /// Home-screen card showing the AppUser's own movement totals for today —
 /// the soft entry point into `/trajectory`. Hidden when there's nothing
-/// to say (off-shift AND zero pings).
+/// to say (off-shift AND zero merged points).
+///
+/// Reads `trajectoryProvider`, the same source `/trajectory` renders from, so
+/// the two surfaces cannot disagree on the numbers they label identically.
 class TodaySummaryCard extends ConsumerStatefulWidget {
   const TodaySummaryCard({super.key});
 
@@ -65,7 +68,7 @@ class _TodaySummaryCardState extends ConsumerState<TodaySummaryCard>
 
     final isOnShift = checkinStatus?.status == AppUserCheckinStatus.onSite ||
         checkinStatus?.status == AppUserCheckinStatus.inTransit;
-    final hasData = (day?.stats.pingCount ?? 0) > 0;
+    final hasData = (day?.stats.pointCount ?? 0) > 0;
     if (!isOnShift && !hasData) {
       return const SizedBox.shrink();
     }

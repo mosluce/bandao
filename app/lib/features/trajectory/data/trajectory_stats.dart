@@ -1,59 +1,67 @@
 import 'package:latlong2/latlong.dart';
 
-import '../../../core/api/models/location_ping.dart';
+import 'trajectory_merge.dart';
 
 /// Distilled numbers for the trajectory screen + home summary card.
 class TrajectoryStats {
   const TrajectoryStats({
     required this.distanceMeters,
     required this.onShiftDuration,
-    required this.pingCount,
+    required this.pointCount,
   });
 
   final double distanceMeters;
   final Duration onShiftDuration;
-  final int pingCount;
+
+  /// Number of plotted points — the merged series' length, so the 位置點
+  /// figure matches what is actually drawn on the map.
+  final int pointCount;
 
   static const empty = TrajectoryStats(
     distanceMeters: 0,
     onShiftDuration: Duration.zero,
-    pingCount: 0,
+    pointCount: 0,
   );
 }
 
-/// Compute distance + duration from a list of pings for one day.
+/// Compute distance + duration from one day's merged series.
 ///
-/// - Distance: sum of geodesic distances between consecutive points after
-///   sorting by `occurred_at_client` ascending. Uses `latlong2`'s
-///   `Distance().distance()` (Vincenty by default, falls back to Haversine).
-/// - On-shift duration: span between the earliest and latest ping. This is
-///   an approximation — a precise "in-shift" answer would need to cross
-///   with `checkin_events` which is out of scope for this surface.
-TrajectoryStats computeTrajectoryStats(List<LocationPingDto> pings) {
-  if (pings.isEmpty) {
+/// - Distance: sum of geodesic distances between consecutive points. Uses
+///   `latlong2`'s `Distance().distance()` (Vincenty by default, falls back to
+///   Haversine). Because the series carries the day's checkin coordinates, this
+///   now includes the leg from the clock-in point to the first ping and from
+///   the last ping to the clock-out point — both previously missing.
+/// - On-shift duration: span between the first and last merged point. On a
+///   normal day that IS the clock-in→clock-out span, so it no longer
+///   under-reports by the tracker's start-up delay and its stop-on-tap.
+///
+/// The caller supplies a series already ordered by [buildMergedSeries]; this
+/// function does not reorder it.
+TrajectoryStats computeTrajectoryStats(List<MergedPoint> points) {
+  if (points.isEmpty) {
     return TrajectoryStats.empty;
   }
-  final sorted = [...pings]
-    ..sort((a, b) => a.occurredAtClient.compareTo(b.occurredAtClient));
 
   double meters = 0;
-  if (sorted.length > 1) {
+  if (points.length > 1) {
     const distance = Distance();
-    for (var i = 1; i < sorted.length; i++) {
+    for (var i = 1; i < points.length; i++) {
       meters += distance.distance(
-        LatLng(sorted[i - 1].lat, sorted[i - 1].lng),
-        LatLng(sorted[i].lat, sorted[i].lng),
+        LatLng(points[i - 1].lat, points[i - 1].lng),
+        LatLng(points[i].lat, points[i].lng),
       );
     }
   }
 
-  final firstTs = DateTime.parse(sorted.first.occurredAtClient);
-  final lastTs = DateTime.parse(sorted.last.occurredAtClient);
-  final dur = lastTs.difference(firstTs);
+  final firstTs = DateTime.tryParse(points.first.occurredAtClient);
+  final lastTs = DateTime.tryParse(points.last.occurredAtClient);
+  final dur = (firstTs != null && lastTs != null)
+      ? lastTs.difference(firstTs)
+      : Duration.zero;
 
   return TrajectoryStats(
     distanceMeters: meters,
     onShiftDuration: dur.isNegative ? Duration.zero : dur,
-    pingCount: sorted.length,
+    pointCount: points.length,
   );
 }

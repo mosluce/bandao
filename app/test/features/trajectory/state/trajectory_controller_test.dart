@@ -8,11 +8,24 @@ import 'package:bandao_app/features/checkin/data/checkin_repository.dart';
 import 'package:bandao_app/features/trajectory/data/my_locations_repository.dart';
 import 'package:bandao_app/features/trajectory/state/trajectory_controller.dart';
 
-/// The controller fetches the day's events for the start anchor; stub to empty.
+/// The controller fetches the day's events — they feed both the markers and,
+/// via the merge contract, the line's endpoints.
 class _StubCheckinRepo implements CheckinRepository {
+  _StubCheckinRepo([this._events = const <CheckinEventDto>[]]);
+
+  final List<CheckinEventDto> _events;
+  final List<({DateTime? from, DateTime? to, int limit})> calls = [];
+
   @override
-  Future<List<CheckinEventDto>> events({String? before, int limit = 50}) async =>
-      const <CheckinEventDto>[];
+  Future<List<CheckinEventDto>> events({
+    String? before,
+    int limit = 50,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    calls.add((from: from, to: to, limit: limit));
+    return _events;
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -52,11 +65,39 @@ LocationPingDto _ping(String iso, {double lat = 25.0, double lng = 121.0}) {
   );
 }
 
-ProviderContainer _container(_FakeMyLocationsRepository repo) {
+CheckinEventDto _event(
+  String id,
+  String iso, {
+  double lat = 25.0,
+  double lng = 121.0,
+  EventSource source = EventSource.app,
+  CheckinEventType eventType = CheckinEventType.clockIn,
+}) {
+  return CheckinEventDto(
+    id: id,
+    appUserId: 'u',
+    eventType: eventType,
+    occurredAtClient: iso,
+    occurredAtServer: iso,
+    source: source,
+    initiatedByKind: source == EventSource.adminForce
+        ? EventInitiatorKind.dashboardUser
+        : EventInitiatorKind.appUser,
+    initiatedById: 'u',
+    location: EventLocation(coordinates: GeoPoint(lat: lat, lng: lng)),
+    hasSkewWarning: false,
+  );
+}
+
+ProviderContainer _container(
+  _FakeMyLocationsRepository repo, {
+  _StubCheckinRepo? checkinRepo,
+}) {
   return ProviderContainer(
     overrides: [
       myLocationsRepositoryProvider.overrideWith((ref) async => repo),
-      checkinRepositoryProvider.overrideWith((ref) async => _StubCheckinRepo()),
+      checkinRepositoryProvider
+          .overrideWith((ref) async => checkinRepo ?? _StubCheckinRepo()),
     ],
   );
 }
@@ -91,7 +132,7 @@ void main() {
       expect(state.selectedDate.hour, 0);
 
       expect(state.pings.length, 2);
-      expect(state.stats.pingCount, 2);
+      expect(state.stats.pointCount, 2);
       expect(state.stats.onShiftDuration, const Duration(minutes: 5));
     });
 
@@ -118,7 +159,126 @@ void main() {
       expect(repo.calls.last.from, DateTime(2026, 5, 14));
       expect(repo.calls.last.to, DateTime(2026, 5, 15));
       expect(state.pings, isEmpty);
-      expect(state.stats.pingCount, 0);
+      expect(state.stats.pointCount, 0);
+    });
+
+    test('event fetch is range-scoped to the selected day', () async {
+      final repo = _FakeMyLocationsRepository(({
+        required from,
+        required to,
+        int? limit,
+      }) async => [],
+      );
+      final checkinRepo = _StubCheckinRepo();
+      final container = _container(repo, checkinRepo: checkinRepo);
+      addTearDown(container.dispose);
+
+      await container.read(trajectoryProvider.future);
+      await container
+          .read(trajectoryProvider.notifier)
+          .selectDate(DateTime(2026, 5, 14, 10, 30));
+
+      // Over-fetching a newest-first page and filtering client-side returned
+      // nothing once the day fell outside the page's reach.
+      expect(checkinRepo.calls.last.from, DateTime(2026, 5, 14));
+      expect(checkinRepo.calls.last.to, DateTime(2026, 5, 15));
+      expect(checkinRepo.calls.last.limit, 200);
+    });
+
+    test('merged series runs from the clock-in to the clock-out coordinate',
+        () async {
+      final day = DateTime(2026, 5, 14);
+      final repo = _FakeMyLocationsRepository(({
+        required from,
+        required to,
+        int? limit,
+      }) async => [
+        _ping('2026-05-14T09:00:00Z', lat: 25.100),
+        _ping('2026-05-14T12:00:00Z', lat: 25.200),
+      ],
+      );
+      final checkinRepo = _StubCheckinRepo([
+        _event(
+          'out',
+          '2026-05-14T17:00:00Z',
+          lat: 25.900,
+          eventType: CheckinEventType.clockOut,
+        ),
+        _event('in', '2026-05-14T08:00:00Z', lat: 25.000),
+      ]);
+      final container = _container(repo, checkinRepo: checkinRepo);
+      addTearDown(container.dispose);
+
+      await container.read(trajectoryProvider.future);
+      await container.read(trajectoryProvider.notifier).selectDate(day);
+      final state = container.read(trajectoryProvider).value!;
+
+      expect(state.mergedSeries.map((p) => p.id).toList(), [
+        'in',
+        'x',
+        'x',
+        'out',
+      ]);
+      expect(state.mergedSeries.first.lat, 25.000);
+      expect(state.mergedSeries.last.lat, 25.900);
+      // 位置點 counts what is plotted, not just the pings.
+      expect(state.stats.pointCount, 4);
+      // 在班時長 becomes the real clock-in→clock-out span.
+      expect(state.stats.onShiftDuration, const Duration(hours: 9));
+    });
+
+    test('one merged point yields no line-drawable pair', () async {
+      final day = DateTime(2026, 5, 14);
+      final repo = _FakeMyLocationsRepository(({
+        required from,
+        required to,
+        int? limit,
+      }) async => [],
+      );
+      final checkinRepo = _StubCheckinRepo([
+        _event('in', '2026-05-14T08:00:00Z'),
+      ]);
+      final container = _container(repo, checkinRepo: checkinRepo);
+      addTearDown(container.dispose);
+
+      await container.read(trajectoryProvider.future);
+      await container.read(trajectoryProvider.notifier).selectDate(day);
+      final state = container.read(trajectoryProvider).value!;
+
+      // >= 1 renders the map; the screen draws a line only at >= 2.
+      expect(state.mergedSeries.length, 1);
+      expect(state.stats.pointCount, 1);
+    });
+
+    test('an admin_force clock_out stays a marker but not a vertex', () async {
+      final day = DateTime(2026, 5, 14);
+      final repo = _FakeMyLocationsRepository(({
+        required from,
+        required to,
+        int? limit,
+      }) async => [_ping('2026-05-14T09:00:00Z', lat: 25.100)],
+      );
+      final checkinRepo = _StubCheckinRepo([
+        _event('in', '2026-05-14T08:00:00Z', lat: 25.000),
+        _event(
+          'forced',
+          '2026-05-14T23:00:00Z',
+          lat: 24.000,
+          source: EventSource.adminForce,
+          eventType: CheckinEventType.clockOut,
+        ),
+      ]);
+      final container = _container(repo, checkinRepo: checkinRepo);
+      addTearDown(container.dispose);
+
+      await container.read(trajectoryProvider.future);
+      await container.read(trajectoryProvider.notifier).selectDate(day);
+      final state = container.read(trajectoryProvider).value!;
+
+      expect(state.mergedSeries.map((p) => p.id).toList(), ['in', 'x']);
+      expect(state.mergedSeries.any((p) => p.lat == 24.000), isFalse);
+      // The event is still available to the marker layer.
+      expect(state.events.length, 2);
     });
 
     test('repository error surfaces as AsyncError', () async {

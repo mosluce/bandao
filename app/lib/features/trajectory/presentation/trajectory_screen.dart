@@ -6,10 +6,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/api/models/checkin_event.dart';
-import '../../../core/api/models/location_ping.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../checkin/state/location_permission_provider.dart';
 import '../data/time_of_day_color.dart';
+import '../data/trajectory_merge.dart';
 import '../data/trajectory_stats.dart';
 import '../state/trajectory_controller.dart';
 
@@ -86,7 +86,9 @@ class _DateDropdown extends ConsumerWidget {
           for (final d in options)
             DropdownMenuItem<DateTime>(
               value: d,
-              child: Text(_sameDay(d, _today()) ? l10n.trajectoryDateToday : _label(d)),
+              child: Text(
+                _sameDay(d, _today()) ? l10n.trajectoryDateToday : _label(d),
+              ),
             ),
         ],
       ),
@@ -126,10 +128,9 @@ class _Body extends StatelessWidget {
         ),
       ),
       data: (day) {
-        // Render the map when there is anything to show: a ping path OR at
-        // least one check-in event (e.g. clocked in but no pings yet). Only
-        // fall back to the empty text when neither exists.
-        if (day.pings.isEmpty && day.events.isEmpty) {
+        // Rendering keys off the merged point count: 0 → the empty text and no
+        // map at all; 1 → map plus markers; 2+ → map, markers, and the line.
+        if (day.mergedSeries.isEmpty) {
           return Center(
             child: Text(
               l10n.trajectoryEmpty,
@@ -141,7 +142,7 @@ class _Body extends StatelessWidget {
           children: [
             Expanded(
               child: _Map(
-                pings: day.pings,
+                mergedSeries: day.mergedSeries,
                 events: day.events,
                 attribution: l10n.trajectoryAttribution,
               ),
@@ -156,22 +157,25 @@ class _Body extends StatelessWidget {
 
 class _Map extends StatelessWidget {
   const _Map({
-    required this.pings,
+    required this.mergedSeries,
     required this.events,
     required this.attribution,
   });
 
-  final List<LocationPingDto> pings;
+  /// Already ordered by the merge contract — do not re-sort.
+  final List<MergedPoint> mergedSeries;
   final List<CheckinEventDto> events;
   final String attribution;
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...pings]
-      ..sort((a, b) => a.occurredAtClient.compareTo(b.occurredAtClient));
-    final points = sorted.map((p) => LatLng(p.lat, p.lng)).toList();
-    final times = sorted
-        .map((p) => DateTime.parse(p.occurredAtClient).toLocal())
+    final points = mergedSeries.map((p) => LatLng(p.lat, p.lng)).toList();
+    final times = mergedSeries
+        .map(
+          (p) =>
+              DateTime.tryParse(p.occurredAtClient)?.toLocal() ??
+              DateTime.now(),
+        )
         .toList();
 
     // One polyline per consecutive pair, colored by the segment's midpoint
@@ -188,10 +192,14 @@ class _Map extends StatelessWidget {
         ),
     ];
 
-    // Event markers (clock in/out, transfer in/out), colored by type. The
-    // clock-in marker anchors the start of the day.
+    // Event markers (clock in/out, transfer in/out), colored by type. Drawn
+    // from the FULL event list, not the merged series: an `admin_force`
+    // clock_out is excluded from the line (its location is copied, not
+    // captured) but must still show where the admin closed the shift.
     final eventPoints = events
-        .map((e) => LatLng(e.location.coordinates.lat, e.location.coordinates.lng))
+        .map(
+          (e) => LatLng(e.location.coordinates.lat, e.location.coordinates.lng),
+        )
         .toList();
 
     // Everything to keep in view: the path + the event markers.
@@ -207,9 +215,8 @@ class _Map extends StatelessWidget {
                     padding: const EdgeInsets.all(32),
                   )
                 : null,
-            initialCenter: allPoints.length == 1
-                ? allPoints.first
-                : const LatLng(0, 0),
+            initialCenter:
+                allPoints.length == 1 ? allPoints.first : const LatLng(0, 0),
             initialZoom: allPoints.length == 1 ? 16 : 3,
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
@@ -360,7 +367,7 @@ class _StatsPanel extends StatelessWidget {
           ),
           _StatColumn(
             label: l10n.trajectoryStatPings,
-            value: stats.pingCount.toString(),
+            value: stats.pointCount.toString(),
           ),
         ],
       ),

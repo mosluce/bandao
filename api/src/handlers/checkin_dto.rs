@@ -234,4 +234,12 @@ pub struct EventsCursorQuery {
     /// Optional override for the page size; capped server-side.
     #[serde(default)]
     pub limit: Option<i64>,
+    /// Inclusive lower bound on `occurred_at_client` (RFC3339). Composes
+    /// with `before` via AND. Absent skips the check.
+    #[serde(default)]
+    pub from: Option<String>,
+    /// Exclusive upper bound on `occurred_at_client` (RFC3339). Composes
+    /// with `before` via AND. Absent skips the check.
+    #[serde(default)]
+    pub to: Option<String>,
 }

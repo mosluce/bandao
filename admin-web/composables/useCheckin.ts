@@ -17,11 +17,13 @@ export function useCheckin() {
 
   async function listUserEvents(
     appUserId: string,
-    opts: { before?: string, limit?: number } = {},
+    opts: { before?: string, limit?: number, from?: string, to?: string } = {},
   ): Promise<CheckinEventDto[]> {
     const params = new URLSearchParams()
     if (opts.before) params.set('before', opts.before)
     if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+    if (opts.from) params.set('from', opts.from)
+    if (opts.to) params.set('to', opts.to)
     const qs = params.toString()
     const path = qs ? `/checkin/users/${appUserId}/events?${qs}` : `/checkin/users/${appUserId}/events`
     return api<CheckinEventDto[]>(path, { method: 'GET' })
