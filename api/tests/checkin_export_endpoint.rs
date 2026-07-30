@@ -81,23 +81,23 @@ async fn default_date_returns_todays_events_at_offset_and_excludes_transfers_and
     let (_admin, org_id, app_user_id, secret) = setup(&app).await;
 
     let now_ms = bson::DateTime::now().timestamp_millis();
-    let one_hour_ago = ms(now_ms - 60 * 60 * 1000);
-    let thirty_hours_ago = ms(now_ms - 30 * 60 * 60 * 1000); // safely "yesterday" at any offset
+    // `now` exactly, NOT `now - 1h`. This test exercises the *default date*
+    // path, which resolves to the calendar day containing `now` at the
+    // requested offset — so the "today" fixtures have to be anchored to the
+    // same instant that resolution uses. Backdating them by an hour made the
+    // test fail for the first hour after local midnight (UTC 16:00–17:00 at
+    // `+08:00`): the query resolved to the new day while the fixtures landed
+    // on the old one, and the assertion saw an empty event list.
+    let today = ms(now_ms);
+    let thirty_hours_ago = ms(now_ms - 30 * 60 * 60 * 1000); // "not today" at any offset
 
-    seed(
-        &app,
-        org_id,
-        app_user_id,
-        CheckinEventType::ClockIn,
-        one_hour_ago,
-    )
-    .await;
+    seed(&app, org_id, app_user_id, CheckinEventType::ClockIn, today).await;
     seed(
         &app,
         org_id,
         app_user_id,
         CheckinEventType::TransferOut,
-        one_hour_ago,
+        today,
     )
     .await;
     seed(
@@ -105,7 +105,7 @@ async fn default_date_returns_todays_events_at_offset_and_excludes_transfers_and
         org_id,
         app_user_id,
         CheckinEventType::TransferIn,
-        one_hour_ago,
+        today,
     )
     .await;
     seed(
