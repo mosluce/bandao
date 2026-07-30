@@ -254,7 +254,12 @@ class _FakeRepo implements CheckinRepository {
   Future<CheckinUserStatusDto> status() async => throw UnimplementedError();
 
   @override
-  Future<List<CheckinEventDto>> events({String? before, int limit = 50}) async =>
+  Future<List<CheckinEventDto>> events({
+    String? before,
+    int limit = 50,
+    DateTime? from,
+    DateTime? to,
+  }) async =>
       <CheckinEventDto>[];
 }
 

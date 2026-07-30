@@ -39,12 +39,27 @@ enum CheckinEventType {
   }
 }
 
-/// Mirrors `EventSource`. Wire: `app | admin_force`.
+/// Mirrors `EventSource`. Wire: `app | admin_force | legacy_backfill`.
+///
+/// `legacyBackfill` is not optional to model: an AppUser whose history was
+/// imported by the `legacy_backfill` script receives those events from
+/// `/app/checkin/events`, and omitting the variant made `fromJson` throw on
+/// the whole page.
 enum EventSource {
   app,
-  adminForce;
+  adminForce,
+  legacyBackfill;
 
-  String toJson() => this == EventSource.app ? 'app' : 'admin_force';
+  String toJson() {
+    switch (this) {
+      case EventSource.app:
+        return 'app';
+      case EventSource.adminForce:
+        return 'admin_force';
+      case EventSource.legacyBackfill:
+        return 'legacy_backfill';
+    }
+  }
 
   static EventSource fromJson(String wire) {
     switch (wire) {
@@ -52,6 +67,8 @@ enum EventSource {
         return EventSource.app;
       case 'admin_force':
         return EventSource.adminForce;
+      case 'legacy_backfill':
+        return EventSource.legacyBackfill;
       default:
         throw ArgumentError.value(wire, 'wire', 'Unknown EventSource value');
     }

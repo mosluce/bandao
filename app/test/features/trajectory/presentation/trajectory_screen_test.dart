@@ -28,12 +28,21 @@ class _FakeGeolocationService implements GeolocationService {
       throw UnimplementedError('${invocation.memberName} not stubbed');
 }
 
-/// Start-anchor fetch calls `events()`; stub it to empty so the trajectory
-/// controller settles without hitting the network.
+/// The day's events feed both the markers and — via the merge contract — the
+/// line's endpoints, so tests control them explicitly.
 class _StubCheckinRepo implements CheckinRepository {
+  _StubCheckinRepo([this._events = const <CheckinEventDto>[]]);
+
+  final List<CheckinEventDto> _events;
+
   @override
-  Future<List<CheckinEventDto>> events({String? before, int limit = 50}) async =>
-      const <CheckinEventDto>[];
+  Future<List<CheckinEventDto>> events({
+    String? before,
+    int limit = 50,
+    DateTime? from,
+    DateTime? to,
+  }) async =>
+      _events;
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -60,6 +69,7 @@ Future<void> _pump(
   WidgetTester tester, {
   required LocationPermission permission,
   required List<LocationPingDto> pings,
+  List<CheckinEventDto> events = const <CheckinEventDto>[],
   _StubRepository? repoOut,
   bool settle = true,
 }) async {
@@ -70,7 +80,8 @@ Future<void> _pump(
         geolocationServiceProvider
             .overrideWithValue(_FakeGeolocationService(permission)),
         myLocationsRepositoryProvider.overrideWith((ref) async => repo),
-        checkinRepositoryProvider.overrideWith((ref) async => _StubCheckinRepo()),
+        checkinRepositoryProvider
+            .overrideWith((ref) async => _StubCheckinRepo(events)),
       ],
       child: const MaterialApp(
         locale: Locale('zh', 'TW'),
@@ -105,22 +116,41 @@ void main() {
     //   - §11 smoke verifies the map+stats render on a real device.
     // The widget tests below stick to branches that don't mount the map.
 
-    testWidgets('empty-day path renders the empty text and no map', (tester) async {
-      await _pump(tester, permission: LocationPermission.whileInUse, pings: const []);
+    testWidgets('empty-day path renders the empty text and no map',
+        (tester) async {
+      await _pump(
+        tester,
+        permission: LocationPermission.whileInUse,
+        pings: const [],
+      );
 
       expect(find.text('該日無軌跡資料'), findsOneWidget);
       expect(find.byType(FlutterMap), findsNothing);
     });
 
-    testWidgets('permission-denied renders the primer and no map', (tester) async {
-      await _pump(tester, permission: LocationPermission.denied, pings: const []);
+    testWidgets('permission-denied renders the primer and no map',
+        (tester) async {
+      await _pump(
+        tester,
+        permission: LocationPermission.denied,
+        pings: const [],
+      );
 
       expect(find.text('尚未授權定位'), findsOneWidget);
       expect(find.text('前往系統設定'), findsOneWidget);
       expect(find.byType(FlutterMap), findsNothing);
     });
 
-    testWidgets('changing the date dropdown triggers a refetch', (tester) async {
+    // The `>= 1 merged point` branches mount FlutterMap, whose tile fetches
+    // always 400 under TestWidgetsFlutterBinding (see the note above), so the
+    // render thresholds are asserted on the controller's `mergedSeries` in
+    // `trajectory_controller_test.dart` instead — that is the value the
+    // widget's branch reads. The drawn geometry itself is covered by
+    // admin-web's `trajectory.test.ts`, which asserts real polyline vertices
+    // against the same merge contract, plus the §6.4 device smoke.
+
+    testWidgets('changing the date dropdown triggers a refetch',
+        (tester) async {
       final repo = _StubRepository(const []);
       await _pump(
         tester,

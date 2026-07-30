@@ -36,6 +36,7 @@ use crate::db::LOCATION_PING_BATCH_MAX;
 use crate::domain::LocationPing;
 use crate::error::{ApiError, ApiResult};
 use crate::handlers::app_checkin::parse_rfc3339;
+use crate::handlers::range::{parse_optional_range, parse_required_range};
 use crate::state::AppState;
 
 // --- Constants ---
@@ -47,9 +48,6 @@ const LIST_MAX_LIMIT: i64 = 1000;
 /// without dropping its backlog; tight enough that a >30-day-old ping is
 /// almost certainly a client bug or a clock-skewed device.
 const PING_MAX_AGE_DAYS: i64 = 30;
-/// Cap on the (to - from) span of an export query. Aligns with the 90-day
-/// TTL — admins can't export beyond the retention window anyway.
-const EXPORT_RANGE_MAX_DAYS: i64 = 90;
 const MILLIS_PER_DAY: i64 = 24 * 3600 * 1000;
 
 // --- DTOs ---
@@ -302,17 +300,7 @@ pub async fn list_my_locations(
         Some(raw) => Some(parse_rfc3339(raw)?),
         None => None,
     };
-    let from = match q.from.as_deref() {
-        Some(raw) => Some(parse_rfc3339(raw).map_err(|_| ApiError::InvalidRange)?),
-        None => None,
-    };
-    let to = match q.to.as_deref() {
-        Some(raw) => Some(parse_rfc3339(raw).map_err(|_| ApiError::InvalidRange)?),
-        None => None,
-    };
-    if from.is_some() || to.is_some() {
-        validate_range(from, to)?;
-    }
+    let (from, to) = parse_optional_range(q.from.as_deref(), q.to.as_deref())?;
     let limit = q
         .limit
         .unwrap_or(LIST_DEFAULT_LIMIT)
@@ -351,17 +339,7 @@ pub async fn list_locations(
         Some(raw) => Some(parse_rfc3339(raw)?),
         None => None,
     };
-    let from = match q.from.as_deref() {
-        Some(raw) => Some(parse_rfc3339(raw).map_err(|_| ApiError::InvalidRange)?),
-        None => None,
-    };
-    let to = match q.to.as_deref() {
-        Some(raw) => Some(parse_rfc3339(raw).map_err(|_| ApiError::InvalidRange)?),
-        None => None,
-    };
-    if from.is_some() || to.is_some() {
-        validate_range(from, to)?;
-    }
+    let (from, to) = parse_optional_range(q.from.as_deref(), q.to.as_deref())?;
     let limit = q
         .limit
         .unwrap_or(LIST_DEFAULT_LIMIT)
@@ -373,31 +351,6 @@ pub async fn list_locations(
         .list_by_app_user_paginated(app_user_id, before, from, to, limit)
         .await?;
     Ok(Json(pings.iter().map(LocationPingDto::from_ping).collect()))
-}
-
-/// Shared range validator used by list + export. Each absent side is a
-/// no-op for its corresponding check (single-sided ranges are allowed).
-///
-/// No longer enforces `from >= now - 90 days`: that floor was written
-/// hand-in-hand with `location_pings`' old 90-day TTL (querying further
-/// back was pointless when nothing that old could still exist). The TTL
-/// is gone (see `location-tracking` spec, "Location pings are persisted
-/// with dual timestamps") — legacy-imported pings can be arbitrarily old —
-/// so this floor would otherwise make that data permanently unreachable
-/// through every read surface (self-list, admin list, export) despite
-/// being safely stored. The span cap (`to - from <= 90 days`) stays: it
-/// bounds a single query's result size, which is a real, still-relevant
-/// concern independent of retention.
-fn validate_range(from: Option<DateTime>, to: Option<DateTime>) -> ApiResult<()> {
-    let span_max_millis = EXPORT_RANGE_MAX_DAYS * MILLIS_PER_DAY;
-    if let (Some(f), Some(t)) = (from, to) {
-        let from_ms = f.timestamp_millis();
-        let to_ms = t.timestamp_millis();
-        if to_ms < from_ms || to_ms - from_ms > span_max_millis {
-            return Err(ApiError::InvalidRange);
-        }
-    }
-    Ok(())
 }
 
 // --- GET /checkin/users/:id/locations/export ---
@@ -420,13 +373,9 @@ pub async fn export_locations(
         return Err(ApiError::NotFound);
     }
 
-    // Export requires both sides; reuse the shared validator that the list
-    // endpoint also runs.
-    let from_raw = q.from.as_deref().ok_or(ApiError::InvalidRange)?;
-    let to_raw = q.to.as_deref().ok_or(ApiError::InvalidRange)?;
-    let from = parse_rfc3339(from_raw).map_err(|_| ApiError::InvalidRange)?;
-    let to = parse_rfc3339(to_raw).map_err(|_| ApiError::InvalidRange)?;
-    validate_range(Some(from), Some(to))?;
+    // Export requires both sides; the span rule is the same one the list
+    // endpoints run.
+    let (from, to) = parse_required_range(q.from.as_deref(), q.to.as_deref())?;
 
     let pings = state
         .db
@@ -439,8 +388,11 @@ pub async fn export_locations(
         ApiError::Internal
     })?;
 
-    let from_date = from_raw.split('T').next().unwrap_or("from");
-    let to_date = to_raw.split('T').next().unwrap_or("to");
+    // Filename uses the caller's raw bounds, not the parsed ones, so the
+    // downloaded name echoes exactly what was asked for. Both sides are
+    // present — `parse_required_range` above rejects a missing one.
+    let from_date = date_part(q.from.as_deref(), "from");
+    let to_date = date_part(q.to.as_deref(), "to");
     let user_label = app_user
         .username
         .as_deref()
@@ -466,6 +418,13 @@ pub async fn export_locations(
             tracing::error!(?err, "xlsx response build failed");
             ApiError::Internal
         })
+}
+
+/// Date half of an RFC3339 bound, for the download filename.
+fn date_part<'a>(raw: Option<&'a str>, fallback: &'a str) -> &'a str {
+    raw.and_then(|r| r.split('T').next())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(fallback)
 }
 
 fn build_xlsx(pings: &[LocationPing]) -> Result<Vec<u8>, rust_xlsxwriter::XlsxError> {
@@ -519,4 +478,35 @@ fn build_xlsx(pings: &[LocationPing]) -> Result<Vec<u8>, rust_xlsxwriter::XlsxEr
     }
 
     workbook.save_to_buffer()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The export filename echoes the caller's raw bounds. The date half used
+    /// to be sliced off the pre-parse `&str` locals; those went away when range
+    /// parsing moved to `handlers::range`, so this guards that the rewrite
+    /// produces the same names for every bound a validated request can carry.
+    #[test]
+    fn date_part_takes_everything_before_the_t() {
+        assert_eq!(date_part(Some("2026-04-04T00:00:00Z"), "from"), "2026-04-04");
+        assert_eq!(
+            date_part(Some("2026-05-04T08:00:00+08:00"), "to"),
+            "2026-05-04"
+        );
+    }
+
+    #[test]
+    fn date_part_passes_through_a_bare_date() {
+        assert_eq!(date_part(Some("2026-04-04"), "from"), "2026-04-04");
+    }
+
+    #[test]
+    fn date_part_falls_back_when_absent_or_empty() {
+        assert_eq!(date_part(None, "from"), "from");
+        assert_eq!(date_part(Some(""), "to"), "to");
+        // Leading 'T' would previously have yielded an empty filename segment.
+        assert_eq!(date_part(Some("T00:00:00Z"), "from"), "from");
+    }
 }

@@ -12,6 +12,7 @@ pub mod location_tracking;
 pub mod me;
 pub mod org_api_tokens;
 pub mod orgs;
+pub mod range;
 pub mod users;
 
 use axum::Json;

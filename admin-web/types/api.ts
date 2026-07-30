@@ -210,7 +210,7 @@ export type PasswordResetResponse = CreateAppUserResponse
 
 export type CheckinEventType = 'clock_in' | 'clock_out' | 'transfer_out' | 'transfer_in'
 export type AppUserCheckinStatus = 'off_duty' | 'on_site' | 'in_transit'
-export type EventSource = 'app' | 'admin_force'
+export type EventSource = 'app' | 'admin_force' | 'legacy_backfill'
 export type EventInitiatorKind = 'app_user' | 'dashboard_user'
 
 export interface GeoPoint {

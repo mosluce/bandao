@@ -18,7 +18,12 @@ import 'package:bandao_app/l10n/app_localizations.dart';
 
 class _StubCheckinRepo implements CheckinRepository {
   @override
-  Future<List<CheckinEventDto>> events({String? before, int limit = 50}) async =>
+  Future<List<CheckinEventDto>> events({
+    String? before,
+    int limit = 50,
+    DateTime? from,
+    DateTime? to,
+  }) async =>
       const <CheckinEventDto>[];
 
   @override

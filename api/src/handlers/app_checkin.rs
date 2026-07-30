@@ -40,6 +40,7 @@ use crate::handlers::checkin_dto::{
     CheckinEventDto, CheckinUserStatusDto, EventsCursorQuery, SubmitCheckinEventRequest,
     SubmitCheckinEventResponse,
 };
+use crate::handlers::range::parse_optional_range;
 use crate::state::AppState;
 
 const MANUAL_LABEL_MIN: usize = 1;
@@ -208,12 +209,13 @@ pub async fn list_events(
         Some(raw) => Some(parse_rfc3339(raw)?),
         None => None,
     };
+    let (from, to) = parse_optional_range(q.from.as_deref(), q.to.as_deref())?;
     let limit = q.limit.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE);
 
     let events = state
         .db
         .checkin_events
-        .list_by_app_user_paginated(ctx.app_user_id, before, limit)
+        .list_by_app_user_paginated(ctx.app_user_id, before, from, to, limit)
         .await?;
     Ok(Json(
         events.iter().map(CheckinEventDto::from_event).collect(),

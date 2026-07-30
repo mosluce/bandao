@@ -244,7 +244,12 @@ class _RecordingRepo implements CheckinRepository {
   final List<List<CheckinEventDto>> responses = [];
 
   @override
-  Future<List<CheckinEventDto>> events({String? before, int limit = 50}) async {
+  Future<List<CheckinEventDto>> events({
+    String? before,
+    int limit = 50,
+    DateTime? from,
+    DateTime? to,
+  }) async {
     calls.add((before: before, limit: limit));
     if (responses.isEmpty) return const [];
     return responses.removeAt(0);

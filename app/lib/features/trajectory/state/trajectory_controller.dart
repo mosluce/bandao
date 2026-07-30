@@ -4,6 +4,7 @@ import '../../../core/api/models/checkin_event.dart';
 import '../../../core/api/models/location_ping.dart';
 import '../../checkin/data/checkin_repository.dart';
 import '../data/my_locations_repository.dart';
+import '../data/trajectory_merge.dart';
 import '../data/trajectory_stats.dart';
 
 /// State held by `trajectoryProvider`.
@@ -13,6 +14,7 @@ class TrajectoryDayState {
     required this.pings,
     required this.stats,
     this.events = const [],
+    this.mergedSeries = const [],
   });
 
   /// Calendar day in *local* time. The repository call converts to UTC
@@ -22,21 +24,27 @@ class TrajectoryDayState {
   final TrajectoryStats stats;
 
   /// The day's check-in events (clock in/out, transfer in/out), drawn as
-  /// event-type markers. The first `clock_in` anchors the start of the day, so
-  /// the map renders as soon as the user has clocked in — before any pings.
+  /// event-type markers. Markers come from this full list — including events
+  /// the merge contract excludes from the line.
   final List<CheckinEventDto> events;
+
+  /// Polyline vertices: pings plus genuine checkin coordinates, in contract
+  /// order. See [buildMergedSeries].
+  final List<MergedPoint> mergedSeries;
 
   TrajectoryDayState copyWith({
     DateTime? selectedDate,
     List<LocationPingDto>? pings,
     TrajectoryStats? stats,
     List<CheckinEventDto>? events,
+    List<MergedPoint>? mergedSeries,
   }) {
     return TrajectoryDayState(
       selectedDate: selectedDate ?? this.selectedDate,
       pings: pings ?? this.pings,
       stats: stats ?? this.stats,
       events: events ?? this.events,
+      mergedSeries: mergedSeries ?? this.mergedSeries,
     );
   }
 }
@@ -61,7 +69,8 @@ class TrajectoryController extends AsyncNotifier<TrajectoryDayState> {
   /// Refresh the currently-selected day (used by the screen's pull-to-refresh
   /// and by the home summary card's debounced ticker).
   Future<void> refresh() async {
-    final current = state.valueOrNull?.selectedDate ?? _startOfDay(DateTime.now());
+    final current =
+        state.valueOrNull?.selectedDate ?? _startOfDay(DateTime.now());
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() => _fetchFor(current));
   }
@@ -71,36 +80,38 @@ class TrajectoryController extends AsyncNotifier<TrajectoryDayState> {
     final next = startOfDay.add(const Duration(days: 1));
     final pings = await repo.listForRange(from: startOfDay, to: next);
     final events = await _fetchDayEvents(startOfDay, next);
+    final merged = buildMergedSeries(pings, events);
     return TrajectoryDayState(
       selectedDate: startOfDay,
       pings: pings,
-      stats: computeTrajectoryStats(pings),
+      stats: computeTrajectoryStats(merged),
       events: events,
+      mergedSeries: merged,
     );
   }
 
-  /// Fetch the day's check-in events (for event markers + the clock-in start
-  /// anchor). Best-effort: any failure degrades to an empty list so the ping
-  /// path still renders. The events endpoint is cursor-paginated (no from/to);
-  /// one page comfortably covers the trajectory's 8-day range for typical use.
+  /// Fetch the day's check-in events — both the markers and, via the merge
+  /// contract, the line's endpoints. Range-scoped server-side: over-fetching a
+  /// newest-first page and filtering here returned nothing once the day fell
+  /// outside the page's reach, which silently dropped the day's events
+  /// entirely.
+  ///
+  /// Best-effort: any failure degrades to an empty list so the ping path still
+  /// renders.
   Future<List<CheckinEventDto>> _fetchDayEvents(
     DateTime startOfDay,
     DateTime next,
   ) async {
     try {
       final checkin = await ref.read(checkinRepositoryProvider.future);
-      final events = await checkin.events(limit: 100);
-      return events.where((e) {
-        final t = DateTime.tryParse(e.occurredAtClient)?.toLocal();
-        return t != null && !t.isBefore(startOfDay) && t.isBefore(next);
-      }).toList(growable: false);
+      // 200 is the endpoint's server-side cap; one day never approaches it.
+      return await checkin.events(limit: 200, from: startOfDay, to: next);
     } catch (_) {
       return const [];
     }
   }
 
-  static DateTime _startOfDay(DateTime t) =>
-      DateTime(t.year, t.month, t.day);
+  static DateTime _startOfDay(DateTime t) => DateTime(t.year, t.month, t.day);
 }
 
 final trajectoryProvider =
