@@ -1,7 +1,7 @@
 ## 1. Resolve the open question first
 
-- [ ] 1.1 Query KLCC production `checkin_events` for imported events with degenerate coordinates (`location.coordinates.lat == 0 && lng == 0`, or non-finite values) scoped to `source = legacy_backfill`. Record the count in this file.
-- [ ] 1.2 If degenerate coordinates exist, decide with the user whether the merge drops exactly-`(0, 0)` points, and if so add the rule to the merge-contract requirement in `specs/app-personal-trajectory/spec.md` before writing any client code. If none exist, note "none found" against the Open Questions entry in `design.md` and proceed unchanged.
+- [x] 1.1 Query KLCC production `checkin_events` for imported events with degenerate coordinates scoped to `source = legacy_backfill`. **Result: 0 rows.** `countDocuments({ source: "legacy_backfill", $and: [{ "location.coordinates.lat": 0 }, { "location.coordinates.lng": 0 }] })` → `0` (run 2026-07-30).
+- [x] 1.2 No degenerate coordinates exist, so the merge ships unchanged with no coordinate validation. Recorded against the Open Questions entry in `design.md` and folded into the matching Risks entry — the absence of a `(0, 0)` filter is now evidence-backed, not an oversight.
 
 ## 2. API — range filters on the event history endpoints
 

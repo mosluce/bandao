@@ -123,7 +123,7 @@ There is also a rename: `TrajectoryStats.pingCount` becomes `pointCount`, since 
 
 - **The xlsx export and the map now disagree** → Export stays ping-only, so a day's exported rows are fewer than the plotted points and the exported distance, if anyone recomputes it, is short by the head and tail legs. Left out of scope rather than solved silently; called out in the proposal's Impact.
 
-- **Legacy coordinate quality warps the line** → A `legacy_backfill` event with `geo: {lat: 0, lng: 0}` (device with no fix) becomes a vertex, dragging the line to the Gulf of Guinea. The blast radius today is limited to `fitBounds`, which already includes marker coordinates; merging extends it to the line's shape. Not mitigated in this change — see Open Questions.
+- **Legacy coordinate quality warps the line** → A `legacy_backfill` event with `geo: {lat: 0, lng: 0}` (device with no fix) would become a vertex, dragging the line to the Gulf of Guinea. Merging widens the blast radius from `fitBounds` alone (which already includes marker coordinates) to the line's shape. **Checked against KLCC production: zero such rows**, so this is not mitigated by design rather than by oversight — see the resolved Open Question. The exposure remains for any *future* import of unfixed coordinates.
 
 - **Range-scoped fetch changes an endpoint two other surfaces use** → `from` / `to` are optional and default to current behaviour, and the history screens pass neither, so their cursor pagination is untouched.
 
@@ -135,5 +135,5 @@ There is also a rename: `TrajectoryStats.pingCount` becomes `pointCount`, since 
 
 ## Open Questions
 
-- **Do KLCC's imported events contain `(0, 0)` or otherwise unfixed coordinates?** Answerable with a query against the imported `checkin_events` before implementation. If they exist, the cheap mitigation is to drop exactly-`(0, 0)` points from the merge — but that is inventing validation, so it should be driven by evidence rather than added speculatively. If they do not exist, close this and note it.
+- ~~**Do KLCC's imported events contain `(0, 0)` or otherwise unfixed coordinates?**~~ **Resolved 2026-07-30: none found.** `countDocuments({ source: "legacy_backfill", lat: 0, lng: 0 })` against KLCC production returned `0`. The merge therefore ships with **no coordinate validation**, which is now an evidence-backed decision rather than an omission: adding a `(0, 0)` filter would have been inventing a rule for data that does not exist. If a future import introduces unfixed coordinates, the mitigation is the one sketched above — drop exactly-`(0, 0)` points in `buildMergedSeries` on both platforms and add the rule to the merge contract requirement.
 - **Should the range-scoped fetch replace the history screens' cursor pagination too?** Out of scope here — those screens page backwards through all events and have no date to scope to — but if the endpoints grow range support, a future change could give the history screens a date filter for free.
