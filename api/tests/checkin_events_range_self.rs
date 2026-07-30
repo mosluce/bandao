@@ -102,7 +102,11 @@ async fn omitting_the_range_preserves_prior_behaviour() {
     assert_eq!(r.status(), StatusCode::OK);
     let body: Value = r.json().await.unwrap();
     let arr = body.as_array().unwrap();
-    assert_eq!(arr.len(), 4, "unranged call returns the full page as before");
+    assert_eq!(
+        arr.len(),
+        4,
+        "unranged call returns the full page as before"
+    );
 }
 
 /// The span cap is the only range ceiling; a bound far outside any retention

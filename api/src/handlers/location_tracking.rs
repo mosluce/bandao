@@ -490,7 +490,10 @@ mod tests {
     /// produces the same names for every bound a validated request can carry.
     #[test]
     fn date_part_takes_everything_before_the_t() {
-        assert_eq!(date_part(Some("2026-04-04T00:00:00Z"), "from"), "2026-04-04");
+        assert_eq!(
+            date_part(Some("2026-04-04T00:00:00Z"), "from"),
+            "2026-04-04"
+        );
         assert_eq!(
             date_part(Some("2026-05-04T08:00:00+08:00"), "to"),
             "2026-05-04"
