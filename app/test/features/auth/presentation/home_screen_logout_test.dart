@@ -11,6 +11,7 @@ import 'package:bandao_app/core/api/models/org.dart';
 import 'package:bandao_app/features/auth/presentation/home_screen.dart';
 import 'package:bandao_app/features/auth/state/auth_provider.dart';
 import 'package:bandao_app/features/auth/state/auth_state.dart';
+import 'package:bandao_app/features/auth/state/session_notice_provider.dart';
 import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
 import 'package:bandao_app/features/checkin/state/checkin_queue_provider.dart';
 import 'package:bandao_app/features/checkin/state/checkin_status_provider.dart';
@@ -70,6 +71,41 @@ void main() {
       expect(fake.logoutCalls, 1);
     });
   });
+  group('session-not-persisted notice', () {
+    // Raised by login() when the token could not be written. Home must show
+    // it, because the alternative this change replaced was an endless spinner
+    // with no explanation at all.
+    testWidgets('is shown once when the flag is set before home mounts',
+        (tester) async {
+      await _pump(
+        tester,
+        queue: const <QueueRow>[],
+        extraOverrides: <Override>[
+          pendingSessionNotPersistedProvider.overrideWith((ref) => true),
+        ],
+      );
+
+      expect(
+        find.text(
+          AppLocalizations(const Locale('zh', 'TW')).sessionNotPersistedNotice,
+        ),
+        findsOneWidget,
+      );
+      // Still on home — a failed persist must never bounce the user back.
+      expect(find.text('login'), findsNothing);
+    });
+
+    testWidgets('is absent on a normal login', (tester) async {
+      await _pump(tester, queue: const <QueueRow>[]);
+
+      expect(
+        find.text(
+          AppLocalizations(const Locale('zh', 'TW')).sessionNotPersistedNotice,
+        ),
+        findsNothing,
+      );
+    });
+  });
 }
 
 QueueRow _row(int id, String status) {
@@ -94,6 +130,7 @@ QueueRow _row(int id, String status) {
 Future<_LogoutCountingNotifier> _pump(
   WidgetTester tester, {
   required List<QueueRow> queue,
+  List<Override> extraOverrides = const <Override>[],
 }) async {
   final fake = _LogoutCountingNotifier(_authedAuthState());
   final router = GoRouter(
@@ -124,6 +161,7 @@ Future<_LogoutCountingNotifier> _pump(
         // Permission and effective status fixed to safe defaults.
         locationPermissionProvider.overrideWith(_NotDeterminedNotifier.new),
         effectiveStatusProvider.overrideWithValue(EffectiveStatus.offDuty),
+        ...extraOverrides,
       ],
       child: MaterialApp.router(
         routerConfig: router,

@@ -33,5 +33,9 @@
   "serverConnectionCustom": "Connected to: {host} (custom)",
   "splashRetry": "Retry",
   "splashLogout": "Sign out",
-  "splashNetworkMessage": "Could not reach the server. Please retry."
+  "splashNetworkMessage": "Could not reach the server. Please retry.",
+  "sessionNotPersistedNotice": "Could not save your sign-in. You will need to log in again next time you open the app.",
+  "@sessionNotPersistedNotice": {
+    "description": "Shown after a login whose bearer token could not be persisted to the platform keystore."
+  }
 }

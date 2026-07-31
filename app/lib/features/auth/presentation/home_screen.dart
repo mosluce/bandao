@@ -15,6 +15,7 @@ import '../../checkin/state/handover_notice_provider.dart';
 import '../../checkin/state/location_permission_provider.dart';
 import '../../trajectory/presentation/today_summary_card.dart';
 import '../state/auth_provider.dart';
+import '../state/session_notice_provider.dart';
 import '../state/auth_state.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -30,20 +31,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Catch the case where the handover wipe ran during `_fetchMe` BEFORE
-    // home was mounted. In that path the regular `ref.listen` below never
-    // fires (Riverpod's WidgetRef.listen doesn't support fireImmediately),
-    // so we read once on the first frame and surface the toast manually.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final pending = ref.read(pendingHandoverNoticeProvider);
-      if (pending != null && pending.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(pending)),
-        );
-        ref.read(pendingHandoverNoticeProvider.notifier).state = null;
-      }
-    });
+    // Catch notices raised BEFORE home was mounted — the handover wipe during
+    // `_fetchMe`, and the session-persistence notice, which `login()` sets in
+    // the same synchronous step as the state flip that routes here. In both
+    // paths the `ref.listen` in `build` never fires (Riverpod's
+    // WidgetRef.listen has no fireImmediately), so read each carrier once on
+    // the first frame.
+    _showHandoverNotice(ref.read(pendingHandoverNoticeProvider));
+    _showSessionNotPersistedNotice(
+      ref.read(pendingSessionNotPersistedProvider),
+    );
   }
 
   @override
@@ -99,6 +96,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     await ref.read(authProvider.notifier).logout();
   }
 
+  /// Show a notice once, then clear its carrier so it cannot re-fire on the
+  /// next rebuild.
+  ///
+  /// Deferred to a post-frame callback for two reasons: the listener can run
+  /// mid-build, before a ScaffoldMessenger exists; and it lets [message]
+  /// resolve `AppLocalizations` at a point where the context is safe to read
+  /// (notably when called from `initState`).
+  void _showOneShotNotice({
+    required bool show,
+    required String Function(AppLocalizations l10n) message,
+    required VoidCallback clear,
+  }) {
+    if (!show) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message(AppLocalizations.of(context)))),
+      );
+      clear();
+    });
+  }
+
+  void _showHandoverNotice(String? notice) => _showOneShotNotice(
+        show: notice != null && notice.isNotEmpty,
+        // Already a complete string built by the notifier.
+        message: (_) => notice ?? '',
+        clear: () =>
+            ref.read(pendingHandoverNoticeProvider.notifier).state = null,
+      );
+
+  void _showSessionNotPersistedNotice(bool show) => _showOneShotNotice(
+        show: show,
+        message: (l10n) => l10n.sessionNotPersistedNotice,
+        clear: () =>
+            ref.read(pendingSessionNotPersistedProvider.notifier).state = false,
+      );
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -111,16 +145,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // microtask path (state flip → home mounts → wipe runs). The auto-login
     // path is covered by the postFrame check in `initState` since the value
     // is already set by the time home mounts.
-    ref.listen<String?>(pendingHandoverNoticeProvider, (prev, next) {
-      if (next == null || next.isEmpty) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next)),
-        );
-        ref.read(pendingHandoverNoticeProvider.notifier).state = null;
-      });
-    });
+    ref.listen<String?>(
+      pendingHandoverNoticeProvider,
+      (prev, next) => _showHandoverNotice(next),
+    );
+
+    // "This session will not survive a restart" — raised when login succeeded
+    // but the bearer token could not be persisted. Separate channel from the
+    // handover notice so neither overwrites the other when both fire on the
+    // same login.
+    ref.listen<bool>(
+      pendingSessionNotPersistedProvider,
+      (prev, next) => _showSessionNotPersistedNotice(next),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -159,14 +196,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             authed.user.displayName,
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            authed.user.username,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(fontFamily: 'monospace'),
-                          ),
+                          // Internal users show their username; external
+                          // shadow users their key in the customer's own
+                          // system, which is the identifier they recognise.
+                          if (authed.user.identityLabel != null) ...<Widget>[
+                            const SizedBox(height: 4),
+                            Text(
+                              authed.user.identityLabel!,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontFamily: 'monospace'),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           const CheckinStatusPill(),
                           const SizedBox(height: 16),

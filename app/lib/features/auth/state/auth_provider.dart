@@ -6,6 +6,7 @@ import '../../checkin/data/checkin_queue_db.dart';
 import '../../checkin/state/handover_notice_provider.dart';
 import '../data/auth_repository.dart';
 import 'auth_state.dart';
+import 'session_notice_provider.dart';
 
 /// AuthNotifier owns the auth state machine. Construction kicks off
 /// `_bootstrap()` which executes the auto-login flow:
@@ -34,7 +35,6 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   }
 
   Future<AuthState> _fetchMe() async {
-    final storage = ref.read(secureStorageProvider);
     try {
       final repo = await ref.read(authRepositoryProvider.future);
       final me = await repo.me();
@@ -46,7 +46,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       );
     } on ApiException catch (e) {
       if (_isAuthFailure(e)) {
-        await storage.clearToken();
+        await _clearTokenBestEffort();
         return const AuthState.unauthenticated();
       }
       // Network errors / unknowns: keep the token, surface error so UI
@@ -80,6 +80,19 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     }
   }
 
+  /// Clears the stored token without letting a keystore failure escape.
+  /// `clearToken` empties the in-memory cache even when the platform delete
+  /// fails, so the session is always dropped; the persisted entry may linger,
+  /// but a stale token only survives to be rejected with 401 on the next
+  /// bootstrap, which clears it again. Never worth breaking logout over.
+  Future<void> _clearTokenBestEffort() async {
+    try {
+      await ref.read(secureStorageProvider).clearToken();
+    } on SecureStorageFailure {
+      // Already reported by the storage layer.
+    }
+  }
+
   bool _isAuthFailure(ApiException e) {
     if (e.status == 401) return true;
     return e.code == ApiErrorCode.unauthorized ||
@@ -106,7 +119,13 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     // our `data(authenticated)` with the bootstrap result, leaving the user
     // stranded on /splash with a stale GET /app/me request fired off.
     await future;
-    state = const AsyncValue<AuthState>.data(AuthState.loading());
+    // Deliberately NOT flipping to AuthState.loading() here. The router maps
+    // AuthLoading to /splash, which would unmount the login screen at the
+    // start of its own submit — and that screen is the only thing that can
+    // report the outcome. Every `catch` there begins `if (!mounted) return;`,
+    // so an unmounted screen silently discards the failure. The screen's own
+    // `_submitting` flag drives its progress indicator; the global loading
+    // state exists for the bootstrap window, where no screen owns the failure.
     final storage = ref.read(secureStorageProvider);
     try {
       final repo = await ref.read(authRepositoryProvider.future);
@@ -115,8 +134,26 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         username: username,
         password: password,
       );
-      await storage.writeToken(res.token);
-      await storage.writeLastOrgCode(orgCode);
+
+      // A token that cannot be persisted does NOT fail the login. The server
+      // issued it and this process holds it, so the session is valid — the
+      // only loss is surviving a cold start. Failing here would make a device
+      // with an unwritable keystore permanently unable to open the app.
+      var tokenPersisted = true;
+      try {
+        await storage.writeToken(res.token);
+      } on SecureStorageFailure {
+        // Already reported by the storage layer; the user is told what it
+        // means for them once we are on home.
+        tokenPersisted = false;
+      }
+      try {
+        await storage.writeLastOrgCode(orgCode);
+      } on SecureStorageFailure {
+        // Cosmetic — only pre-fills a form field on a future visit to /login.
+        // Never affects the session.
+      }
+
       state = AsyncValue<AuthState>.data(
         AuthState.authenticated(
           user: res.user,
@@ -124,6 +161,11 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           needsPasswordChange: res.needsPasswordChange,
         ),
       );
+      if (!tokenPersisted) {
+        // A flag, not a message: the wording is localized on the UI side,
+        // where a BuildContext exists.
+        ref.read(pendingSessionNotPersistedProvider.notifier).state = true;
+      }
       // Run AFTER state flip so home is mounted and its listener can pick up
       // the toast notice. Yielding via microtask gives go_router a chance to
       // navigate before we publish the message.
@@ -135,20 +177,32 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // unauthenticated and let the screen surface `e` via its caller.
       state = const AsyncValue<AuthState>.data(AuthState.unauthenticated());
       Error.throwWithStackTrace(e, st);
+    } catch (e, st) {
+      // Terminal-state guarantee. Anything unanticipated reaching here used to
+      // leave the machine at `loading` forever, parking the user on /splash
+      // with no error, no retry and no route forward. The outcome is known —
+      // the user is not authenticated — so `unauthenticated` is correct, and
+      // the login screen (still mounted) renders the rethrown error.
+      //
+      // Guarded so a failure AFTER the session was established cannot clobber
+      // a perfectly good authenticated state.
+      if (state.value is! AuthAuthenticated) {
+        state = const AsyncValue<AuthState>.data(AuthState.unauthenticated());
+      }
+      Error.throwWithStackTrace(e, st);
     }
   }
 
   /// Best-effort logout: always clear local state regardless of network.
   Future<void> logout() async {
     await future;
-    final storage = ref.read(secureStorageProvider);
     try {
       final repo = await ref.read(authRepositoryProvider.future);
       await repo.logout();
     } on ApiException {
       // ignore — logout is best-effort.
     }
-    await storage.clearToken();
+    await _clearTokenBestEffort();
     // KEEP last_org_code on logout: per spec, /login pre-fills the org_code
     // field on subsequent visits — including after logout — so the user only
     // has to retype username + password.
@@ -196,8 +250,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       );
     } on ApiException catch (e) {
       if (_isAuthFailure(e)) {
-        final storage = ref.read(secureStorageProvider);
-        await storage.clearToken();
+        await _clearTokenBestEffort();
         state = const AsyncValue<AuthState>.data(AuthState.unauthenticated());
       }
       // Other errors: leave cached state alone, user can retry by

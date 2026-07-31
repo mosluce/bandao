@@ -10,6 +10,7 @@ import 'package:bandao_app/core/api/models/location_ping.dart';
 import 'package:bandao_app/features/checkin/data/checkin_repository.dart';
 import 'package:bandao_app/features/checkin/data/geolocation_service.dart';
 import 'package:bandao_app/features/trajectory/data/my_locations_repository.dart';
+import 'package:bandao_app/features/trajectory/data/trajectory_merge.dart';
 import 'package:bandao_app/features/trajectory/presentation/trajectory_screen.dart';
 import 'package:bandao_app/l10n/app_localizations.dart';
 
@@ -107,7 +108,66 @@ Future<void> _pump(
   }
 }
 
+CheckinEventDto _event(String id, String iso, double lat, double lng) =>
+    CheckinEventDto(
+      id: id,
+      appUserId: 'u1',
+      eventType: CheckinEventType.clockIn,
+      occurredAtClient: iso,
+      occurredAtServer: iso,
+      source: EventSource.app,
+      initiatedByKind: EventInitiatorKind.appUser,
+      initiatedById: 'u1',
+      location: EventLocation(coordinates: GeoPoint(lat: lat, lng: lng)),
+      hasSkewWarning: false,
+    );
+
+MergedPoint _pt(String id, String iso, double lat, double lng) => MergedPoint(
+      lat: lat,
+      lng: lng,
+      occurredAtClient: iso,
+      originRank: originEvent,
+      id: id,
+    );
+
 void main() {
+  group('cameraPointsFor', () {
+    // Regression: an event contributes the same LatLng twice — once as a
+    // merged-series vertex, once as a marker. Without dedup a clock-in with
+    // no pings yielded two entries at one place, `length > 1` chose the
+    // fitBounds path, and a zero-area bounds made flutter_map compute an
+    // infinite zoom that TileLayer throws on. Every shift passes through
+    // that state between clocking in and the first ping.
+    test('a clock-in with no pings collapses to ONE distinct point', () {
+      final e = _event('in', '2026-07-31T00:49:08Z', 22.6116, 120.3006);
+      final series = [_pt('in', '2026-07-31T00:49:08Z', 22.6116, 120.3006)];
+
+      expect(cameraPointsFor(series, [e]), hasLength(1));
+    });
+
+    test('distinct coordinates are all kept', () {
+      final e = _event('in', '2026-07-31T00:49:08Z', 22.6116, 120.3006);
+      final series = [
+        _pt('in', '2026-07-31T00:49:08Z', 22.6116, 120.3006),
+        _pt('p1', '2026-07-31T01:00:00Z', 22.7000, 120.4000),
+      ];
+
+      expect(cameraPointsFor(series, [e]), hasLength(2));
+    });
+
+    test('an excluded event still contributes its marker to the camera', () {
+      // admin_force is kept out of the line but must stay in view.
+      final forced = _event('f', '2026-07-31T09:00:00Z', 24.0, 120.0);
+      final series = [_pt('in', '2026-07-31T00:49:08Z', 22.6116, 120.3006)];
+
+      expect(cameraPointsFor(series, [forced]), hasLength(2));
+    });
+
+    test('no data yields no camera points', () {
+      expect(cameraPointsFor(const [], const []), isEmpty);
+    });
+  });
+
   group('TrajectoryScreen', () {
     // The "with-data" path mounts FlutterMap, which fetches network tiles
     // and TestWidgetsFlutterBinding always returns 400 → uncaught exception.
