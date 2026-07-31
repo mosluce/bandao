@@ -23,10 +23,16 @@
 - [x] 3.3 Added `sessionNotPersistedNotice` to the hand-rolled `app_localizations.dart` shim (zh + en) and to all three ARB files. **No regeneration step exists** — the project uses a hand-written shim, not `flutter gen-l10n` (see the header comment in that file). Noted in passing: the ARBs carry 34 keys against the shim's ~102, so they are already well behind; not fixed here.
 - [x] 3.4 Widget tests: an unexpected failure now renders on the login screen with the submit button re-enabled (it was previously discarded by `if (!mounted) return;`); home shows the notice when the flag is set before it mounts, and stays on home rather than bouncing to `/login`; no notice on a normal login.
 
+## 5. Root cause — AppUser identity (added mid-implementation)
+
+- [x] 5.1 Make `username` optional and add `externalKey` to `app/lib/core/api/models/app_user.dart`, matching `AppUserDto`'s `skip_serializing_if` on both fields. Add `identityLabel` (`username ?? externalKey`).
+- [x] 5.2 Render the identity via `identityLabel` in `home_screen.dart` — the only UI reader of this field — and omit the line entirely when it is null rather than showing a blank.
+- [x] 5.3 Model tests over the two shapes `AppUserDto` actually serialises (internal carries `username`, external carries `external_key`, the other key **absent** rather than null), plus the fallback and the both-missing case.
+
 ## 4. Verification
 
 - [x] 4.1 `flutter analyze lib test` clean; `flutter test` **216/216** green, including every pre-existing auth test — removing the loading flip broke nothing.
-- [ ] 4.2 **Reproduce on the affected physical device** (iPhone 17, iOS 26.5.2 — the simulator's Keychain is clean and cannot reproduce this). Login must reach home. If the Keychain write still fails, the persistence notice must appear.
-- [ ] 4.3 While on that device, capture the actual Keychain `OSStatus` from Console.app (filter process `Runner`) and record it here. This is the input to the follow-up investigation — plugin upgrade vs entitlements vs device state — which is deliberately out of this change's scope.
-- [ ] 4.4 Confirm the fix on a healthy device too: a normal login is unchanged, no spurious notice, and `org_code` still pre-fills on the next visit to `/login`.
-- [ ] 4.5 Check whether Android reproduces the write failure. The write paths are shared and were equally unprotected; 0.4.2's read-side fix came from an Android report, so it is the likelier second platform.
+- [x] 4.2 **Verified on the affected physical device** (iPhone 17, iOS 26.5.2, debug build against prod). Login reaches home and issues `/app/checkin/status`, `/app/checkin/me/locations` and `/app/checkin/events` — none of which had ever been reached before, every prior attempt stopped dead at the login `200`. Also confirms today's range-scoped event fetch working in the real app (`limit=200&from=…&to=…` over one Taipei day).
+- [x] 4.3 **Moot — there is no `OSStatus` to capture.** Device verification showed the Keychain writing fine and the persistence notice never firing. The Keychain hypothesis was wrong; the root cause was the DTO mismatch in group 5. The storage hardening in group 1 stands as prophylactic, not as the fix.
+- [x] 4.4 Confirmed on the same device: `displayName` and the external key both render, no spurious notice.
+- [ ] 4.5 Check Android. The DTO fix is platform-independent so external-auth Orgs are unblocked there too, but the write-path hardening has only ever been exercised on iOS. Lower priority now that the keystore is known not to be at fault.

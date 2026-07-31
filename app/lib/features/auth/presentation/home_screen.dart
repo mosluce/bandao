@@ -196,14 +196,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             authed.user.displayName,
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            authed.user.username,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(fontFamily: 'monospace'),
-                          ),
+                          // Internal users show their username; external
+                          // shadow users their key in the customer's own
+                          // system, which is the identifier they recognise.
+                          if (authed.user.identityLabel != null) ...<Widget>[
+                            const SizedBox(height: 4),
+                            Text(
+                              authed.user.identityLabel!,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontFamily: 'monospace'),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           const CheckinStatusPill(),
                           const SizedBox(height: 16),

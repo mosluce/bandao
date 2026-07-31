@@ -67,6 +67,31 @@ Every secure-storage failure, read or write, SHALL be reported to the app's erro
 - **THEN** local auth state is still cleared and the user reaches `/login`
 - **AND** the storage failure is reported
 
+### Requirement: The app accepts both internal and external AppUser identities
+
+The client model of an AppUser SHALL treat `username` and `external_key` as optional and SHALL NOT require either to be present.
+
+`AppUserDto` identifies an AppUser by **either** `username` (internal) **or** `external_key` (an external shadow user provisioned by `external-db-auth`), and omits whichever does not apply — the absent one is not sent as `null`, it is not sent at all. Requiring `username` therefore makes **every** login to an external-auth Org fail while parsing an otherwise successful `200` response, which the user cannot recover from and did nothing to cause.
+
+Where the UI shows a machine-readable identity, it SHALL prefer `username`, fall back to `external_key`, and render nothing when neither is present — an external user's key in the customer's own system is the identifier they actually recognise.
+
+#### Scenario: An external shadow user's login response parses
+
+- **GIVEN** an Org whose `auth_source` is external, so none of its AppUsers has a `username`
+- **WHEN** a user of that Org logs in and the API returns `200`
+- **THEN** the response parses without error
+- **AND** the session reaches the authenticated app
+
+#### Scenario: Identity falls back to the external key
+
+- **WHEN** the UI displays the identity of an AppUser that has `external_key` but no `username`
+- **THEN** it shows the `external_key`
+
+#### Scenario: Neither identifier renders nothing
+
+- **WHEN** an AppUser payload carries neither `username` nor `external_key`
+- **THEN** the identity line is omitted entirely rather than rendered blank
+
 ## MODIFIED Requirements
 
 ### Requirement: Login screen authenticates an AppUser via three-field form
