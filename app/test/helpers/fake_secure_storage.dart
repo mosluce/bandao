@@ -76,14 +76,15 @@ class FakeSecureStorage implements SecureStorage {
   Future<void> writeLocationTrackingConsent(String appUserId) async =>
       _trackingConsent[appUserId] = true;
 
-  String? _recentLabels;
+  final Map<String, String> _recentLabels = <String, String>{};
 
   @override
-  Future<String?> readRecentCheckinLabels() async => _recentLabels;
+  Future<String?> readRecentCheckinLabels(String appUserId) async =>
+      _recentLabels[appUserId];
 
   @override
-  Future<void> writeRecentCheckinLabels(String json) async =>
-      _recentLabels = json;
+  Future<void> writeRecentCheckinLabels(String appUserId, String json) async =>
+      _recentLabels[appUserId] = json;
 
   @override
   Future<String?> readPrivacyUrlOverride() async => _privacyUrlOverride;
