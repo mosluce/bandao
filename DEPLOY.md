@@ -340,6 +340,48 @@ the change ships). This section is the operator's quick-reference card.
 4. Tag the merge commit: `git tag app-v<name> && git push --tags`. The
    tag is purely for audit — no CI hooks off it.
 
+### Hourly incremental legacy backfill (operator machine)
+
+One customer's records are imported continuously from their legacy system by
+a LaunchAgent on the operator's Mac, hourly between 08:00 and 19:00 local.
+This is **not** part of the deployed API — it runs off-cluster, so if that
+machine is off, the import simply pauses.
+
+```
+api/scripts/legacy_backfill_sync.sh                    build + publish to the deploy dir
+api/scripts/legacy_backfill_run.sh                     what the schedule actually runs
+api/scripts/io.no8.bandao.legacy-backfill.plist        the schedule
+```
+
+Install:
+
+```bash
+# plists cannot expand $HOME, so the vendored copy carries a __HOME__ placeholder
+sed "s|__HOME__|$HOME|g" api/scripts/io.no8.bandao.legacy-backfill.plist \
+  > ~/Library/LaunchAgents/io.no8.bandao.legacy-backfill.plist
+./api/scripts/legacy_backfill_sync.sh
+launchctl load ~/Library/LaunchAgents/io.no8.bandao.legacy-backfill.plist
+launchctl start io.no8.bandao.legacy-backfill    # verify immediately
+tail ~/Library/Logs/bandao-legacy-backfill.log
+```
+
+**Everything runs from `~/Library/Application Support/bandao-legacy-backfill`,
+not from the repo.** launchd-spawned processes are denied access to the
+external `/Volumes/Backup` disk by macOS TCC (`Operation not permitted`, and
+launchd cannot even create a log file there — `EX_CONFIG`). The sync script
+copies the built binary, `run.sh`, and `.env` into that directory, so
+**re-run it after every rebuild or `.env` change** or the schedule keeps
+using the old copy.
+
+Which Org gets imported comes from `LEGACY_BACKFILL_ORG_ID` in `api/.env`,
+not from the script — this repository is public and a literal org id would
+pin one customer's deployment into it.
+
+Overlapping runs are safe in two ways: `run.sh` takes an atomic `mkdir` lock
+so a slow hour cannot race the next one, and the `--since-days 1` window
+re-imports nothing thanks to the partial unique index on `legacy_source_id`
+(a re-run reports `already present (re-run no-op)`).
+
 ### Version numbering (read before cutting either platform)
 
 `app/pubspec.yaml`'s `version: <name>+<build>` drives **both** platforms:
