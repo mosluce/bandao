@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hourly incremental legacy backfill for one Org.
+
+  Install (plists cannot expand $HOME, so __HOME__ is substituted):
+    sed "s|__HOME__|$HOME|g" api/scripts/io.no8.bandao.legacy-backfill.plist \
+      > ~/Library/LaunchAgents/io.no8.bandao.legacy-backfill.plist
+    ./api/scripts/legacy_backfill_sync.sh
+    launchctl load ~/Library/LaunchAgents/io.no8.bandao.legacy-backfill.plist
+
+  The PATH below must contain cargo's bin dir only because the sync script
+  builds there; the job itself runs a copied binary.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.no8.bandao.legacy-backfill</string>
+
+    <!-- Runs out of the deploy dir, not the repo: launchd is denied access to
+         the external /Volumes/Backup disk by macOS TCC. Refresh the deploy dir
+         with api/scripts/legacy_backfill_sync.sh after every rebuild. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__HOME__/Library/Application Support/bandao-legacy-backfill/run.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__/Library/Application Support/bandao-legacy-backfill</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__HOME__/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>7</integer></dict>
+        <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>7</integer></dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- Logs live under ~/Library/Logs, not next to the repo: launchd cannot
+         create the log file on the external /Volumes/Backup disk (EX_CONFIG). -->
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/bandao-legacy-backfill.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/bandao-legacy-backfill.log</string>
+</dict>
+</plist>
