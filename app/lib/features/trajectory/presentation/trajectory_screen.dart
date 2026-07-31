@@ -180,6 +180,11 @@ List<LatLng> cameraPointsFor(
   }.toList();
 }
 
+/// Matches admin-web's Leaflet `maxZoom: 19` so the two surfaces frame the
+/// same day identically, and so the camera can never settle at a scale where
+/// the light basemap has nothing to draw.
+const double _maxZoom = 19;
+
 class _Map extends StatelessWidget {
   const _Map({
     required this.mergedSeries,
@@ -244,10 +249,19 @@ class _Map extends StatelessWidget {
       children: [
         FlutterMap(
           options: MapOptions(
+            // `maxZoom` is load-bearing, not a nicety. A day spent in one
+            // building puts every point within tens of metres, and an
+            // unclamped fit then zooms until the viewport covers a few metres
+            // — at which scale the CARTO Positron basemap is literally blank
+            // white, so the screen reads as "the map is broken" even though
+            // the path drew correctly. admin-web has always clamped at 19;
+            // this matches it.
+            maxZoom: _maxZoom,
             initialCameraFit: allPoints.length > 1
                 ? CameraFit.bounds(
                     bounds: LatLngBounds.fromPoints(allPoints),
                     padding: const EdgeInsets.all(32),
+                    maxZoom: _maxZoom,
                   )
                 : null,
             initialCenter:
@@ -262,6 +276,7 @@ class _Map extends StatelessWidget {
               // CARTO Positron — free, OSM-attributed.
               urlTemplate:
                   'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+              maxZoom: _maxZoom,
               retinaMode: true,
               userAgentPackageName: 'tw.no8.bandao',
             ),
