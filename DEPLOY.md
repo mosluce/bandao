@@ -435,9 +435,20 @@ on 2026-05-15 — keep these in place for every future build that ships
       App Review credentials grant access to, seed at least one full
       day of location pings so the "我的軌跡" tab has a visible
       polyline. Quickest path: open the app on a real device with
-      the demo creds, tap 上班, drive / walk for a few minutes,
-      tap 下班. Verify in the app that `/trajectory` shows the
-      polyline before submitting.
+      the demo creds, **fill the required 地點 field** (the action
+      buttons stay disabled until you do — since 0.4.3+5 every
+      check-in carries a location label), tap 上班, drive / walk for
+      a few minutes, tap 下班. Verify in the app that `/trajectory`
+      shows the polyline before submitting.
+      **Walk, don't stand still**: pings need 100m of movement AND 60s
+      elapsed, so an indoor shift produces a single coordinate and no
+      visible line — which is exactly what the reviewer would see.
+- [ ] **Reviewer will meet the 地點 field**: a reviewer trying a
+      check-in hits a required field with no obvious value to enter.
+      Either seed a recent label on the demo account first (so the
+      one-tap chips are populated and self-explanatory), or say in the
+      review notes that any text is acceptable there. Untested with a
+      reviewer as of 0.4.3+5.
 - [ ] **App Review notes / message thread**: Paste the full "Reply body"
       of the most recent reply file in
       `app/store_metadata/ios/app_review_replies/` (currently
