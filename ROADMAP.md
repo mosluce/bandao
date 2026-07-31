@@ -37,6 +37,8 @@
 - **[cross]** 即時看板 push：admin-web `/checkin` 目前是 30 秒輪詢。可考慮 SSE / WebSocket 真即時更新。觸發：admin 抱怨延遲或人多時 polling 太重。
 - **[cross]** 多裝置 session 管理 UI：AppUser 可能在多裝置登入；目前沒地方看「我有哪些在線 session」也沒地方一鍵下線他裝置。`app_sessions` 已支援多筆，缺 UI / endpoint。
 - **[app]** 設定頁顯示 version+build：App 目前任何地方都不顯示版本號（沒有 `package_info_plus` 依賴）。TestFlight 上同時掛著多支 build 時，「使用者裝到的是哪一版」只能從 TestFlight 那端猜，除錯時每次都要多繞一輪確認。2026-07-31 就為此誤判過一次：以為 release 與 debug 行為不同，實際只是裝到舊 build。約十行的事。
+- **[app]** Android 端跑一次 secure-storage write-path 硬化：`fix-login-hang-on-storage-write-failure` 把 `SecureStorage` 的寫入／刪除包成 typed failure（0.4.2 只硬化了讀取），但只在 iOS 上驗證過。實務上這是預防性程式碼——那次調查最後確認 keystore 從來沒失敗，真正的元凶是 DTO 不匹配——所以沒有已知觸發條件可以測。觸發：下次動 Android build 或收到 Keystore 相關回報時順手驗。
+- **[cross]** `openspec-archive-change` skill 指到不存在的 skill：`SKILL.md:66` 與 `:113` 要求用 `openspec-sync-specs` 同步 delta spec，但 `.claude/skills/` 只有 apply / archive / explore / propose 四個。2026-07-31 archive 三個 change 時，subagent 自行判斷改成手動套用才沒卡住；保守一點的 agent 會回報「找不到 skill」就停下。修法二選一：補一個 `openspec-sync-specs` skill，或把指引改成直接描述套用步驟。
 - **[infra]** `/readyz` deep health：目前 `/healthz` 只報 process 起來、不打 Mongo。等有監控之後加 `/readyz`，會 ping Mongo + 確認 tailscale 上線；給 SLO / 告警系統用，不影響 deploy 流。
 - **[infra]** Staging 環境：MVP 只開 prod，靠 `git revert` 回滾。哪天人多 / risky 變動多，再開 `staging` 分支 + 第二個 Zeabur project。
 - **[infra]** Backup 升級：daily/ 升級成 daily/ + weekly/ + monthly/ 三層保留，需要 S3 replication 規則或 host 上的 cron 把週末 / 月初的 dump 複製到 weekly/ / monthly/ prefix；目前先只留 30 天 daily。
