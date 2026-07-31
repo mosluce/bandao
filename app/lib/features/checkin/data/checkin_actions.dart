@@ -10,6 +10,7 @@ import '../../auth/state/auth_provider.dart';
 import '../../auth/state/auth_state.dart';
 import '../state/checkin_label_provider.dart';
 import '../state/location_permission_provider.dart';
+import '../state/recent_labels_provider.dart';
 import 'background_sync.dart';
 import 'checkin_queue_db.dart';
 import 'geolocation_service.dart';
@@ -77,6 +78,12 @@ class CheckinActions {
       occurredAtClient: Value(nowOccurredAtClient(now)),
       enqueuedAt: Value(now.toIso8601String()),
     ),);
+
+    // Remember it for the suggestions BEFORE clearing the field. Done
+    // locally rather than by refetching, because the event is still sitting
+    // in the queue — the server cannot offer it back yet, and offline never
+    // would.
+    unawaited(_ref.read(recentLabelsProvider.notifier).remember(label));
 
     // Cleared so the next check-in is labelled deliberately rather than
     // inheriting this one.
