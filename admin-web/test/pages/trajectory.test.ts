@@ -24,7 +24,9 @@ const leafletSpies = vi.hoisted(() => ({
 // async watcher, and the throw is swallowed — the map silently never draws
 // while DOM-presence assertions still pass.
 const leafletModule = {
-  map: vi.fn(() => ({
+  // Typed on the container parameter so `map.mock.calls[i][0]` carries the
+  // element instead of `never` — the date-switch tests assert on it.
+  map: vi.fn((_container?: unknown) => ({
     remove: vi.fn(),
     eachLayer: vi.fn(),
     removeLayer: vi.fn(),
@@ -119,9 +121,28 @@ async function mountPage() {
   const wrapper = await mountSuspended(TrajectoryPage, {
     route: { params: { appUserId: 'u1' }, query: { date: '2026-05-05' } },
   })
+  await settle(wrapper)
+  return wrapper
+}
+
+async function settle(wrapper: Awaited<ReturnType<typeof mountSuspended>>) {
   await new Promise(resolve => setTimeout(resolve, 80))
   await wrapper.vm.$nextTick()
-  return wrapper
+}
+
+/**
+ * Drive the date picker the way an admin does, then let the refetch settle.
+ *
+ * The blank-map bug lived exactly here: the page kept rendering off a
+ * `watch(hasData)` that only fires on a *change*, so a day-with-data →
+ * day-with-data switch left the new container empty until a page reload.
+ */
+async function selectDate(
+  wrapper: Awaited<ReturnType<typeof mountSuspended>>,
+  date: string,
+) {
+  await wrapper.find('input[name="date-picker"]').setValue(date)
+  await settle(wrapper)
 }
 
 /** The [lat,lng] pairs the page passed to L.polyline, in call order. */
@@ -132,6 +153,23 @@ function drawnSegments(): [number, number][][] {
 /** The [lat,lng] pairs the page passed to L.circleMarker, in call order. */
 function drawnMarkers(): [number, number][] {
   return leafletSpies.circleMarker.mock.calls.map(c => c[0])
+}
+
+/**
+ * The heart of the blank-map regression: the Leaflet instance must be bound to
+ * the container element that is *currently* in the document.
+ *
+ * Drawn-geometry assertions alone cannot catch the bug — the old code happily
+ * called `L.polyline` with the new day's coordinates, it just fed them to a map
+ * whose container Vue had already unmounted. Only comparing the element the map
+ * was built against with the live one distinguishes the two.
+ */
+function expectMapBoundToLiveContainer(
+  wrapper: Awaited<ReturnType<typeof mountSuspended>>,
+) {
+  const liveEl = wrapper.find('[data-testid="trajectory-map"]').element
+  const builtAgainst = leafletModule.map.mock.calls.at(-1)?.[0]
+  expect(builtAgainst).toBe(liveEl)
 }
 
 describe('Trajectory page', () => {
@@ -150,16 +188,21 @@ describe('Trajectory page', () => {
 
     expect(wrapper.text()).toContain('該日無軌跡資料')
     expect(wrapper.find('[data-testid="trajectory-empty"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="trajectory-map"]').exists()).toBe(false)
+    // The container is permanently mounted now — unmounting it is what left
+    // Leaflet bound to a detached node. "No map" means Leaflet was never
+    // instantiated, not that the element is absent.
+    expect(wrapper.find('[data-testid="trajectory-map"]').exists()).toBe(true)
     expect(leafletModule.map).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="trajectory-legend"]').exists()).toBe(false)
   })
 
-  it('mounts map container when pings are present', async () => {
+  it('instantiates Leaflet when pings are present', async () => {
     resolvePings([ping('p1', '2026-05-05T10:00:00+08:00', 25.04, 121.55)])
     const wrapper = await mountPage()
 
     expect(wrapper.find('[data-testid="trajectory-empty"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="trajectory-map"]').exists()).toBe(true)
+    expect(leafletModule.map).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="trajectory-legend"]').exists()).toBe(true)
   })
 
   it('fetches events range-scoped to the resolved day, not as an unranged page', async () => {
@@ -195,9 +238,9 @@ describe('Trajectory page', () => {
       event('e_in', 'clock_in', '2026-05-05T08:00:00+08:00', 25.00, 121.00),
       event('e_out', 'clock_out', '2026-05-05T17:00:00+08:00', 25.50, 121.50),
     ])
-    const wrapper = await mountPage()
+    await mountPage()
 
-    expect(wrapper.find('[data-testid="trajectory-map"]').exists()).toBe(true)
+    expect(leafletModule.map).toHaveBeenCalledTimes(1)
     const segments = drawnSegments()
     expect(segments).toHaveLength(1)
     expect(segments[0]).toEqual([[25.00, 121.00], [25.50, 121.50]])
@@ -207,7 +250,7 @@ describe('Trajectory page', () => {
     resolveEvents([event('e_in', 'clock_in', '2026-05-05T08:00:00+08:00', 25.00, 121.00)])
     const wrapper = await mountPage()
 
-    expect(wrapper.find('[data-testid="trajectory-map"]').exists()).toBe(true)
+    expect(leafletModule.map).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="trajectory-empty"]').exists()).toBe(false)
     expect(drawnSegments()).toHaveLength(0)
     expect(drawnMarkers()).toEqual([[25.00, 121.00]])
@@ -240,5 +283,70 @@ describe('Trajectory page', () => {
     await mountPage()
 
     expect(drawnSegments()).toHaveLength(1)
+  })
+
+  describe('changing the date', () => {
+    function dayA() {
+      return [
+        event('a_in', 'clock_in', '2026-05-05T08:00:00+08:00', 25.00, 121.00),
+        event('a_out', 'clock_out', '2026-05-05T17:00:00+08:00', 25.50, 121.50),
+      ]
+    }
+
+    function dayB() {
+      return [
+        event('b_in', 'clock_in', '2026-05-06T08:00:00+08:00', 24.00, 120.00),
+        event('b_out', 'clock_out', '2026-05-06T17:00:00+08:00', 24.50, 120.50),
+      ]
+    }
+
+    it('redraws when both the old and the new date have data', async () => {
+      resolveEvents(dayA())
+      const wrapper = await mountPage()
+      expect(drawnSegments()).toHaveLength(1)
+
+      leafletSpies.polyline.mockClear()
+      leafletSpies.circleMarker.mockClear()
+      resolveEvents(dayB())
+      await selectDate(wrapper, '2026-05-06')
+
+      expect(drawnSegments()).toEqual([[[24.00, 120.00], [24.50, 120.50]]])
+      expect(drawnMarkers()).toEqual([[24.00, 120.00], [24.50, 120.50]])
+      // The retained instance is reused, not rebuilt against a new container.
+      expect(leafletModule.map).toHaveBeenCalledTimes(1)
+      expectMapBoundToLiveContainer(wrapper)
+    })
+
+    it('recovers after stepping onto a date with zero merged points', async () => {
+      resolveEvents(dayA())
+      const wrapper = await mountPage()
+
+      resolveEvents([])
+      await selectDate(wrapper, '2026-05-06')
+      expect(wrapper.find('[data-testid="trajectory-empty"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="trajectory-legend"]').exists()).toBe(false)
+
+      leafletSpies.polyline.mockClear()
+      resolveEvents(dayB())
+      await selectDate(wrapper, '2026-05-07')
+
+      expect(wrapper.find('[data-testid="trajectory-empty"]').exists()).toBe(false)
+      expect(drawnSegments()).toEqual([[[24.00, 120.00], [24.50, 120.50]]])
+      expect(leafletModule.map).toHaveBeenCalledTimes(1)
+      expectMapBoundToLiveContainer(wrapper)
+    })
+
+    it('renders the next date after a failed fetch', async () => {
+      listMock.mockImplementation(() => Promise.reject(new Error('網路錯誤')))
+      const wrapper = await mountPage()
+      expect(wrapper.text()).toContain('網路錯誤')
+
+      resolvePings([])
+      resolveEvents(dayB())
+      await selectDate(wrapper, '2026-05-06')
+
+      expect(wrapper.text()).not.toContain('網路錯誤')
+      expect(drawnSegments()).toEqual([[[24.00, 120.00], [24.50, 120.50]]])
+    })
   })
 })

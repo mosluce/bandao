@@ -1,8 +1,5 @@
-# admin-trajectory-dashboard Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-location-tracking-dashboard. Update Purpose after archive.
-## Requirements
 ### Requirement: Trajectory page renders one AppUser's daily polyline + event markers
 
 The admin-web SHALL provide a route `/checkin/:appUserId/trajectory` accepting an optional `?date=YYYY-MM-DD` query parameter. When `date` is absent the page SHALL default to the current calendar date in the active Org's timezone. The page SHALL convert the `date` parameter to an RFC3339 range covering that calendar day in the active Org's timezone (`from = <date>T00:00:00<tz_offset>`, `to = <next date>T00:00:00<tz_offset>`) before requesting data.
@@ -137,44 +134,3 @@ The `?date=` URL parameter and the date input SHALL stay in sync — selecting a
 - **GIVEN** a fetch for a date failed and the error overlay is displayed
 - **WHEN** the admin selects a date whose fetch succeeds with a non-zero merged point count
 - **THEN** the error overlay is dismissed and that day's path and markers render
-### Requirement: Org settings page exposes location_tracking_enabled toggle
-
-The admin-web Org settings UI on `/` SHALL include a toggle for `location_tracking_enabled` immediately following the existing `transfer_enabled` toggle. The toggle SHALL display the current value from `auth.currentOrg.value.checkin.location_tracking_enabled` and SHALL submit its inverse via `PATCH /orgs/me/settings` when changed. While the request is in flight the toggle SHALL be disabled. When the server responds with `STATE_LOCKED` the UI SHALL display a localized error: `目前有 App 使用者在班，需先全部下班才能調整此設定`.
-
-#### Scenario: Toggle reflects current Org setting
-
-- **WHEN** an admin lands on `/` and `Org.checkin.location_tracking_enabled` is true
-- **THEN** the toggle is rendered checked
-
-#### Scenario: Successful toggle update
-
-- **WHEN** an admin clicks the toggle from on to off
-- **AND** no AppUser is on shift
-- **THEN** the page sends `PATCH /orgs/me/settings { "location_tracking_enabled": false }`
-- **AND** the toggle reflects the new value on success
-
-#### Scenario: STATE_LOCKED shows localized error
-
-- **WHEN** an admin clicks the toggle while at least one AppUser is on shift
-- **THEN** the API returns `STATE_LOCKED`
-- **AND** the page displays `目前有 App 使用者在班，需先全部下班才能調整此設定`
-
-### Requirement: Trajectory page provides xlsx export entry point
-
-The trajectory page SHALL include an export action that opens a date-range selector. After the admin picks `from` and `to` and confirms, the page SHALL trigger a browser download by navigating to `GET /checkin/users/:id/locations/export?from=&to=` (cookie auth carries via the same-origin / SameSite=Lax navigation). The page SHALL pre-validate the range client-side: rejecting empty values, `to < from`, and span > 90 days with localized inline messages so the most common errors do not require a server round-trip.
-
-#### Scenario: Valid export triggers download
-
-- **WHEN** an admin enters a valid `from` / `to` range and confirms
-- **THEN** the browser navigates to the export URL with the cookie session
-- **AND** the response downloads as `bandao-locations-<username>-<from>-<to>.xlsx`
-
-#### Scenario: Span > 90 days rejected client-side
-
-- **WHEN** the admin selects a `from` / `to` range exceeding 90 days
-- **THEN** the page shows an inline error and does NOT issue the export request
-
-#### Scenario: to before from rejected client-side
-
-- **WHEN** the admin selects `to` earlier than `from`
-- **THEN** the page shows an inline error and does NOT issue the export request

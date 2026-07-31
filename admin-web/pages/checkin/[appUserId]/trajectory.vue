@@ -42,6 +42,10 @@ const events = ref<CheckinEventDto[]>([])
 const mapContainer = ref<HTMLElement | null>(null)
 let mapInstance: any = null
 let leaflet: any = null
+// A single in-flight creation promise. Two quick date switches can both reach
+// `ensureMap` before the dynamic `import('leaflet')` resolves; without this the
+// second would build a second map over the first one's container.
+let mapInit: Promise<void> | null = null
 
 // The day's polyline vertices: pings plus genuine checkin coordinates, in
 // contract order. The clock-in needs no special anchor role any more — with
@@ -120,46 +124,70 @@ async function ensureLeaflet() {
   return leaflet
 }
 
-watch(hasData, async (next) => {
-  if (next) {
-    await nextTick()
-    await renderMap()
+// Drawing is a function of the current data, not of a `hasData` transition.
+// The old `watch(hasData)` only fired when the flag flipped, so moving between
+// two days that both had data never re-rendered the map.
+watch([mergedSeries, events], async () => {
+  if (!hasData.value) {
+    clearLayers()
+    return
   }
-  else {
-    teardownMap()
+  await nextTick()
+  try {
+    await ensureMap()
   }
+  catch {
+    error.value = '地圖載入失敗'
+    return
+  }
+  redrawLayers()
 })
 
-watch([pings, events], async () => {
-  if (hasData.value && mapInstance) {
-    redrawLayers()
+/**
+ * Ensure a Leaflet instance exists for the mounted container.
+ *
+ * Instantiation stays lazy — a day with zero merged points must not pull the
+ * Leaflet bundle or fetch tiles — but once created the map is retained until
+ * the page unmounts. Stepping onto an empty day clears the layers instead of
+ * destroying the map, so stepping back off it needs no re-initialization.
+ */
+function ensureMap(): Promise<void> {
+  if (mapInstance) return Promise.resolve()
+  if (!mapInit) {
+    mapInit = createMap().catch((err) => {
+      // Let the next data change retry rather than wedging the page.
+      mapInit = null
+      throw err
+    })
   }
-}, { deep: false })
+  return mapInit
+}
 
-async function renderMap() {
-  if (!mapContainer.value) return
+async function createMap() {
   const L = await ensureLeaflet()
-  if (mapInstance) {
-    mapInstance.remove()
-    mapInstance = null
-  }
+  if (!mapContainer.value) throw new Error('trajectory map container is not mounted')
   mapInstance = L.map(mapContainer.value)
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OpenStreetMap contributors © CARTO',
   }).addTo(mapInstance)
-  redrawLayers()
 }
 
-function redrawLayers() {
+/** Remove the drawn polyline / markers, keeping the tile layer. */
+function clearLayers() {
   if (!mapInstance || !leaflet) return
   const L = leaflet
-  // Remove existing polyline / markers (cheap: clear all non-tile layers).
   mapInstance.eachLayer((layer: any) => {
     if (!(layer instanceof L.TileLayer)) {
       mapInstance.removeLayer(layer)
     }
   })
+}
+
+function redrawLayers() {
+  if (!mapInstance || !leaflet) return
+  const L = leaflet
+  clearLayers()
 
   const sorted = mergedSeries.value
   const points: [number, number][] = sorted.map(p => [p.lat, p.lng])
@@ -216,6 +244,7 @@ function teardownMap() {
     mapInstance.remove()
     mapInstance = null
   }
+  mapInit = null
 }
 
 onBeforeUnmount(teardownMap)
@@ -319,45 +348,23 @@ if (auth.currentOrg.value) {
         </div>
       </header>
 
-      <div
-        v-if="loading"
-        class="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500"
-      >
-        載入軌跡中...
-      </div>
-
-      <div
-        v-else-if="error"
-        class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-      >
-        {{ error }}
-      </div>
-
-      <div
-        v-else-if="!hasData"
-        class="rounded-xl border border-slate-200 bg-white p-12 text-center"
-        data-testid="trajectory-empty"
-      >
-        <p class="text-sm text-slate-600">
-          該日無軌跡資料
-        </p>
-        <button
-          type="button"
-          class="mt-3 text-sm text-slate-700 hover:text-slate-900 underline"
-          @click="focusDatePicker"
-        >
-          換日期
-        </button>
-      </div>
-
-      <div v-else class="relative rounded-xl border border-slate-200 overflow-hidden">
+      <!--
+        The map container stays mounted for the page's lifetime; loading, error
+        and empty are overlays on top of it. Putting the container inside a
+        v-if chain unmounted it whenever `loading` flipped, which left the
+        Leaflet instance bound to a detached node while the freshly created
+        container stayed blank until a page reload.
+      -->
+      <div class="relative rounded-xl border border-slate-200 overflow-hidden">
         <div
           ref="mapContainer"
           class="h-[600px] w-full"
           data-testid="trajectory-map"
         />
-        <!-- Color → time legend for the time-of-day path coloring. -->
+        <!-- Color → time legend for the time-of-day path coloring. Gated on
+             having data so it never floats over an empty or errored surface. -->
         <div
+          v-if="hasData && !error"
           class="absolute bottom-3 left-3 z-[1000] rounded-md bg-white/90 px-2 py-1.5 shadow"
           data-testid="trajectory-legend"
         >
@@ -368,6 +375,42 @@ if (auth.currentOrg.value) {
           <div class="mt-0.5 flex w-40 justify-between text-[10px] text-slate-600">
             <span>6:00</span><span>12:00</span><span>18:00</span><span>22:00</span>
           </div>
+        </div>
+
+        <!-- State overlays sit above Leaflet's panes (controls top out at
+             z-index 800) and the legend, and below the export modal (1100).
+             Loading is translucent so a date change dims the previous day
+             instead of flashing the whole card away; error and empty are
+             opaque because their layers have already been cleared. -->
+        <div
+          v-if="loading"
+          class="absolute inset-0 z-[1010] flex items-center justify-center bg-white/80 text-sm text-slate-500"
+        >
+          載入軌跡中...
+        </div>
+
+        <div
+          v-else-if="error"
+          class="absolute inset-0 z-[1010] flex items-center justify-center bg-red-50 p-4 text-center text-sm text-red-700"
+        >
+          {{ error }}
+        </div>
+
+        <div
+          v-else-if="!hasData"
+          class="absolute inset-0 z-[1010] flex flex-col items-center justify-center bg-white p-12 text-center"
+          data-testid="trajectory-empty"
+        >
+          <p class="text-sm text-slate-600">
+            該日無軌跡資料
+          </p>
+          <button
+            type="button"
+            class="mt-3 text-sm text-slate-700 hover:text-slate-900 underline"
+            @click="focusDatePicker"
+          >
+            換日期
+          </button>
         </div>
       </div>
     </div>
