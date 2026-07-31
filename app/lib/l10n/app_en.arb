@@ -37,5 +37,17 @@
   "sessionNotPersistedNotice": "Could not save your sign-in. You will need to log in again next time you open the app.",
   "@sessionNotPersistedNotice": {
     "description": "Shown after a login whose bearer token could not be persisted to the platform keystore."
+  },
+  "checkinLabelTitle": "Location",
+  "@checkinLabelTitle": {
+    "description": "Check-in location label field."
+  },
+  "checkinLabelHint": "Type or pick a location",
+  "@checkinLabelHint": {
+    "description": "Check-in location label field."
+  },
+  "labelRequired": "Enter a location first",
+  "@labelRequired": {
+    "description": "Check-in location label field."
   }
 }

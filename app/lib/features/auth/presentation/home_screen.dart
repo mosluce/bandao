@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../checkin/presentation/background_sync_tip.dart';
+import '../../checkin/presentation/checkin_label_field.dart';
 import '../../checkin/presentation/home_buttons.dart';
 import '../../checkin/presentation/location_permission_blocker.dart';
 import '../../checkin/presentation/queue_chip.dart';
@@ -216,6 +217,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           const SizedBox(height: 8),
                           const LocationPermissionBlocker(),
                           const SizedBox(height: 16),
+                          // Directly above the buttons: the label must be
+                          // supplied before the press, which is what keeps
+                          // the tap→enqueue path free of any dialog.
+                          const CheckinLabelField(),
+                          const SizedBox(height: 12),
                           const HomeButtons(),
                           const SizedBox(height: 16),
                           const TodaySummaryCard(),

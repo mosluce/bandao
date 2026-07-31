@@ -37,5 +37,17 @@
   "sessionNotPersistedNotice": "無法儲存登入狀態，下次開啟 App 需要重新登入",
   "@sessionNotPersistedNotice": {
     "description": "Shown after a login whose bearer token could not be persisted to the platform keystore."
+  },
+  "checkinLabelTitle": "地點",
+  "@checkinLabelTitle": {
+    "description": "Check-in location label field."
+  },
+  "checkinLabelHint": "輸入或選擇地點",
+  "@checkinLabelHint": {
+    "description": "Check-in location label field."
+  },
+  "labelRequired": "請先填寫地點",
+  "@labelRequired": {
+    "description": "Check-in location label field."
   }
 }

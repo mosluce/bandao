@@ -23,6 +23,34 @@ class HistoryScreen extends ConsumerStatefulWidget {
   ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
 }
 
+/// The location line for one history row: what the worker wrote, then where
+/// the server placed them.
+///
+/// Showing only the region discards the label — which for every imported
+/// record is the more meaningful half, since it names the customer or site
+/// rather than the street. Falls back through label-only and region-only to
+/// raw coordinates.
+///
+/// A not-yet-synced row has a label (typed on this device) but no region
+/// (the server geocodes on receipt), so it lands in the label-only case and
+/// gains the region once it syncs.
+String formatLocationLine({
+  required String? manualLabel,
+  required String? regionName,
+  required double lat,
+  required double lng,
+}) {
+  final label = manualLabel?.trim();
+  final region = regionName?.trim();
+  final hasLabel = label != null && label.isNotEmpty;
+  final hasRegion = region != null && region.isNotEmpty;
+
+  if (hasLabel && hasRegion) return '$label, $region';
+  if (hasLabel) return label;
+  if (hasRegion) return region;
+  return '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
+}
+
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final List<CheckinEventDto> _serverEvents = <CheckinEventDto>[];
   bool _loading = false;
@@ -192,11 +220,19 @@ class _HistoryRow extends ConsumerWidget {
     final (badgeLabel, badgeColor) = _badgeStyle(status, l10n, scheme);
 
     final locationLabel = isLocal
-        ? '${entry.local!.lat.toStringAsFixed(4)}, ${entry.local!.lng.toStringAsFixed(4)}'
-        : (entry.server!.location.regionName?.isNotEmpty ?? false
-            ? entry.server!.location.regionName!
-            : '${entry.server!.location.coordinates.lat.toStringAsFixed(4)}, '
-                '${entry.server!.location.coordinates.lng.toStringAsFixed(4)}');
+        ? formatLocationLine(
+            manualLabel: entry.local!.manualLabel,
+            // A local row has no region yet — the server geocodes on receipt.
+            regionName: null,
+            lat: entry.local!.lat,
+            lng: entry.local!.lng,
+          )
+        : formatLocationLine(
+            manualLabel: entry.server!.location.manualLabel,
+            regionName: entry.server!.location.regionName,
+            lat: entry.server!.location.coordinates.lat,
+            lng: entry.server!.location.coordinates.lng,
+          );
 
     return Container(
       padding: const EdgeInsets.all(12),
