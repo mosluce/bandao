@@ -386,11 +386,41 @@ flutter build appbundle --release
 The signed `.aab` lands at
 `app/build/app/outputs/bundle/release/app-release.aab`.
 
-Upload via Play Console → Internal Testing → Create new release →
-upload the `.aab`. Paste the relevant
-`app/store_metadata/android/changelog/<versionCode>.txt` entry into
-the release notes field. Promote Internal → Closed → Production after
-smoke; review can take 1–7 days for first submission.
+Upload with:
+
+```bash
+export PLAY_JSON_KEY=~/.bandao/keystores/<project>-<id>.json
+./scripts/upload_android.sh              # internal track
+./scripts/upload_android.sh --dry-run    # validate credentials only
+```
+
+The script reads `versionCode` out of the bundle itself — not out of
+`pubspec.yaml`, which may have moved on since the build — finds the
+matching `store_metadata/android/changelog/<versionCode>.txt`, and refuses
+to upload when that file is missing so nothing reaches testers with an
+empty "what's new".
+
+It defaults to `internal` and demands typed confirmation for any other
+track. Promote Internal → Closed → Production from the Play Console after
+smoke; review can take 1–7 days for a first submission. Promotion stays
+manual on purpose: deciding a build is fit for real users is a judgement,
+not a step.
+
+One-time operator setup is documented at the top of the script. Two parts
+are easy to miss because they are independent of each other: the
+**Google Play Android Developer API** must be enabled in the GCP project
+(otherwise 403 `SERVICE_DISABLED` even with valid credentials), and the
+service account is granted access via Play Console → **Users and
+permissions** at the top level — the Developer account settings page no
+longer carries an "API access" entry. Verify the whole chain with:
+
+```bash
+fastlane run validate_play_store_json_key json_key:<path>
+# → Successfully established connection to Google Play Store.
+```
+
+Manual fallback: Play Console → Internal Testing → Create new release →
+upload the `.aab` and paste the changelog file's contents.
 
 ### Cut iOS (.ipa)
 
