@@ -19,10 +19,17 @@ class SecureStorageKeys {
       'bandao.location_tracking.last_clean_stop';
   static const String privacyUrlOverride = 'dev.privacy_url_override';
 
-  /// The AppUser's recent check-in labels, JSON-encoded. Cached so the
-  /// suggestions survive going offline — a worker out of signal still has to
-  /// label their check-in, and the list is otherwise derived from a fetch.
-  static const String recentCheckinLabels = 'checkin.recent_labels';
+  /// One AppUser's recent check-in labels, JSON-encoded — formatted as
+  /// `checkin.recent_labels.<app_user_id>`. Cached so the suggestions survive
+  /// going offline: a worker out of signal still has to label their check-in,
+  /// and the list is otherwise derived from a fetch.
+  ///
+  /// Keyed per AppUser, NOT device-wide. A single shared key leaked one
+  /// worker's site names to whoever logged in next on the same device —
+  /// these are customer names, and device sharing is an expected pattern
+  /// here (it is why `wipeForOtherUsers` exists for the event queue).
+  static String recentCheckinLabelsKey(String appUserId) =>
+      'checkin.recent_labels.$appUserId';
 
   /// Per-AppUser consent flag — formatted as
   /// `bandao.location_tracking.consent.<app_user_id>`.
@@ -270,11 +277,11 @@ class SecureStorage {
         'true',
       );
 
-  Future<String?> readRecentCheckinLabels() =>
-      _safeRead(SecureStorageKeys.recentCheckinLabels);
+  Future<String?> readRecentCheckinLabels(String appUserId) =>
+      _safeRead(SecureStorageKeys.recentCheckinLabelsKey(appUserId));
 
-  Future<void> writeRecentCheckinLabels(String json) =>
-      _safeWrite(SecureStorageKeys.recentCheckinLabels, json);
+  Future<void> writeRecentCheckinLabels(String appUserId, String json) =>
+      _safeWrite(SecureStorageKeys.recentCheckinLabelsKey(appUserId), json);
 
   Future<String?> readPrivacyUrlOverride() =>
       _safeRead(SecureStorageKeys.privacyUrlOverride);
