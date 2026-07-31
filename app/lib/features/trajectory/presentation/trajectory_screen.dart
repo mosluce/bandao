@@ -155,6 +155,31 @@ class _Body extends StatelessWidget {
   }
 }
 
+/// Distinct coordinates the camera must keep in view: the polyline's vertices
+/// plus every event marker, **deduplicated**.
+///
+/// Deduplication is load-bearing, not tidiness. Since the merged series
+/// carries the checkin coordinates, an event contributes the same `LatLng`
+/// twice — once as a vertex, once as a marker. A day with a clock-in and no
+/// pings yet therefore holds two entries at one place, and fitting a
+/// zero-area bounds makes flutter_map compute an infinite zoom, which
+/// `TileLayer` throws on: `UnsupportedError: Infinity or NaN toInt`.
+///
+/// That is the state every shift passes through between clocking in and the
+/// first ping clearing the 100m/60s filter, so it is a path every user hits.
+@visibleForTesting
+List<LatLng> cameraPointsFor(
+  List<MergedPoint> series,
+  List<CheckinEventDto> events,
+) {
+  return <LatLng>{
+    ...series.map((p) => LatLng(p.lat, p.lng)),
+    ...events.map(
+      (e) => LatLng(e.location.coordinates.lat, e.location.coordinates.lng),
+    ),
+  }.toList();
+}
+
 class _Map extends StatelessWidget {
   const _Map({
     required this.mergedSeries,
@@ -203,7 +228,17 @@ class _Map extends StatelessWidget {
         .toList();
 
     // Everything to keep in view: the path + the event markers.
-    final allPoints = <LatLng>[...points, ...eventPoints];
+    //
+    // Deduplicated, and the camera decision keys off DISTINCT coordinates
+    // rather than list length. Since the merged series carries the checkin
+    // coordinates, an event contributes the same LatLng twice — once as a
+    // vertex, once as a marker. A day with a clock-in and no pings yet
+    // therefore has two entries at one place, and fitting a zero-area bounds
+    // makes flutter_map compute an infinite zoom:
+    //   `UnsupportedError: Infinity or NaN toInt` from TileLayer.
+    // That is the state every shift passes through between clocking in and
+    // the first ping clearing the 100m/60s filter.
+    final allPoints = cameraPointsFor(mergedSeries, events);
 
     return Stack(
       children: [
