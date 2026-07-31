@@ -6,6 +6,7 @@
 # Combines what `upload_ios.sh` does (operator-facing API key handling)
 # with the missing pieces from a previous failed flow:
 #   - bumping +<build> in pubspec.yaml so Apple accepts the upload
+#     (the same counter is Android's versionCode; it never resets)
 #   - passing --dart-define=API_BASE_URL so the .ipa actually points at
 #     prod (without it, Env.compileTimeDefault falls back to localhost
 #     and TestFlight users can't log in)
@@ -19,7 +20,8 @@
 # Common usage (defaults: bump +build, target prod, upload):
 #   ./scripts/release_ios.sh
 #
-# Bump marketing version too (e.g. 0.3.0 → 0.4.0, build resets to 1):
+# Bump marketing version too (e.g. 0.3.0 → 0.4.0). The build number keeps
+# climbing — it never resets, because it doubles as Android's versionCode:
 #   ./scripts/release_ios.sh --name 0.4.0
 #
 # Re-cut same version+build (e.g. previous upload was rejected by Apple
@@ -49,7 +51,9 @@ the prod API URL baked in, then uploads to App Store Connect via
 `xcrun altool`.
 
 Options:
-  --name X.Y.Z         Set marketing version (also resets build to 1).
+  --name X.Y.Z         Set marketing version. The build number still just
+                       increments — it never resets (it is Android's
+                       versionCode, which must climb globally).
   --no-bump            Don't change pubspec.yaml at all (use existing
                        version+build). Useful when retrying a rejected
                        upload before Apple processed it.
@@ -107,9 +111,13 @@ fi
 
 if [[ -n "$NEW_NAME" ]]; then
   TARGET_NAME="$NEW_NAME"
-  # When marketing version changes, reset build to 1 unless --no-bump.
+  # The build number keeps climbing across a marketing bump — it does NOT
+  # reset. It is Android's `versionCode` too, and Play requires that to
+  # increase globally and forever; a reset makes every subsequent upload
+  # rejected outright. Apple only needs it to increase within one marketing
+  # version, so the stricter rule wins. See DEPLOY.md "Version numbering".
   if [[ $BUMP_BUILD -eq 1 ]]; then
-    TARGET_BUILD=1
+    TARGET_BUILD=$((CURRENT_BUILD + 1))
   else
     TARGET_BUILD="$CURRENT_BUILD"
   fi

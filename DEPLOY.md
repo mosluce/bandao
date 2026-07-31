@@ -340,6 +340,40 @@ the change ships). This section is the operator's quick-reference card.
 4. Tag the merge commit: `git tag app-v<name> && git push --tags`. The
    tag is purely for audit — no CI hooks off it.
 
+### Version numbering (read before cutting either platform)
+
+`app/pubspec.yaml`'s `version: <name>+<build>` drives **both** platforms:
+`<name>` becomes the marketing version and `<build>` becomes iOS
+`CFBundleVersion` and Android `versionCode`.
+
+**The build number is monotonic and NEVER resets, including when the
+marketing version bumps.** It is a single counter shared by both stores.
+
+```
+0.3.0+4 → 0.3.0+7 → 0.3.1+8 → 0.4.0+10 → 0.4.1+11 → 0.4.2+12 → 0.4.3+13
+                                  ↑ marketing bumped, build kept climbing
+```
+
+The two platforms have different tolerances, and the strict one wins:
+
+| | Requirement |
+|---|---|
+| iOS | `CFBundleVersion` must increase within one marketing version. Resetting on a new version string is legal. |
+| Android | `versionCode` must increase **globally**, forever. Play rejects any upload whose code was already used. |
+
+So a reset is fine for Apple and fatal for Google. Always follow the
+Android rule.
+
+**This has bitten once.** On 2026-07-31 the 0.4.3 train was started at
+`+1` while Play already had `versionCode 12`, so five builds were cut
+that Play would have rejected outright. Caught before upload; the train
+was renumbered to `+13`. Note that `scripts/release_ios.sh --bump-version`
+resets the build to 1 by design — do not use it, or fix the pubspec by
+hand afterwards.
+
+When a release ships to both stores, cut both from the **same** build
+number so one number identifies one binary pair.
+
 ### Cut Android (.aab)
 
 ```bash
