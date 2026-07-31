@@ -199,3 +199,22 @@ A local queue row SHALL show its label immediately, since the worker supplied it
 - **AND** the queue row is deleted per the strict-serialization rule
 - **THEN** the history view continues to show one row at `09:30` with the badge `synced` (or `已上傳`)
 - **AND** the row carries the server's `region_name` once the server has reverse-geocoded it
+
+#### Scenario: Recently-synced event is de-duplicated when a server fetch returns it
+
+- **WHEN** an event at `09:30` is in the recently-synced cache
+- **AND** the user taps `[載入更多]` and the next server page contains an event with the same `id` at `09:30`
+- **THEN** the history view shows exactly one row at `09:30` (no duplicate)
+- **AND** the row carries the server-fetched values (region name, server timestamp, etc.)
+
+#### Scenario: Failed row renders with error and dismiss controls
+
+- **WHEN** a queue row has `status = failed`, `last_error_code = "INVALID_TRANSITION"`, `last_error_message = "cannot clock_in from on_site"`
+- **THEN** the history row shows the badge `failed`, the inline message `INVALID_TRANSITION`, and the friendly Chinese `cannot clock_in from on_site` (or its mapped translation)
+- **AND** a `[複製細節]` action and a `[關閉]` action are visible
+
+#### Scenario: Load more only fetches server pages
+
+- **WHEN** the user taps `[載入更多]` while 1 local pending row and 50 synced rows are visible
+- **THEN** the next 50 server rows are appended (using the oldest currently-displayed server row's `occurred_at_client` as the `before` cursor)
+- **AND** the local pending row remains in place above them

@@ -370,6 +370,25 @@ A local queue row SHALL show its label immediately, since the worker supplied it
 - **THEN** the history view continues to show one row at `09:30` with the badge `synced` (or `已上傳`)
 - **AND** the row carries the server's `region_name` once the server has reverse-geocoded it
 
+#### Scenario: Recently-synced event is de-duplicated when a server fetch returns it
+
+- **WHEN** an event at `09:30` is in the recently-synced cache
+- **AND** the user taps `[載入更多]` and the next server page contains an event with the same `id` at `09:30`
+- **THEN** the history view shows exactly one row at `09:30` (no duplicate)
+- **AND** the row carries the server-fetched values (region name, server timestamp, etc.)
+
+#### Scenario: Failed row renders with error and dismiss controls
+
+- **WHEN** a queue row has `status = failed`, `last_error_code = "INVALID_TRANSITION"`, `last_error_message = "cannot clock_in from on_site"`
+- **THEN** the history row shows the badge `failed`, the inline message `INVALID_TRANSITION`, and the friendly Chinese `cannot clock_in from on_site` (or its mapped translation)
+- **AND** a `[複製細節]` action and a `[關閉]` action are visible
+
+#### Scenario: Load more only fetches server pages
+
+- **WHEN** the user taps `[載入更多]` while 1 local pending row and 50 synced rows are visible
+- **THEN** the next 50 server rows are appended (using the oldest currently-displayed server row's `occurred_at_client` as the `before` cursor)
+- **AND** the local pending row remains in place above them
+
 ### Requirement: Failed rows are user-cancellable; pending and sending are not
 
 The system SHALL, on the `failed` row's `[關閉]` action, delete the row from `pending_events`. The system SHALL NOT provide any user-driven cancellation for rows in `pending` or `sending` state — those rows can only leave the queue by being submitted (`201` → deleted) or transitioning to `failed`. The `[複製細節]` action SHALL place a plaintext blob on the system clipboard containing `event_id` (synthesized from queue id), `event_type`, `occurred_at_client`, lat/lng with optional accuracy, `attempts`, `last_error_code`, `last_error_message`, `last_attempt_at`, and `app_user_id`.
