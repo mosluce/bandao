@@ -33,5 +33,9 @@
   "serverConnectionCustom": "目前連線：自訂 {host}",
   "splashRetry": "重試",
   "splashLogout": "登出",
-  "splashNetworkMessage": "無法連線伺服器，請稍後再試。"
+  "splashNetworkMessage": "無法連線伺服器，請稍後再試。",
+  "sessionNotPersistedNotice": "無法儲存登入狀態，下次開啟 App 需要重新登入",
+  "@sessionNotPersistedNotice": {
+    "description": "Shown after a login whose bearer token could not be persisted to the platform keystore."
+  }
 }

@@ -72,6 +72,37 @@ void main() {
 
     expect(loginCalled, isTrue);
   });
+
+  // The regression guard. An unexpected (non-ApiException) failure used to
+  // escape while the router had already replaced this screen with /splash, so
+  // every `catch` here hit `if (!mounted) return;` and discarded the error —
+  // leaving the user on an endless spinner. The screen now stays mounted, so
+  // it must actually render the failure and re-enable the button.
+  testWidgets('an unexpected failure shows an error and re-enables submit',
+      (tester) async {
+    final notifier = FakeAuthNotifier(
+      const AsyncValue<AuthState>.data(AuthState.unauthenticated()),
+    )..onLogin = () => throw StateError('keystore exploded');
+    await _pump(tester, notifier: notifier);
+
+    await tester.enterText(find.byKey(const Key('login.org_code')), 'ORG');
+    await tester.enterText(find.byKey(const Key('login.username')), 'alice');
+    await tester.enterText(find.byKey(const Key('login.password')), 'pass1234');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('login.submit')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(AppLocalizations(const Locale('zh', 'TW')).errorGeneric),
+      findsOneWidget,
+      reason: 'the failure must reach the screen, not be silently dropped',
+    );
+    expect(
+      _isEnabled(tester, find.byKey(const Key('login.submit'))),
+      isTrue,
+      reason: 'the user must be able to try again',
+    );
+  });
 }
 
 bool _isEnabled(WidgetTester tester, Finder f) {

@@ -9,6 +9,7 @@ import 'package:bandao_app/core/api/models/org.dart';
 import 'package:bandao_app/core/storage/secure_storage.dart';
 import 'package:bandao_app/features/auth/data/auth_repository.dart';
 import 'package:bandao_app/features/auth/state/auth_provider.dart';
+import 'package:bandao_app/features/auth/state/session_notice_provider.dart';
 import 'package:bandao_app/features/auth/state/auth_state.dart';
 import 'package:bandao_app/features/checkin/data/checkin_queue_db.dart';
 
@@ -127,6 +128,110 @@ void main() {
       expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
     });
   });
+
+  group('login never strands the state machine', () {
+    // The regression this change exists for. A token write that fails used to
+    // escape as an unhandled exception, leaving the machine at
+    // AuthState.loading() forever and the user on /splash with no error.
+    test('a failed token write still authenticates and raises the notice',
+        () async {
+      final storage = _FakeSecureStorage()..failTokenWrite = true;
+      final repo = _FakeRepo(loginResponse: _loginOk);
+      final container = _container(storage: storage, repo: repo);
+      await container.read(authProvider.future);
+
+      await container.read(authProvider.notifier).login(
+            orgCode: 'C',
+            username: 'u',
+            password: 'p',
+          );
+
+      expect(container.read(authProvider).value, isA<AuthAuthenticated>());
+      expect(container.read(pendingSessionNotPersistedProvider), isTrue);
+    });
+
+    test('a failed org_code write is invisible to the session', () async {
+      final storage = _FakeSecureStorage()..failOrgCodeWrite = true;
+      final repo = _FakeRepo(loginResponse: _loginOk);
+      final container = _container(storage: storage, repo: repo);
+      await container.read(authProvider.future);
+
+      await container.read(authProvider.notifier).login(
+            orgCode: 'C',
+            username: 'u',
+            password: 'p',
+          );
+
+      expect(container.read(authProvider).value, isA<AuthAuthenticated>());
+      expect(
+        container.read(pendingSessionNotPersistedProvider),
+        isFalse,
+        reason: 'org_code only pre-fills a form field',
+      );
+    });
+
+    test('an unexpected non-ApiException terminates, never loading', () async {
+      final storage = _FakeSecureStorage();
+      final repo = _FakeRepo(loginThrow: StateError('unexpected'));
+      final container = _container(storage: storage, repo: repo);
+      await container.read(authProvider.future);
+
+      await expectLater(
+        container.read(authProvider.notifier).login(
+              orgCode: 'C',
+              username: 'u',
+              password: 'p',
+            ),
+        throwsA(isA<StateError>()),
+      );
+
+      final state = container.read(authProvider).value;
+      expect(state, isNot(isA<AuthLoading>()));
+      expect(state, isA<AuthUnauthenticated>());
+    });
+
+    test('login does not park the router on splash mid-request', () async {
+      // AuthLoading routes to /splash, which unmounts the login screen and
+      // with it the only thing that can report the outcome.
+      final storage = _FakeSecureStorage();
+      final repo = _FakeRepo(loginResponse: _loginOk);
+      final container = _container(storage: storage, repo: repo);
+      await container.read(authProvider.future);
+
+      final seen = <AuthState>[];
+      container.listen(
+        authProvider,
+        (_, next) {
+          final v = next.value;
+          if (v != null) seen.add(v);
+        },
+      );
+
+      await container.read(authProvider.notifier).login(
+            orgCode: 'C',
+            username: 'u',
+            password: 'p',
+          );
+
+      expect(
+        seen.whereType<AuthLoading>(),
+        isEmpty,
+        reason: 'a user-initiated login must not unmount its own screen',
+      );
+    });
+
+    test('logout survives a keystore that rejects the delete', () async {
+      final storage = _FakeSecureStorage(token: 'tok')..failTokenDelete = true;
+      final repo = _FakeRepo(meResponse: _meOk);
+      final container = _container(storage: storage, repo: repo);
+      await container.read(authProvider.future);
+
+      await container.read(authProvider.notifier).logout();
+
+      expect(container.read(authProvider).value, isA<AuthUnauthenticated>());
+      expect(await storage.readToken(), isNull);
+    });
+  });
 }
 
 ProviderContainer _container({
@@ -168,20 +273,55 @@ class _FakeSecureStorage implements SecureStorage {
   String? _orgCode;
   String? _override;
 
+  /// Simulates a keystore that rejects writes/deletes the way a broken
+  /// Keychain does.
+  bool failTokenWrite = false;
+  bool failOrgCodeWrite = false;
+  bool failTokenDelete = false;
+
+  static const _failure = SecureStorageFailure(
+    key: 'auth.bearer_token',
+    operation: SecureStorageOperation.write,
+    cause: 'injected',
+  );
+
   @override
   Future<String?> readToken() async => _token;
 
   @override
-  Future<void> writeToken(String token) async => _token = token;
+  Future<void> writeToken(String token) async {
+    // Mirrors the real wrapper: the cache is populated even when the persist
+    // fails, so the session still works for this process.
+    _token = token;
+    if (failTokenWrite) throw _failure;
+  }
 
   @override
-  Future<void> clearToken() async => _token = null;
+  Future<void> clearToken() async {
+    _token = null;
+    if (failTokenDelete) {
+      throw const SecureStorageFailure(
+        key: 'auth.bearer_token',
+        operation: SecureStorageOperation.delete,
+        cause: 'injected',
+      );
+    }
+  }
 
   @override
   Future<String?> readLastOrgCode() async => _orgCode;
 
   @override
-  Future<void> writeLastOrgCode(String orgCode) async => _orgCode = orgCode;
+  Future<void> writeLastOrgCode(String orgCode) async {
+    if (failOrgCodeWrite) {
+      throw const SecureStorageFailure(
+        key: 'auth.last_org_code',
+        operation: SecureStorageOperation.write,
+        cause: 'injected',
+      );
+    }
+    _orgCode = orgCode;
+  }
 
   @override
   Future<void> clearLastOrgCode() async => _orgCode = null;
@@ -237,7 +377,10 @@ class _FakeRepo implements AuthRepository {
 
   LoginResponse? loginResponse;
   MeResponse? meResponse;
-  ApiException? loginThrow;
+  /// `Object?`, not `ApiException?`: the terminal-state guarantee has to be
+  /// exercised with exceptions the notifier does NOT anticipate, which is
+  /// exactly the class that used to strand the state machine.
+  Object? loginThrow;
   ApiException? meThrow;
   ApiException? logoutThrow;
 

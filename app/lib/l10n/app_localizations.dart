@@ -149,6 +149,13 @@ class AppLocalizations {
   String handoverWipedNotice(int n) =>
       _isZh ? '前個帳號的 $n 筆未送事件已清除' : 'Cleared $n unsent events from previous account';
 
+  // Login succeeded but the bearer token could not be persisted. Phrased as
+  // the consequence the user will actually experience — there is nothing they
+  // can do about a platform error code.
+  String get sessionNotPersistedNotice => _isZh
+      ? '無法儲存登入狀態，下次開啟 App 需要重新登入'
+      : 'Could not save your sign-in. You will need to log in again next time you open the app.';
+
   // Onboarding tip (iOS background limitation)
   String get backgroundTipTitle =>
       _isZh ? '背景同步說明' : 'Background sync note';

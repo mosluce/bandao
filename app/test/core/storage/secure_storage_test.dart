@@ -3,6 +3,25 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bandao_app/core/storage/secure_storage.dart';
+import 'package:bandao_app/core/telemetry/error_reporter.dart';
+
+/// Captures what the storage wrapper reports, so tests can assert that a
+/// recovered failure is still made visible rather than silently absorbed.
+class _RecordingReporter extends ErrorReporter {
+  final List<Object> errors = <Object>[];
+  final List<Map<String, Object?>> contexts = <Map<String, Object?>>[];
+
+  @override
+  void recordNonFatal(
+    Object error,
+    StackTrace stackTrace, {
+    String? reason,
+    Map<String, Object?> context = const <String, Object?>{},
+  }) {
+    errors.add(error);
+    contexts.add(context);
+  }
+}
 
 /// Counting fake — extends `FlutterSecureStorage` so we satisfy the type
 /// argument to `SecureStorage`'s constructor without faking the whole
@@ -17,6 +36,8 @@ class _CountingStorage extends FlutterSecureStorage {
   String? initialValue;
   bool throwOnRead = false;
   bool throwPlatformExceptionOnRead = false;
+  bool throwPlatformExceptionOnWrite = false;
+  bool throwPlatformExceptionOnDelete = false;
   int reads = 0;
   int writes = 0;
   int deletes = 0;
@@ -57,6 +78,9 @@ class _CountingStorage extends FlutterSecureStorage {
     WindowsOptions? wOptions,
   }) async {
     writes++;
+    if (throwPlatformExceptionOnWrite) {
+      throw PlatformException(code: 'write_error', message: 'KEYCHAIN_WRITE');
+    }
     initialValue = value;
   }
 
@@ -71,6 +95,9 @@ class _CountingStorage extends FlutterSecureStorage {
     WindowsOptions? wOptions,
   }) async {
     deletes++;
+    if (throwPlatformExceptionOnDelete) {
+      throw PlatformException(code: 'delete_error', message: 'KEYCHAIN_DELETE');
+    }
     initialValue = null;
   }
 }
@@ -160,6 +187,120 @@ void main() {
 
       expect(await storage.readLastOrgCode(), isNull);
       expect(fake.deletes, 1);
+    });
+  });
+
+  group('SecureStorage write and delete failures', () {
+    test('a failing token write throws a typed failure naming the key', () async {
+      final fake = _CountingStorage()..throwPlatformExceptionOnWrite = true;
+      final storage = SecureStorage(fake);
+
+      await expectLater(
+        storage.writeToken('abc'),
+        throwsA(
+          isA<SecureStorageFailure>()
+              .having((f) => f.key, 'key', 'auth.bearer_token')
+              .having(
+                (f) => f.operation,
+                'operation',
+                SecureStorageOperation.write,
+              ),
+        ),
+      );
+    });
+
+    test('no raw PlatformException escapes the wrapper', () async {
+      final fake = _CountingStorage()..throwPlatformExceptionOnWrite = true;
+      final storage = SecureStorage(fake);
+
+      await expectLater(
+        storage.writeToken('abc'),
+        throwsA(isNot(isA<PlatformException>())),
+      );
+    });
+
+    // The load-bearing one. A token that cannot be persisted is still a valid
+    // session for this process — dropping the cache too would break every
+    // outbound request and turn a recoverable annoyance into a dead session.
+    test('a failing token write still populates the in-memory cache', () async {
+      final fake = _CountingStorage()..throwPlatformExceptionOnWrite = true;
+      final storage = SecureStorage(fake);
+
+      await expectLater(storage.writeToken('abc'), throwsA(anything));
+
+      fake.throwOnRead = true; // prove the value comes from the cache
+      expect(await storage.readToken(), 'abc');
+    });
+
+    test('a failing write is reported', () async {
+      final reporter = _RecordingReporter();
+      final fake = _CountingStorage()..throwPlatformExceptionOnWrite = true;
+      final storage = SecureStorage(fake, reporter);
+
+      await expectLater(storage.writeToken('abc'), throwsA(anything));
+
+      expect(reporter.errors.single, isA<SecureStorageFailure>());
+      expect(
+        reporter.contexts.single['secure_storage_key'],
+        'auth.bearer_token',
+      );
+      expect(reporter.contexts.single['secure_storage_operation'], 'write');
+    });
+
+    test('a failing delete still clears the cached token', () async {
+      final fake = _CountingStorage(initialValue: 'tok');
+      final storage = SecureStorage(fake);
+      expect(await storage.readToken(), 'tok');
+
+      fake.throwPlatformExceptionOnDelete = true;
+      await expectLater(
+        storage.clearToken(),
+        throwsA(isA<SecureStorageFailure>()),
+      );
+
+      // A broken keystore must never leave a logged-out session still
+      // holding a usable token.
+      expect(await storage.readToken(), isNull);
+    });
+
+    test('a failing delete is reported', () async {
+      final reporter = _RecordingReporter();
+      final fake = _CountingStorage()..throwPlatformExceptionOnDelete = true;
+      final storage = SecureStorage(fake, reporter);
+
+      await expectLater(storage.clearToken(), throwsA(anything));
+
+      expect(reporter.errors.single, isA<SecureStorageFailure>());
+      expect(reporter.contexts.single['secure_storage_operation'], 'delete');
+    });
+  });
+
+  group('SecureStorage read failures are fail-soft but visible', () {
+    test('an unreadable entry resolves as absent AND is reported', () async {
+      final reporter = _RecordingReporter();
+      final fake = _CountingStorage()..throwPlatformExceptionOnRead = true;
+      final storage = SecureStorage(fake, reporter);
+
+      expect(await storage.readToken(), isNull);
+      expect(
+        reporter.errors.single,
+        isA<SecureStorageFailure>().having(
+          (f) => f.operation,
+          'operation',
+          SecureStorageOperation.read,
+        ),
+        reason: 'silently absorbing this is what hid the real bug',
+      );
+    });
+
+    test('a read whose corrupted-entry cleanup also fails still resolves absent',
+        () async {
+      final fake = _CountingStorage()
+        ..throwPlatformExceptionOnRead = true
+        ..throwPlatformExceptionOnDelete = true;
+      final storage = SecureStorage(fake);
+
+      expect(await storage.readToken(), isNull);
     });
   });
 
