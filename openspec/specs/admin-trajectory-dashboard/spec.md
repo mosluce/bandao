@@ -5,54 +5,95 @@ TBD - created by archiving change add-location-tracking-dashboard. Update Purpos
 ## Requirements
 ### Requirement: Trajectory page renders one AppUser's daily polyline + event markers
 
-The admin-web SHALL provide a route `/checkin/:appUserId/trajectory` accepting an optional `?date=YYYY-MM-DD` query parameter. When `date` is absent the page SHALL default to the current calendar date in the active Org's timezone. The page SHALL convert the `date` parameter to an RFC3339 range covering that calendar day in the active Org's timezone (`from = <date>T00:00:00<tz_offset>`, `to = <next date>T00:00:00<tz_offset>`) before requesting pings.
+The admin-web SHALL provide a route `/checkin/:appUserId/trajectory` accepting an optional `?date=YYYY-MM-DD` query parameter. When `date` is absent the page SHALL default to the current calendar date in the active Org's timezone. The page SHALL convert the `date` parameter to an RFC3339 range covering that calendar day in the active Org's timezone (`from = <date>T00:00:00<tz_offset>`, `to = <next date>T00:00:00<tz_offset>`) before requesting data.
 
-The page SHALL fetch:
-1. Pings via `GET /checkin/users/:id/locations?from=&to=` for the resolved date range
-2. Events via the existing events list endpoint, filtering client-side to the same calendar day by comparing instants (not raw string comparison — `occurred_at_client` and the range bounds may use different offset representations, e.g. UTC `Z` vs `+08:00`, so a lexical compare can drop early-morning events)
+The page SHALL fetch, for the resolved date range:
 
-When pings are present the page SHALL render a Leaflet map with CartoDB Positron tiles; draw a polyline through pings ordered by `occurred_at_client` ascending, **colored by time of day using the shared time-of-day color scale** (defined in `app-personal-trajectory`: domain `06:00`→`22:00` clamped, anchors `#ea580c / #e11d48 / #c026d3 / #7c3aed / #4338ca`, interpolated) — since Leaflet has no native gradient polyline, the path SHALL be drawn as consecutive per-segment polylines each colored by that segment's midpoint time; overlay markers at each event's coordinates (distinct visual style per event type, kept visually distinct from the path colors); display the required `© OpenStreetMap contributors © CARTO` attribution; render a **legend** mapping color to time (`6:00 / 12:00 / 18:00 / 22:00`); and auto-fit the map bounds to encompass all polyline points and event markers.
+1. Pings via `GET /checkin/users/:id/locations?from=&to=`
+2. Events via `GET /checkin/users/:id/events?from=&to=` using the same range
 
-The day's start SHALL be anchored to the first `clock_in` event: its event marker (event-type colored, not the time scale) marks where the day began, and the page SHALL render the map whenever there is a `clock_in` event with a location, even with zero pings (only the event marker, no line). When there are neither pings nor a `clock_in` event, the page SHALL render the text `該日無軌跡資料` and SHALL NOT instantiate a map.
+The event fetch SHALL be range-scoped server-side. The page SHALL NOT request a newest-first page and filter it client-side: that approach silently returns zero events for any date beyond the page's reach (roughly 25 days at four events per day), which drops both the markers and — now that events contribute vertices — the line's endpoints, and it fails for every `legacy_backfill`-imported day.
 
-The `?date=` URL parameter and the date input SHALL stay in sync — selecting a new date in the picker SHALL update the URL and trigger a refetch.
+The page SHALL build the day's **merged series** per the Trajectory point merge contract defined in `app-personal-trajectory` (eligible points, `admin_force` exclusion, three-level instant-based ordering, no deduplication). Rendering SHALL be keyed off the merged point count:
+
+| Merged points | Behaviour |
+|---|---|
+| `0` | Render the text `該日無軌跡資料`; SHALL NOT instantiate Leaflet |
+| `1` | Render the map and the event markers; SHALL NOT draw a line |
+| `>= 2` | Render the map, the event markers, and the line |
+
+When the map renders it SHALL use Leaflet with CartoDB Positron tiles; draw the path through the **merged series** in its contract order, **colored by time of day using the shared time-of-day color scale** (defined in `app-personal-trajectory`: domain `06:00`→`22:00` clamped, anchors `#ea580c / #e11d48 / #c026d3 / #7c3aed / #4338ca`, interpolated) — since Leaflet has no native gradient polyline, the path SHALL be drawn as consecutive per-segment polylines each colored by that segment's midpoint time; overlay markers at each event's coordinates (distinct visual style per event type, kept visually distinct from the path colors), including events excluded from the merged series; display the required `© OpenStreetMap contributors © CARTO` attribution; render a **legend** mapping color to time (`6:00 / 12:00 / 18:00 / 22:00`); and auto-fit the map bounds to encompass all merged points and event markers.
+
+The day's start is the merged series' first vertex, which on a normal day is the first `clock_in` event. The page SHALL NOT maintain a separate "clock-in anchors the day" code path: with events contributing vertices, the clock-in is simply the first merged point. This supersedes the previous rules that a `clock_in` with zero pings rendered a marker but never a line, and that the map was gated on `pings.length > 0 || clockInEvent !== null`.
+
+The `?date=` URL parameter and the date input SHALL stay in sync — selecting a new date in the picker SHALL update the URL and trigger a refetch of both pings and events.
 
 #### Scenario: Default date is today in Org timezone
 
 - **WHEN** an admin navigates to `/checkin/:appUserId/trajectory` with no `?date=`
-- **THEN** the page resolves the date to today in the Org timezone and fetches pings for that range
+- **THEN** the page resolves the date to today in the Org timezone and fetches pings and events for that range
 
-#### Scenario: Date param drives the fetch range
+#### Scenario: Date param drives both fetch ranges
 
 - **WHEN** the URL is `/checkin/:appUserId/trajectory?date=2026-03-01` and Org timezone is `Asia/Taipei` (+08:00)
 - **THEN** the page issues `GET /checkin/users/:id/locations?from=2026-03-01T00:00:00+08:00&to=2026-03-02T00:00:00+08:00`
+- **AND** `GET /checkin/users/:id/events?from=2026-03-01T00:00:00+08:00&to=2026-03-02T00:00:00+08:00`
+
+#### Scenario: A date far in the past still returns its events
+
+- **GIVEN** an AppUser with `legacy_backfill` events from 200 days ago and more than 100 events since
+- **WHEN** an admin opens the trajectory page for that date
+- **THEN** the range-scoped event fetch returns that day's events
+- **AND** the markers and the line's endpoints render
+
+#### Scenario: Line passes through the clock-in and clock-out coordinates
+
+- **GIVEN** the day has a `clock_in`, several pings, and a `clock_out`, all with coordinates
+- **WHEN** the page renders
+- **THEN** the path's first vertex is the `clock_in` coordinate and its last vertex is the `clock_out` coordinate
+- **AND** those markers sit on the path rather than off it
 
 #### Scenario: Path is colored by time of day with a legend
 
-- **WHEN** the day's pings span morning to evening
+- **WHEN** the day's merged points span morning to evening
 - **THEN** the path segments transition from the warm (`06:00`) end toward the cool (`22:00`) end following each segment's midpoint time
 - **AND** a legend shows the color→time mapping
 - **AND** event-type markers remain visually distinct from the path colors
 
-#### Scenario: Clock-in with no pings still renders the map
+#### Scenario: admin_force clock_out is not a vertex but is still a marker
 
-- **WHEN** the API returns a `clock_in` event with a location but zero pings for the date range
-- **THEN** the map renders with the clock-in event marker (anchoring the start) and no path line
+- **GIVEN** the day's last event is a `clock_out` with `source = admin_force`
+- **WHEN** the page renders
+- **THEN** the path does not extend to that event's copied coordinate
+- **AND** a `clock_out` marker is drawn there
 
-#### Scenario: Neither pings nor clock-in hides the map
+#### Scenario: Clock-in plus clock-out with no pings now draws a line
 
-- **WHEN** the API returns zero pings and no `clock_in` event for the date range
+- **WHEN** the API returns a `clock_in` and a `clock_out` with locations and zero pings for the date
+- **THEN** the merged point count is `2`
+- **AND** the map renders both markers AND a line between the two coordinates
+
+#### Scenario: A single merged point renders the map without a line
+
+- **WHEN** the API returns a `clock_in` with a location and zero pings for the date
+- **THEN** the map renders with the clock-in marker
+- **AND** no path line is drawn
+
+#### Scenario: Zero merged points hides the map
+
+- **WHEN** the merged point count is `0` for the date
 - **THEN** the page shows `該日無軌跡資料` text
 - **AND** does not initialize Leaflet
 
-#### Scenario: Polyline ordered chronologically
+#### Scenario: Path ordered by the merge contract
 
-- **WHEN** the API returns pings out of order (newest-first per the API contract)
-- **THEN** the page sorts ascending by `occurred_at_client` before drawing and coloring
+- **WHEN** the API returns pings and events newest-first (per the API contract)
+- **THEN** the page builds the merged series in contract order before drawing and coloring
+- **AND** ordering compares parsed instants, not raw strings
 
 #### Scenario: Auto fit-bounds on render
 
-- **WHEN** pings and event markers are rendered
+- **WHEN** merged points and event markers are rendered
 - **THEN** the map's viewport encompasses every plotted coordinate
 
 #### Scenario: Date picker round-trips through URL
