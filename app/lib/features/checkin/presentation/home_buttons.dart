@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../auth/state/auth_provider.dart';
 import '../../auth/state/auth_state.dart';
 import '../data/checkin_actions.dart';
+import '../state/checkin_label_provider.dart';
 import '../state/effective_status_provider.dart';
 import '../state/location_permission_provider.dart';
 import 'location_consent_dialog.dart';
@@ -24,7 +25,12 @@ class HomeButtons extends ConsumerWidget {
     // Only `deniedForever` truly blocks the tap. `denied` includes the
     // "never asked yet" iOS state — we want the button enabled so first-tap
     // triggers the system permission dialog.
-    final disabled = permission == LocationPermission.deniedForever;
+    // Two independent gates. The label one is how this screen collects a
+    // label without a dialog between the tap and the enqueue: the value is
+    // supplied BEFORE the press, exactly as the login form gates its submit.
+    final hasLabel = ref.watch(checkinLabelIsValidProvider);
+    final disabled =
+        permission == LocationPermission.deniedForever || !hasLabel;
 
     // When the org has disabled transfers, drop `[轉出]` / `[轉入]` from the
     // visible button set. Server has a state-lock that prevents flipping
@@ -134,6 +140,16 @@ class HomeButtons extends ConsumerWidget {
                 // Blocker widget renders; nothing else to do.
                 break;
               case EnqueueOutcome.notAuthenticated:
+                break;
+              case EnqueueOutcome.labelMissing:
+                // The buttons gate on a valid label, so this only fires if
+                // something bypassed the gate. Surface it rather than
+                // silently doing nothing.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(AppLocalizations.of(context).labelRequired),
+                  ),
+                );
                 break;
             }
           };

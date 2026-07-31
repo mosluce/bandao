@@ -19,6 +19,11 @@ class SecureStorageKeys {
       'bandao.location_tracking.last_clean_stop';
   static const String privacyUrlOverride = 'dev.privacy_url_override';
 
+  /// The AppUser's recent check-in labels, JSON-encoded. Cached so the
+  /// suggestions survive going offline — a worker out of signal still has to
+  /// label their check-in, and the list is otherwise derived from a fetch.
+  static const String recentCheckinLabels = 'checkin.recent_labels';
+
   /// Per-AppUser consent flag — formatted as
   /// `bandao.location_tracking.consent.<app_user_id>`.
   static String locationTrackingConsentKey(String appUserId) =>
@@ -264,6 +269,12 @@ class SecureStorage {
         SecureStorageKeys.locationTrackingConsentKey(appUserId),
         'true',
       );
+
+  Future<String?> readRecentCheckinLabels() =>
+      _safeRead(SecureStorageKeys.recentCheckinLabels);
+
+  Future<void> writeRecentCheckinLabels(String json) =>
+      _safeWrite(SecureStorageKeys.recentCheckinLabels, json);
 
   Future<String?> readPrivacyUrlOverride() =>
       _safeRead(SecureStorageKeys.privacyUrlOverride);

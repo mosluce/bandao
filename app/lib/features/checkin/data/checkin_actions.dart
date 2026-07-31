@@ -8,7 +8,9 @@ import '../../../core/api/models/checkin_event.dart';
 import '../../../core/api/models/submit_checkin_event.dart';
 import '../../auth/state/auth_provider.dart';
 import '../../auth/state/auth_state.dart';
+import '../state/checkin_label_provider.dart';
 import '../state/location_permission_provider.dart';
+import '../state/recent_labels_provider.dart';
 import 'background_sync.dart';
 import 'checkin_queue_db.dart';
 import 'geolocation_service.dart';
@@ -16,6 +18,10 @@ import 'queue_processor.dart';
 
 enum EnqueueOutcome {
   enqueued,
+
+  /// The label was missing or too long. The action buttons gate on this, so
+  /// it only fires if something bypassed them.
+  labelMissing,
   permissionDenied,
   locationUnavailable,
   notAuthenticated,
@@ -35,6 +41,14 @@ class CheckinActions {
   Future<EnqueueOutcome> enqueueEvent(CheckinEventType eventType) async {
     final auth = _ref.read(authProvider).valueOrNull;
     if (auth is! AuthAuthenticated) return EnqueueOutcome.notAuthenticated;
+
+    // The buttons are gated on a valid label, so reaching here without one
+    // means the gate was bypassed. Refuse rather than silently submitting an
+    // unlabelled event — the whole point is that every event carries one.
+    final label = _ref.read(checkinLabelProvider).trim();
+    if (label.isEmpty || label.runes.length > checkinLabelMaxLength) {
+      return EnqueueOutcome.labelMissing;
+    }
 
     final permNotifier = _ref.read(locationPermissionProvider.notifier);
     var permission = await permNotifier.refresh();
@@ -60,9 +74,20 @@ class CheckinActions {
       lat: Value(captured.point.lat),
       lng: Value(captured.point.lng),
       accuracy: Value(captured.accuracyMeters),
+      manualLabel: Value(label),
       occurredAtClient: Value(nowOccurredAtClient(now)),
       enqueuedAt: Value(now.toIso8601String()),
     ),);
+
+    // Remember it for the suggestions BEFORE clearing the field. Done
+    // locally rather than by refetching, because the event is still sitting
+    // in the queue — the server cannot offer it back yet, and offline never
+    // would.
+    unawaited(_ref.read(recentLabelsProvider.notifier).remember(label));
+
+    // Cleared so the next check-in is labelled deliberately rather than
+    // inheriting this one.
+    _ref.read(checkinLabelProvider.notifier).state = '';
 
     // Foreground tick — drift's watchAll stream also wakes the processor,
     // but calling tick directly avoids a 1-frame UI lag.

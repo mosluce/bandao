@@ -7,6 +7,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 
+/// Mirrors `checkinLabelMaxLength`; duplicated here so the l10n shim has no
+/// dependency on a feature module.
+const int checkinLabelMaxLengthForL10n = 120;
+
 class AppLocalizations {
   const AppLocalizations(this.locale);
 
@@ -155,6 +159,16 @@ class AppLocalizations {
   String get sessionNotPersistedNotice => _isZh
       ? '無法儲存登入狀態，下次開啟 App 需要重新登入'
       : 'Could not save your sign-in. You will need to log in again next time you open the app.';
+
+  // Check-in location label — the site/customer name attached to every event.
+  String get checkinLabelTitle => _isZh ? '地點' : 'Location';
+  String get checkinLabelHint =>
+      _isZh ? '輸入或選擇地點' : 'Type or pick a location';
+  String get labelRequired =>
+      _isZh ? '請先填寫地點' : 'Enter a location first';
+  String get checkinLabelTooLong => _isZh
+      ? '地點最多 $checkinLabelMaxLengthForL10n 個字'
+      : 'Location must be at most $checkinLabelMaxLengthForL10n characters';
 
   // Onboarding tip (iOS background limitation)
   String get backgroundTipTitle =>

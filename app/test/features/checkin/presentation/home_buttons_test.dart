@@ -10,6 +10,7 @@ import 'package:bandao_app/core/api/models/org.dart';
 import 'package:bandao_app/features/auth/state/auth_provider.dart';
 import 'package:bandao_app/features/auth/state/auth_state.dart';
 import 'package:bandao_app/features/checkin/presentation/home_buttons.dart';
+import 'package:bandao_app/features/checkin/state/checkin_label_provider.dart';
 import 'package:bandao_app/features/checkin/state/effective_status_provider.dart';
 import 'package:bandao_app/features/checkin/state/location_permission_provider.dart';
 import 'package:bandao_app/l10n/app_localizations.dart';
@@ -116,6 +117,58 @@ void main() {
       expect(find.text('下班'), findsNothing);
     });
   });
+  group('HomeButtons label gate', () {
+    // The label is collected BEFORE the press — that is what keeps the
+    // tap→enqueue path free of any dialog. The buttons are the gate.
+    testWidgets('disabled while the label is empty', (tester) async {
+      await _pump(tester, status: AppUserCheckinStatus.offDuty, label: '');
+
+      expect(find.text('上班'), findsOneWidget);
+      expect(_enabled(tester, '上班'), isFalse);
+    });
+
+    testWidgets('enabled once a label is supplied', (tester) async {
+      await _pump(tester, status: AppUserCheckinStatus.offDuty, label: '乙工地');
+
+      expect(_enabled(tester, '上班'), isTrue);
+    });
+
+    testWidgets('a whitespace-only label does not count', (tester) async {
+      await _pump(tester, status: AppUserCheckinStatus.offDuty, label: '   ');
+
+      expect(_enabled(tester, '上班'), isFalse);
+    });
+
+    testWidgets('an over-long label does not count', (tester) async {
+      // Server validates 1–120 characters; the device must agree so the
+      // failure happens here rather than at submit time.
+      await _pump(
+        tester,
+        status: AppUserCheckinStatus.offDuty,
+        label: 'x' * 121,
+      );
+
+      expect(_enabled(tester, '上班'), isFalse);
+    });
+
+    testWidgets('no dialog is shown when the label is empty', (tester) async {
+      await _pump(tester, status: AppUserCheckinStatus.offDuty, label: '');
+
+      expect(find.byType(Dialog), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
+    });
+  });
+}
+
+/// Whether the button carrying [text] is tappable.
+bool _enabled(WidgetTester tester, String text) {
+  final button = tester.widget<ButtonStyleButton>(
+    find.ancestor(
+      of: find.text(text),
+      matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+    ),
+  );
+  return button.onPressed != null;
 }
 
 Future<void> _pump(
@@ -123,6 +176,10 @@ Future<void> _pump(
   required AppUserCheckinStatus status,
   LocationPermission permission = LocationPermission.whileInUse,
   bool transferEnabled = true,
+  // The buttons now gate on a label as well as on permission. Default to a
+  // filled one so the pre-existing tests keep asserting what they were
+  // written to assert; the label gate has its own group below.
+  String label = '甲工地',
 }) async {
   final auth = AuthState.authenticated(
     user: const AppUser(
@@ -147,6 +204,7 @@ Future<void> _pump(
   await tester.pumpWidget(
     ProviderScope(
       overrides: <Override>[
+        checkinLabelProvider.overrideWith((ref) => label),
         effectiveStatusProvider.overrideWithValue(EffectiveStatus(
           status: status,
           hasPendingTransition: false,
