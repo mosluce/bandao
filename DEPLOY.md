@@ -420,13 +420,49 @@ number so one number identifies one binary pair.
 
 ```bash
 cd app
-flutter pub get
-dart run build_runner build --delete-conflicting-outputs
-flutter build appbundle --release
+export PLAY_JSON_KEY=~/.bandao/keystores/<project>-<id>.json
+./scripts/release_android.sh                 # build, verify, upload
+./scripts/release_android.sh --no-upload     # build and verify only
 ```
 
-The signed `.aab` lands at
+The script runs `pub get` + codegen, builds the bundle with the production
+URLs baked in, verifies the bundle actually carries them, and hands off to
+`upload_android.sh`. The signed `.aab` lands at
 `app/build/app/outputs/bundle/release/app-release.aab`.
+
+**The dart-defines are required.** Without
+`--dart-define=API_BASE_URL`, `Env.compileTimeDefault()` falls back to
+`http://10.0.2.2:9090` — the Android emulator's alias for the *build
+machine's* loopback. On a real device that address means nothing, and the
+app ships no `usesCleartextTraffic` and no `network_security_config`, so
+the platform blocks the plain-HTTP request besides. The bundle still
+builds, still signs, and still uploads: it simply cannot reach the
+backend. This is not hypothetical — 0.4.3+13 shipped to Play production
+that way on 2026-07-31, because this section used to document a bare
+`flutter build appbundle --release`.
+
+`--dart-define=PRIVACY_URL` matters for the same reason in a quieter way:
+without it the location-consent dialog's privacy link resolves to
+`http://10.0.2.2:3000/privacy` while the Play listing declares the real
+URL. The script reads it from
+`store_metadata/android/privacy_policy_url.txt` — the same file that feeds
+the listing — so the two cannot drift.
+
+Unlike `release_ios.sh`, this script does **not** touch `pubspec.yaml`.
+The build number is shared between the stores, so bumping happens once,
+deliberately, before either platform is cut.
+
+If you need to drive it by hand, pass both defines — and verify afterwards
+(see "Verify a release artifact" below):
+
+```bash
+cd app
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter build appbundle --release \
+  --dart-define=API_BASE_URL=https://bandao-api.ccmos.tw \
+  --dart-define=PRIVACY_URL="$(cat store_metadata/android/privacy_policy_url.txt)"
+```
 
 Upload with:
 
@@ -480,14 +516,22 @@ That single script does:
 1. Bumps `pubspec.yaml`'s build number (`+N` → `+N+1`). Apple rejects
    re-uploads of the same build number, so this auto-increment is
    load-bearing.
-2. Runs `flutter build ipa --release --dart-define=API_BASE_URL=https://bandao-api.ccmos.tw`.
-   The dart-define is **required** — without it the .ipa falls back to
-   `Env.compileTimeDefault` (`http://localhost:9090` on iOS), which
-   means the on-device build cannot reach the prod backend and login
-   silently fails.
-3. Uploads the signed .ipa to App Store Connect via
+2. Runs `flutter build ipa --release` with `--dart-define=API_BASE_URL`
+   and `--dart-define=PRIVACY_URL`. Both are **required** — without the
+   first, the .ipa falls back to `Env.compileTimeDefault`
+   (`http://localhost:9090` on iOS), so the on-device build cannot reach
+   the prod backend and login silently fails; without the second, the
+   location-consent dialog's privacy link resolves to
+   `http://localhost:3000/privacy` while the App Store listing declares
+   the real URL. The privacy URL is read from
+   `store_metadata/ios/privacy_url.txt`, the same file that feeds the
+   listing, so the two cannot drift apart.
+3. Re-opens the .ipa it just built and verifies both URLs are actually
+   inside it, refusing to upload otherwise. See "Verify a release
+   artifact" below for why this checks the file rather than the flags.
+4. Uploads the signed .ipa to App Store Connect via
    `xcrun altool --upload-app` (same API as `fastlane pilot upload`).
-4. Reminds you to commit the pubspec bump + tag.
+5. Reminds you to commit the pubspec bump + tag.
 
 Useful flags:
 
@@ -498,14 +542,16 @@ Useful flags:
   (uncommon).
 - `./scripts/release_ios.sh --no-upload` — build only, skip upload.
 
-If you'd rather drive each step yourself:
+If you'd rather drive each step yourself — pass both defines, and verify
+afterwards:
 
 ```bash
 cd app
 flutter pub get
 cd ios && pod install && cd ..
 flutter build ipa --release \
-  --dart-define=API_BASE_URL=https://bandao-api.ccmos.tw
+  --dart-define=API_BASE_URL=https://bandao-api.ccmos.tw \
+  --dart-define=PRIVACY_URL="$(cat store_metadata/ios/privacy_url.txt)"
 ./scripts/upload_ios.sh
 ```
 
@@ -515,6 +561,41 @@ to set up the App Store Connect API key (see operator setup below).
 After upload, the build appears in App Store Connect → TestFlight →
 internal testers can install immediately. Submit to App Store review
 once smoke passes; first review can take 1–3 days.
+
+### Verify a release artifact
+
+Both release scripts check, after building and before uploading, that the
+production URLs are really inside the artifact. Run the same check by hand
+against any `.aab` or `.ipa` — including one downloaded from Play Console's
+App bundle explorer, which is the only way to inspect what a past release
+actually shipped:
+
+```bash
+# Android — one Dart snapshot per ABI, all of them must carry it
+for lib in $(unzip -Z1 app-release.aab 'base/lib/*/libapp.so'); do
+  unzip -p app-release.aab "$lib" > /tmp/snap
+  grep -a -q -F 'https://bandao-api.ccmos.tw' /tmp/snap \
+    && echo "ok  $lib" || echo "MISSING  $lib"
+done
+
+# iOS
+unzip -p bandao_app.ipa 'Payload/Runner.app/Frameworks/App.framework/App' > /tmp/snap
+grep -a -c -F 'https://bandao-api.ccmos.tw' /tmp/snap
+```
+
+Two things about this check are easy to get wrong:
+
+- **It checks the artifact, not the build command.** A script can log the
+  flags it believes it passed and still emit a binary without them. The
+  artifact is what reaches users, so the artifact is what gets asserted.
+- **It can only assert presence, never absence.** "Fail if the binary
+  mentions `10.0.2.2`" is the obvious check and it does not work. Whether a
+  dev loopback literal survives into a release artifact is not
+  predictable: measured on two real bundles, a *correctly* built one has
+  no `10.0.2.2:3000/privacy` (supplying `PRIVACY_URL` makes that fallback
+  branch dead code, which gets shaken out) but still contains
+  `http://10.0.2.2:9090`. An absence check would red-flag good releases on
+  one URL and never fire on the other.
 
 ### App Review submission checklist (post-upload, pre-submit)
 
