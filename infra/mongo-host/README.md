@@ -3,17 +3,25 @@
 Daily encrypted dump → S3 + monthly restore drill, packaged for the operator
 to drop onto a host that can reach the production database.
 
-> **The source database is no longer local to this host.** Mongo moved to
-> Zeabur-managed hosting during August 2026, but `MONGO_URI` still pointed at
-> `127.0.0.1:27017`. The timer kept succeeding against the drained
-> self-hosted mongod, so every dump from roughly 2026-08-19 onward is of a
-> near-empty database — around 6.9 KB, against a production dataset of ~8 MB
-> and 32k documents. With a 30-day lifecycle on `daily/`, that means no
-> usable backup of production currently exists in S3.
+> **There is no known-good backup of production, and this pipeline's current
+> state is unverified.** As of 2026-08-30 the bucket named below,
+> `bandao-mongo-backups-apne1`, is newly created and empty. No bandao dump
+> has been confirmed to land anywhere.
 >
-> Point `MONGO_URI` at the Zeabur connection string, and set
-> `ASSERT_COLLECTION` / `MIN_ARCHIVE_BYTES` (below) so the same failure
-> cannot be silent a second time.
+> What is known: a daily `*.archive.gz.age` object does land in a *different*
+> bucket on the same schedule and naming pattern this script produces, sized
+> ~6.9 KB against a production dataset of ~8 MB and ~32k documents. Whether
+> those objects are bandao's — written by a copy of this script whose
+> `MONGO_URI` still points at the pre-migration `127.0.0.1:27017` — or belong
+> to another project entirely has **not** been established; they are
+> age-encrypted and the private key is off-host by design. Either way, no
+> object anywhere has been shown to restore bandao.
+>
+> To get to a known-good state: find the host running `bandao-backup.timer`,
+> point `MONGO_URI` at the Zeabur connection string and `S3_BUCKET` at the
+> dedicated bucket below, set the guards, then run the restore drill. A
+> dedicated bucket is what makes the next such question answerable from
+> `aws s3 ls` alone.
 
 ## Files
 
@@ -63,7 +71,7 @@ Create `/etc/bandao-backup.env` (mode 0600, root-owned):
 MONGO_URI=mongodb://backup_user:<pw>@<zeabur-host>:<port>/?authSource=admin
 MONGO_DB=bandao
 AGE_RECIPIENT=age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-S3_BUCKET=backup.ccmos.tw
+S3_BUCKET=bandao-mongo-backups-apne1
 S3_REGION=ap-northeast-1
 S3_ACCESS_KEY_ID=AKIAxxxxxxxxxxxxxxxx
 S3_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -83,10 +91,14 @@ sudo chmod 0600 /etc/bandao-backup.env
 sudo chown root:root /etc/bandao-backup.env
 ```
 
-The bucket is `backup.ccmos.tw` in AWS account `869847891424`, under the
-`daily/` prefix. (Earlier revisions of this file named a
-`bandao-mongo-backups-apne1` bucket that does not exist in any of the
-project's accounts.)
+The bucket is `bandao-mongo-backups-apne1` in AWS account `869847891424`,
+`ap-northeast-1`, under the `daily/` prefix. Created 2026-08-30 with
+versioning, SSE-S3, Block Public Access, and the lifecycle rule below.
+
+It is **dedicated to bandao** on purpose. Sharing a bucket with other
+projects is what made "is this object ours?" unanswerable without the
+decryption key — a question worth answering during an incident, not after.
+Do not point another project's backup at it.
 
 ### Guards
 
