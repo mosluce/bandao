@@ -1,20 +1,34 @@
 # Mongo host backup pipeline
 
 Daily encrypted dump → S3 + monthly restore drill, packaged for the operator
-to drop onto the production Mongo host.
+to drop onto a host that can reach the production database.
+
+> **The source database is no longer local to this host.** Mongo moved to
+> Zeabur-managed hosting during August 2026, but `MONGO_URI` still pointed at
+> `127.0.0.1:27017`. The timer kept succeeding against the drained
+> self-hosted mongod, so every dump from roughly 2026-08-19 onward is of a
+> near-empty database — around 6.9 KB, against a production dataset of ~8 MB
+> and 32k documents. With a 30-day lifecycle on `daily/`, that means no
+> usable backup of production currently exists in S3.
+>
+> Point `MONGO_URI` at the Zeabur connection string, and set
+> `ASSERT_COLLECTION` / `MIN_ARCHIVE_BYTES` (below) so the same failure
+> cannot be silent a second time.
 
 ## Files
 
 | Path on repo | Path on host | Purpose |
 | --- | --- | --- |
-| `bandao-backup.sh` | `/usr/local/bin/bandao-backup.sh` | Daily dump + age + s3 cp |
+| `bandao-backup.sh` | `/usr/local/bin/bandao-backup.sh` | Daily dump + age + s3 cp, with pre-dump and size guards |
 | `bandao-restore-drill.sh` | `/usr/local/bin/bandao-restore-drill.sh` | Pulls latest dump, restores to scratch DB, asserts counts |
 | `bandao-backup.service` | `/etc/systemd/system/bandao-backup.service` | One-shot unit invoked by the timer |
 | `bandao-backup.timer` | `/etc/systemd/system/bandao-backup.timer` | Daily 03:30 schedule |
 
-## One-time setup on the Mongo host
+## One-time setup on the backup host
 
-Assumes Debian 12 / Ubuntu 22.04+. Adjust package names for other distros.
+Any always-on Linux host that can reach the production Mongo will do; it no
+longer has to be the database host itself. Assumes Debian 12 / Ubuntu 22.04+.
+Adjust package names for other distros.
 
 ```bash
 # Tooling — mongo client, awscli v2, age.
@@ -23,7 +37,7 @@ sudo apt-get install -y mongodb-mongosh mongodb-database-tools awscli age
 ```
 
 Generate the encryption keypair on the operator's workstation (NOT on the
-Mongo host) and copy only the public key to the host:
+backup host) and copy only the public key to the host:
 
 ```bash
 # on workstation:
@@ -44,15 +58,22 @@ sudo install -m 0644 bandao-backup.timer /etc/systemd/system/
 Create `/etc/bandao-backup.env` (mode 0600, root-owned):
 
 ```
-MONGO_URI=mongodb://backup_user:<pw>@127.0.0.1:27017/?authSource=admin
+# Must reach the database production actually writes to. Since the Zeabur
+# migration this is NOT 127.0.0.1 — use the Zeabur connection string.
+MONGO_URI=mongodb://backup_user:<pw>@<zeabur-host>:<port>/?authSource=admin
 MONGO_DB=bandao
 AGE_RECIPIENT=age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-S3_BUCKET=bandao-mongo-backups-apne1
+S3_BUCKET=backup.ccmos.tw
 S3_REGION=ap-northeast-1
 S3_ACCESS_KEY_ID=AKIAxxxxxxxxxxxxxxxx
 S3_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # optional:
 # S3_PREFIX=bandao
+
+# Guards — both optional, both strongly recommended. See "Guards" below.
+ASSERT_COLLECTION=checkin_events
+ASSERT_MIN_COUNT=1000
+MIN_ARCHIVE_BYTES=100000
 ```
 
 Lock it down:
@@ -61,6 +82,31 @@ Lock it down:
 sudo chmod 0600 /etc/bandao-backup.env
 sudo chown root:root /etc/bandao-backup.env
 ```
+
+The bucket is `backup.ccmos.tw` in AWS account `869847891424`, under the
+`daily/` prefix. (Earlier revisions of this file named a
+`bandao-mongo-backups-apne1` bucket that does not exist in any of the
+project's accounts.)
+
+### Guards
+
+Every command in the old pipeline exited 0 while it backed up the wrong
+database for weeks, because a dump of an empty database is a valid dump.
+Two opt-in checks close that gap; set both.
+
+| Key | Effect |
+| --- | --- |
+| `ASSERT_COLLECTION` | Counts documents in this collection (via `mongosh`) **before** dumping. Nothing runs if the source does not look like production. |
+| `ASSERT_MIN_COUNT` | Minimum that count must reach. Default `1`; set it near the real row count, not to 1 — the failure being guarded against left a handful of documents behind, not zero. |
+| `MIN_ARCHIVE_BYTES` | Refuses to upload an archive smaller than this. Default `100000`. |
+
+Exit codes: `64` missing config, `65` pre-dump assertion failed, `66`
+archive below the size floor. A non-zero exit fails the systemd unit, so
+these surface wherever the timer's failures are already routed.
+
+The script stages the archive to a temp file (removed on exit) instead of
+streaming into `aws s3 cp -`, because a stream cannot be measured before it
+lands. Scratch space needed is one compressed dump — single-digit MB today.
 
 Mongo user for backups (run from `mongosh` as a dbAdmin):
 
@@ -109,13 +155,17 @@ sudo mount -t tmpfs -o size=16k,mode=0700 tmpfs /run/bandao-drill
 sudo env \
   AGE_IDENTITY_FILE=/run/bandao-drill/age.key \
   ASSERT_COLLECTION=checkin_events \
-  ASSERT_MIN_COUNT=1 \
+  ASSERT_MIN_COUNT=1000 \
   /usr/local/bin/bandao-restore-drill.sh
 
 # Always tear down:
 sudo umount /run/bandao-drill
 sudo rmdir /run/bandao-drill
 ```
+
+Set `ASSERT_MIN_COUNT` to something near the real row count rather than `1`.
+A drill that only asserts "at least one document" passes against a dump of a
+drained database, which is exactly the state that went unnoticed for weeks.
 
 A failed drill exits non-zero and writes the failure to syslog tagged
 `bandao-restore-drill`. Wire that into the operator's alerting (mailx,
