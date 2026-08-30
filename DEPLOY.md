@@ -1,9 +1,17 @@
 # Production deployment runbook
 
-Production for **班到 (bandao)** runs on Zeabur for the stateless services
-(`api`, `admin-web`) and on an operator-controlled host for MongoDB. The
-api reaches Mongo only over a Tailscale private network; backups land in
-AWS S3.
+Production for **班到 (bandao)** runs entirely on Zeabur: the stateless
+services (`api`, `admin-web`) and, since the August 2026 migration, a
+Zeabur-managed MongoDB. The api reaches Mongo over a public endpoint;
+backups are dumped to AWS S3 by a separate host.
+
+> **Two open risks, both live.** The Mongo endpoint is reachable from the
+> public internet and the connection string carries no `tls=true`, so
+> credentials and check-in data cross the internet in cleartext — the
+> Tailscale tunnel that used to carry this traffic was removed and nothing
+> replaced it. Separately, the daily backup has been dumping the drained
+> pre-migration database since roughly 2026-08-19 and no usable backup of
+> production exists. See "Backups" below.
 
 This file is the authoritative runbook. Changes to production topology,
 env vars, or operational procedures should land here in the same PR.
@@ -16,15 +24,15 @@ env vars, or operational procedures should land here in the same PR.
    browsers ───▶│  https://bandao-admin.ccmos.tw   (admin-web, Nuxt SPA, Zeabur)      │
    mobile   ───▶│  https://bandao-api.ccmos.tw     (api, Rust binary, Zeabur)         │
                 │                              │                                      │
+                │                              │  mongodb:// — no TLS                 │
                 │                              ▼                                      │
-                │                      Tailscale tailnet (private)                    │
-                │                              │                                      │
-                └──────────────────────────────┼──────────────────────────────────────┘
-                                               ▼
-                                  Mongo host (operator-controlled)
-                                  ├── mongod 7.x (bind 127.0.0.1 + tailscale0)
-                                  ├── tailscaled
-                                  └── bandao-backup.timer ─▶ AWS S3 (encrypted dumps)
+                │                    MongoDB (Zeabur-managed)                         │
+                │                    └── public endpoint, SCRAM auth only             │
+                │                                                                     │
+                └─────────────────────────────────────────────────────────────────────┘
+
+     operator Mac ─▶ hourly legacy-backfill job ─▶ same public Mongo endpoint
+     backup host  ─▶ daily dump ─▶ s3://bandao-mongo-backups-apne1/daily/
 ```
 
 - `bandao-admin.ccmos.tw` and `bandao-api.ccmos.tw` are siblings under the
@@ -32,9 +40,13 @@ env vars, or operational procedures should land here in the same PR.
   so cookie auth survives with `SameSite=Lax`.
 - The api accepts both **cookie auth** (admin-web) and **Bearer token auth**
   (mobile app) on the same host.
-- Mongo is **never** exposed to the public internet. Only nodes carrying
-  the `tag:bandao-api` Tailscale ACL tag can reach `:27017` on the Mongo
-  host.
+- Mongo **is** reachable from the public internet, protected only by SCRAM
+  credentials. Until the August 2026 migration it was bound to loopback plus
+  a Tailscale interface and reachable only by tagged tailnet nodes; that
+  boundary no longer exists. Two things are worth fixing: the connection
+  string should carry `tls=true` (with TLS enabled server-side), and the
+  endpoint should be restricted to the addresses that need it — the Zeabur
+  services and the operator machine running the legacy backfill.
 
 ## Repositories and ownership
 
@@ -42,8 +54,10 @@ env vars, or operational procedures should land here in the same PR.
 - `admin-web/` — Nuxt 3 SPA (`ssr: false`); `Dockerfile` is provided as a
   fallback (nginx serving `.output/public` with SPA fallback) in case
   Zeabur's Nuxt auto-detect does not handle SPA routing.
-- `infra/mongo-host/` — backup scripts + systemd units to be installed on
-  the Mongo host. See [`infra/mongo-host/README.md`](./infra/mongo-host/README.md).
+- `infra/mongo-host/` — backup scripts + systemd units, installed on the
+  backup host (which no longer runs the database itself; the directory name
+  predates the Zeabur migration). See
+  [`infra/mongo-host/README.md`](./infra/mongo-host/README.md).
 - `openspec/changes/add-zeabur-deployment/` — proposal, design, specs, tasks
   for the change that introduced this runbook.
 
@@ -54,7 +68,7 @@ env vars, or operational procedures should land here in the same PR.
 | Var | Required | Production value | Notes |
 | --- | --- | --- | --- |
 | `BANDAO_LISTEN_ADDR` | yes | `0.0.0.0:8080` | Default `127.0.0.1:8080` only binds loopback. |
-| `BANDAO_MONGO_URI` | yes | `mongodb://bandao:<pw>@<mongo-host>.<tailnet>.ts.net:27017/bandao?authSource=admin` | Use the Tailscale MagicDNS hostname, not an IP. |
+| `BANDAO_MONGO_URI` | yes | `mongodb://bandao:<pw>@<zeabur-host>:<port>/bandao?authSource=admin` | Zeabur-managed Mongo's public endpoint. Add `&tls=true` once TLS is enabled server-side — it is not today. |
 | `BANDAO_MONGO_DB` | yes | `bandao` | |
 | `BANDAO_COOKIE_SECURE` | yes | `true` | Production runs over HTTPS only. |
 | `BANDAO_COOKIE_DOMAIN` | no | _(unset)_ | Leave unset → host-only cookie on `bandao-api.ccmos.tw`. |
@@ -64,12 +78,13 @@ env vars, or operational procedures should land here in the same PR.
 | `RESEND_API_KEY` | no† | _(Resend API key)_ | †Required for forgot-password email to actually send. Without it, the api falls back to a no-op sender: `POST /auth/forgot-password` still responds `204` and the reset flow is otherwise fully functional, but no email is ever sent — watch logs for `NoopEmailSender: email send skipped` if password resets seem to silently not arrive. The sending domain must be verified in Resend (SPF/DKIM) before this works for real recipients. |
 | `RESEND_FROM_ADDRESS` | no | `班到 <noreply@ccmos.tw>` | From-address for outbound email. Irrelevant when `RESEND_API_KEY` is unset. |
 | `ADMIN_WEB_BASE_URL` | yes | `https://bandao-admin.ccmos.tw` | Used to build the password-reset link embedded in email. Defaults to `http://localhost:3000` for local dev — production must set this explicitly or reset links will point at localhost. |
-| `TS_AUTHKEY` | yes | _(reusable Tailscale auth key)_ | Tagged `tag:bandao-api`. Rotate on operator's schedule. |
-| `TS_HOSTNAME` | no | `bandao-api` | Container's tailnet hostname. |
 
 The api refuses to start if `BANDAO_LISTEN_ADDR` cannot parse. Other vars
 fall back to the dev defaults baked into `api/src/config.rs` — production
 SHOULD set every row above explicitly.
+
+`TS_AUTHKEY` and `TS_HOSTNAME` are no longer used; remove them from the
+Zeabur service if they are still set.
 
 #### External-database App-user auth
 
@@ -83,10 +98,11 @@ successful login just-in-time provisions a local shadow user. Operational notes:
 - **Dependency**: the MSSQL driver (`tiberius`) is compiled in — it noticeably
   lengthens the first `cargo build`. Nothing to configure.
 - **Known limitation — network reachability**: the api must be able to open a
-  TCP connection to the customer's MSSQL. In the current Tailscale topology the
-  prod api may NOT reach an on-prem/customer-LAN database; there is no tunneling
-  story yet. Verify reachability (or arrange a route/VPN) before promising a
-  customer external auth. Misconfig/unreachable surfaces as
+  TCP connection to the customer's MSSQL. The prod api may NOT reach an
+  on-prem/customer-LAN database; there is no tunneling story yet, and dropping
+  Tailscale removed the one that might have been repurposed. Verify
+  reachability (or arrange a route/VPN) before promising a customer external
+  auth. Misconfig/unreachable surfaces as
   `EXTERNAL_AUTH_UNAVAILABLE`; admins can self-diagnose via the 試登入 button.
 
 ### `admin-web` service on Zeabur
@@ -100,18 +116,20 @@ If using the bundled `admin-web/Dockerfile`, pass via Docker build arg:
 Nuxt auto-detect injects build-time env from the service's environment
 section.
 
-### Mongo host (`/etc/bandao-backup.env`, mode 0600 root-owned)
+### Backup host (`/etc/bandao-backup.env`, mode 0600 root-owned)
 
 | Var | Required | Notes |
 | --- | --- | --- |
-| `MONGO_URI` | yes | A connection string with a user that has the `backup` role. |
+| `MONGO_URI` | yes | Connection string with a user holding the `backup` role. Must point at the **Zeabur** Mongo — pointing it at a local mongod is the bug described under "Backups". |
 | `MONGO_DB` | yes | `bandao` |
 | `AGE_RECIPIENT` | yes | `age1...` public key. The matching private key lives off-host. |
-| `S3_BUCKET` | yes | Dedicated bucket. |
+| `S3_BUCKET` | yes | `bandao-mongo-backups-apne1`, in AWS account `869847891424`. Dedicated to bandao — do not share it with another project. |
 | `S3_REGION` | yes | e.g. `ap-northeast-1`. |
 | `S3_ACCESS_KEY_ID` | yes | IAM user scoped to this bucket. |
 | `S3_SECRET_ACCESS_KEY` | yes | |
 | `S3_PREFIX` | no | Optional prefix inside the bucket. |
+| `ASSERT_COLLECTION` / `ASSERT_MIN_COUNT` | no, set them | Refuse to dump a source that does not look like production. |
+| `MIN_ARCHIVE_BYTES` | no, set it | Refuse to upload an undersized archive. |
 
 Never commit any of these values. Examples in `infra/mongo-host/README.md`
 use placeholders.
@@ -120,20 +138,20 @@ use placeholders.
 
 Order matters. Each step has a verifiable acceptance criterion.
 
-1. **Provision the Mongo host.** Pick a VPS / NAS the operator can root-SSH
-   into. Install `mongod` 7.x, `tailscale`, `awscli` v2, `age`, and
-   `mongodb-database-tools`. Bind `mongod` to `127.0.0.1` and the
-   `tailscale0` interface only — verify with `ss -lntp`. ✓ when no
-   `0.0.0.0:27017` line appears.
+1. **Provision MongoDB on Zeabur.** Add the managed Mongo service to the
+   project and note its connection string. ✓ when `mongosh "<uri>"` connects
+   and `db.stats()` returns.
 
-2. **Bring up Tailscale on the Mongo host.** `sudo tailscale up
-   --advertise-tags=tag:bandao-mongo`. ✓ when the host appears in the
-   tailnet admin UI.
+2. **Restrict the endpoint.** The managed endpoint is public by default.
+   Limit it to the Zeabur services and the operator machine that runs the
+   legacy backfill, and enable TLS. ✓ when a connection from an unlisted
+   address is refused. _(Not done as of 2026-08-30.)_
 
-3. **Mint a Tailscale auth key for the api container.** Reusable,
-   non-ephemeral, tagged `tag:bandao-api`. Store as the Zeabur service env
-   `TS_AUTHKEY`. Add an ACL rule allowing `tag:bandao-api → tag:bandao-mongo`
-   on `tcp:27017` only.
+3. **Provision the backup host.** Any always-on Linux box that can reach the
+   Zeabur Mongo. Install `awscli` v2, `age`, `mongodb-database-tools`, and
+   `mongodb-mongosh`. It does **not** need to run `mongod`. ✓ when
+   `mongodump --uri="<zeabur uri>" --db=bandao --archive > /dev/null`
+   succeeds.
 
 4. **Provision the S3 backup bucket + IAM user.** Permissions limited to
    `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` on the single bucket.
@@ -221,17 +239,37 @@ to be the next deploy and the next thing CI verifies.
 Mongo state is unaffected by either path. If a prod commit corrupted data,
 run a restore from S3 instead — see below.
 
-## Tailscale auth-key rotation
+## Backups
 
-1. In the Tailscale admin console, generate a new reusable, non-ephemeral
-   key tagged `tag:bandao-api`.
-2. Update the `TS_AUTHKEY` env var on the api service in Zeabur.
-3. Redeploy the api service (or wait for the next merge to `main`).
-4. The previous container picks up the new key on the next rollout; old
-   nodes drop off the tailnet automatically.
-5. Revoke the old key in the Tailscale admin console.
+The daily dump is defined in [`infra/mongo-host/`](./infra/mongo-host/):
+a systemd timer runs `bandao-backup.sh` at 03:30, which dumps Mongo,
+encrypts with `age`, and uploads to `s3://bandao-mongo-backups-apne1/daily/`.
+S3 lifecycle expires that prefix after 30 days.
 
-The existing image is fine — only the env var needs to change.
+> **There is no known-good backup of production.** As of 2026-08-30 the
+> bucket above is newly created and empty; no bandao dump has been confirmed
+> to land anywhere, and the host running `bandao-backup.timer` has not been
+> located — it is not the operator Mac, and the repo never recorded which
+> machine was provisioned for it.
+>
+> A daily `*.archive.gz.age` object does land in a different bucket on this
+> script's schedule and naming pattern, sized ~6.9 KB against a production
+> dataset of ~8 MB and ~32k documents. Whether those are bandao's — written
+> by a copy of this script still pointed at the pre-migration
+> `127.0.0.1:27017` — or another project's is **unverified**: they are
+> age-encrypted and the private key is off-host by design. Either way,
+> nothing has been shown to restore bandao.
+>
+> To reach a known-good state: locate the timer host, point `MONGO_URI` at
+> the Zeabur connection string and `S3_BUCKET` at the dedicated bucket, set
+> `ASSERT_COLLECTION` / `ASSERT_MIN_COUNT` / `MIN_ARCHIVE_BYTES`, then run
+> the restore drill.
+
+Never treat "an object landed in S3" as evidence the backup works. Every
+command in the pipeline exits 0 when it dumps an empty database — that is
+how this went unnoticed. Compare the object's size against the production
+dataset, keep the bucket dedicated so provenance is never in doubt, and run
+the drill.
 
 ## Restoring Mongo from S3
 
@@ -242,7 +280,7 @@ recovery source. **Practice this monthly** via the drill script — see
 1. Confirm which dump to restore from (`aws s3 ls s3://$S3_BUCKET/daily/`).
 2. Stop writes by pausing the api Zeabur service or scaling it to zero.
 3. Mount the operator's `age` private key at a tmpfs path (see drill
-   instructions). Never persist the key on the Mongo host.
+   instructions). Never persist the key on the backup host.
 4. Stream the dump back into the live database:
 
    ```bash
@@ -797,7 +835,7 @@ to the same prod api regardless of build.
 
 ## Out-of-scope (tracked in `ROADMAP.md`)
 
-- `/readyz` endpoint with deep dependency checks (Mongo ping, tailnet up).
+- `/readyz` endpoint with deep dependency checks (Mongo ping).
 - Centralized log aggregation / metrics (Loki, Sentry, Grafana).
 - Staging environment.
 - Multi-region or HA Mongo.
