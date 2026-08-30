@@ -382,6 +382,13 @@ so a slow hour cannot race the next one, and the `--since-days 1` window
 re-imports nothing thanks to the partial unique index on `legacy_source_id`
 (a re-run reports `already present (re-run no-op)`).
 
+Each run reconciles `checkin_user_status` for the AppUsers it saw a checkin
+document for, so **no API restart is needed after an import** and the status
+board stays current between deploys. It reconciles them whether or not the
+run inserted anything new — a window that is already imported is exactly when
+the projection has had time to drift. The summary line to look for is
+`status reconciled: N of M AppUsers needed a fix`.
+
 ### Version numbering (read before cutting either platform)
 
 `app/pubspec.yaml`'s `version: <name>+<build>` drives **both** platforms:
