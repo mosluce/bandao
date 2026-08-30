@@ -238,7 +238,10 @@ class AppLocalizations {
   String get serverConfigEntry => _isZh ? '伺服器設定' : 'Server settings';
   String get serverConfigHelper => _isZh
       ? '自建伺服器請填 https 網址；留空即使用官方預設'
-      : 'Enter your self-hosted https URL, or leave the default';
+      : 'Enter your self-hosted https URL, or leave blank for the official default';
+  String get serverConfigPrivacyHelper => _isZh
+      ? '自建伺服器請填 https 網址；留空即使用官方預設'
+      : 'Enter your self-hosted https URL, or leave blank for the official default';
   String get serverConfigResetDefault =>
       _isZh ? '恢復官方預設' : 'Reset to default';
   String get serverConfigHttpsRequired =>

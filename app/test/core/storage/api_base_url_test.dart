@@ -73,6 +73,27 @@ void main() {
     });
   });
 
+  group('validateBaseUrlOverride (empty string)', () {
+    // The empty string stays malformed in BOTH modes and deliberately carries
+    // no "clear the override" meaning. Callers that want to clear detect a
+    // blank input and take the clear path before validating, which keeps this
+    // a pure predicate over candidate URLs rather than something every future
+    // caller has to know has a second mode.
+    test('is malformed in release', () {
+      expect(
+        validateBaseUrlOverride('', release: true),
+        BaseUrlOverrideError.malformed,
+      );
+    });
+
+    test('is malformed in debug', () {
+      expect(
+        validateBaseUrlOverride('', release: false),
+        BaseUrlOverrideError.malformed,
+      );
+    });
+  });
+
   group('ApiBaseUrlResolver', () {
     test('returns the compile-time default when no override is stored',
         () async {

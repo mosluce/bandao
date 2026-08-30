@@ -39,18 +39,29 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
     _seed();
   }
 
+  /// Seed each input from the STORED OVERRIDE only, leaving it empty when
+  /// none exists.
+  ///
+  /// It used to fall back to `Env.compileTimeDefault()`, which made the two
+  /// states indistinguishable: "you have an override of X" and "you have no
+  /// override, and X is this build's default" rendered identically. Since
+  /// `_save` persists whatever is in the box, opening the screen and tapping
+  /// 儲存 without editing silently froze that build's default into secure
+  /// storage — and an override outranks the compile-time value forever, so
+  /// every later URL change shipped in an app update became invisible to the
+  /// device. On iOS the Keychain entry survives app deletion, so a reinstall
+  /// did not clear it either.
+  ///
+  /// An empty box now means "no override"; the effective URL is displayed
+  /// immediately above it either way, so nothing is hidden.
   Future<void> _seed() async {
     final overrides = ref.read(serverUrlOverrideProvider);
     final saved = await overrides.read();
     final storage = ref.read(secureStorageProvider);
     final savedPrivacy = await storage.readPrivacyUrlOverride();
     if (!mounted) return;
-    _input.text = (saved == null || saved.isEmpty)
-        ? Env.compileTimeDefault()
-        : saved;
-    _privacyInput.text = (savedPrivacy == null || savedPrivacy.isEmpty)
-        ? Env.privacyUrlCompileTimeDefault()
-        : savedPrivacy;
+    _input.text = saved ?? '';
+    _privacyInput.text = savedPrivacy ?? '';
     setState(() => _initialized = true);
   }
 
@@ -64,6 +75,25 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   Future<void> _save() async {
     final l10n = AppLocalizations.of(context);
     final url = _input.text.trim();
+
+    // Blank means "no override" — the field's own helper text promises this
+    // (留空即使用官方預設) and until now it was a lie: `validateBaseUrlOverride`
+    // parses "" as a URI with no scheme and rejects it as malformed. Route
+    // blank to the clear path BEFORE validating, so the validator stays a
+    // pure predicate over candidate URLs with no empty-string special case.
+    if (url.isEmpty) {
+      await _clear();
+      return;
+    }
+
+    // Note what is deliberately NOT here: a comparison against
+    // `Env.compileTimeDefault()`. A value the user typed is stored as typed,
+    // even when it equals the default. The default is a fixed property of the
+    // build that nothing here redefines — which is why 恢復官方預設 can always
+    // return to it — and what an override sets is the *current* value. The
+    // accidental-pinning path is already closed by `_seed` leaving the box
+    // empty, so a second guard would only add a save that silently discards
+    // what the user entered.
     switch (validateBaseUrlOverride(url)) {
       case BaseUrlOverrideError.insecureScheme:
         setState(() => _error = l10n.serverConfigHttpsRequired);
@@ -124,11 +154,36 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   }
 
   Future<void> _savePrivacy() async {
+    final l10n = AppLocalizations.of(context);
     final url = _privacyInput.text.trim();
-    final parsed = Uri.tryParse(url);
-    if (parsed == null || !parsed.hasScheme || !parsed.hasAuthority) {
-      setState(() => _privacyError = AppLocalizations.of(context).errorGeneric);
+
+    if (url.isEmpty) {
+      await _clearPrivacy();
+      if (!mounted) return;
+      // The base-URL blank path navigates away, which is its own
+      // acknowledgement. This section stays put, so say something — a 儲存
+      // that appears to do nothing reads as a bug.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.devMenuSaved)),
+      );
       return;
+    }
+
+    // Same build-mode rules as the base URL rather than a parallel check.
+    // This section renders in release builds (the kDebugMode gate sits below
+    // it), and its old inline scheme+authority test accepted `http://` there
+    // — so the field next to one that rejects cleartext was quietly taking
+    // it. Both values are URLs the app opens on the user's behalf, so they
+    // get the same rules; two sets would be two things to drift.
+    switch (validateBaseUrlOverride(url)) {
+      case BaseUrlOverrideError.insecureScheme:
+        setState(() => _privacyError = l10n.serverConfigHttpsRequired);
+        return;
+      case BaseUrlOverrideError.malformed:
+        setState(() => _privacyError = l10n.errorGeneric);
+        return;
+      case null:
+        break;
     }
     setState(() => _privacyError = null);
     final storage = ref.read(secureStorageProvider);
@@ -144,7 +199,10 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
     final storage = ref.read(secureStorageProvider);
     await storage.clearPrivacyUrlOverride();
     ref.invalidate(effectivePrivacyUrlProvider);
-    _privacyInput.text = Env.privacyUrlCompileTimeDefault();
+    // Empty, not the compile-time default: the box shows overrides, and there
+    // is no longer one. Re-seeding it with the default would put the value
+    // back within one tap of being written straight back to storage.
+    _privacyInput.text = '';
     if (!mounted) return;
     setState(() => _privacyError = null);
   }
@@ -223,9 +281,11 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                     ),
                     const SizedBox(height: 16),
                     TextField(
+                      key: const Key('server_config.privacy_url'),
                       controller: _privacyInput,
                       decoration: InputDecoration(
                         labelText: l10n.devMenuPrivacyInputLabel,
+                        helperText: l10n.serverConfigPrivacyHelper,
                         border: const OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.url,
@@ -245,11 +305,13 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: <Widget>[
                         TextButton(
+                          key: const Key('server_config.privacy_clear'),
                           onPressed: _clearPrivacy,
                           child: Text(l10n.devMenuClear),
                         ),
                         const SizedBox(width: 8),
                         FilledButton(
+                          key: const Key('server_config.privacy_save'),
                           onPressed: _savePrivacy,
                           child: Text(l10n.devMenuSave),
                         ),
