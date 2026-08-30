@@ -32,7 +32,7 @@ env vars, or operational procedures should land here in the same PR.
                 └─────────────────────────────────────────────────────────────────────┘
 
      operator Mac ─▶ hourly legacy-backfill job ─▶ same public Mongo endpoint
-     backup host  ─▶ daily dump ─▶ s3://backup.ccmos.tw/daily/ (age-encrypted)
+     backup host  ─▶ daily dump ─▶ s3://bandao-mongo-backups-apne1/daily/
 ```
 
 - `bandao-admin.ccmos.tw` and `bandao-api.ccmos.tw` are siblings under the
@@ -123,7 +123,7 @@ section.
 | `MONGO_URI` | yes | Connection string with a user holding the `backup` role. Must point at the **Zeabur** Mongo — pointing it at a local mongod is the bug described under "Backups". |
 | `MONGO_DB` | yes | `bandao` |
 | `AGE_RECIPIENT` | yes | `age1...` public key. The matching private key lives off-host. |
-| `S3_BUCKET` | yes | `backup.ccmos.tw`, in AWS account `869847891424`. |
+| `S3_BUCKET` | yes | `bandao-mongo-backups-apne1`, in AWS account `869847891424`. Dedicated to bandao — do not share it with another project. |
 | `S3_REGION` | yes | e.g. `ap-northeast-1`. |
 | `S3_ACCESS_KEY_ID` | yes | IAM user scoped to this bucket. |
 | `S3_SECRET_ACCESS_KEY` | yes | |
@@ -243,24 +243,33 @@ run a restore from S3 instead — see below.
 
 The daily dump is defined in [`infra/mongo-host/`](./infra/mongo-host/):
 a systemd timer runs `bandao-backup.sh` at 03:30, which dumps Mongo,
-encrypts with `age`, and uploads to `s3://backup.ccmos.tw/daily/`. S3
-lifecycle expires that prefix after 30 days.
+encrypts with `age`, and uploads to `s3://bandao-mongo-backups-apne1/daily/`.
+S3 lifecycle expires that prefix after 30 days.
 
-> **Currently broken.** The August 2026 migration moved Mongo to Zeabur but
-> `MONGO_URI` on the backup host still points at `127.0.0.1:27017`, so the
-> timer has been dumping the drained self-hosted database. Archives went from
-> ~20 KB on 8/01 to ~6.9 KB from 8/19 onward, against a production dataset of
-> ~8 MB and ~32k documents. Every command exits 0 — a dump of an empty
-> database is a valid dump — so nothing went red. With the 30-day lifecycle,
-> **no object in S3 can restore production.**
+> **There is no known-good backup of production.** As of 2026-08-30 the
+> bucket above is newly created and empty; no bandao dump has been confirmed
+> to land anywhere, and the host running `bandao-backup.timer` has not been
+> located — it is not the operator Mac, and the repo never recorded which
+> machine was provisioned for it.
 >
-> To fix: repoint `MONGO_URI` at the Zeabur connection string, set
-> `ASSERT_COLLECTION` / `ASSERT_MIN_COUNT` / `MIN_ARCHIVE_BYTES` so the
-> failure cannot recur silently, then run the restore drill to confirm the
-> new dumps actually restore.
+> A daily `*.archive.gz.age` object does land in a different bucket on this
+> script's schedule and naming pattern, sized ~6.9 KB against a production
+> dataset of ~8 MB and ~32k documents. Whether those are bandao's — written
+> by a copy of this script still pointed at the pre-migration
+> `127.0.0.1:27017` — or another project's is **unverified**: they are
+> age-encrypted and the private key is off-host by design. Either way,
+> nothing has been shown to restore bandao.
+>
+> To reach a known-good state: locate the timer host, point `MONGO_URI` at
+> the Zeabur connection string and `S3_BUCKET` at the dedicated bucket, set
+> `ASSERT_COLLECTION` / `ASSERT_MIN_COUNT` / `MIN_ARCHIVE_BYTES`, then run
+> the restore drill.
 
-Never treat "an object landed in S3" as evidence the backup works. Compare
-its size against the production dataset, and run the drill.
+Never treat "an object landed in S3" as evidence the backup works. Every
+command in the pipeline exits 0 when it dumps an empty database — that is
+how this went unnoticed. Compare the object's size against the production
+dataset, keep the bucket dedicated so provenance is never in doubt, and run
+the drill.
 
 ## Restoring Mongo from S3
 
