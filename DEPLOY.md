@@ -50,7 +50,7 @@ env vars, or operational procedures should land here in the same PR.
 
 ## Repositories and ownership
 
-- `api/` — Rust binary; `Dockerfile` + `entrypoint.sh` ship the image.
+- `api/` — Rust binary; `Dockerfile` ships the image.
 - `admin-web/` — Nuxt 3 SPA (`ssr: false`); `Dockerfile` is provided as a
   fallback (nginx serving `.output/public` with SPA fallback) in case
   Zeabur's Nuxt auto-detect does not handle SPA routing.
