@@ -1,20 +1,42 @@
 # Mongo host backup pipeline
 
 Daily encrypted dump → S3 + monthly restore drill, packaged for the operator
-to drop onto the production Mongo host.
+to drop onto a host that can reach the production database.
+
+> **There is no known-good backup of production, and this pipeline's current
+> state is unverified.** As of 2026-08-30 the bucket named below,
+> `bandao-mongo-backups-apne1`, is newly created and empty. No bandao dump
+> has been confirmed to land anywhere.
+>
+> What is known: a daily `*.archive.gz.age` object does land in a *different*
+> bucket on the same schedule and naming pattern this script produces, sized
+> ~6.9 KB against a production dataset of ~8 MB and ~32k documents. Whether
+> those objects are bandao's — written by a copy of this script whose
+> `MONGO_URI` still points at the pre-migration `127.0.0.1:27017` — or belong
+> to another project entirely has **not** been established; they are
+> age-encrypted and the private key is off-host by design. Either way, no
+> object anywhere has been shown to restore bandao.
+>
+> To get to a known-good state: find the host running `bandao-backup.timer`,
+> point `MONGO_URI` at the Zeabur connection string and `S3_BUCKET` at the
+> dedicated bucket below, set the guards, then run the restore drill. A
+> dedicated bucket is what makes the next such question answerable from
+> `aws s3 ls` alone.
 
 ## Files
 
 | Path on repo | Path on host | Purpose |
 | --- | --- | --- |
-| `bandao-backup.sh` | `/usr/local/bin/bandao-backup.sh` | Daily dump + age + s3 cp |
+| `bandao-backup.sh` | `/usr/local/bin/bandao-backup.sh` | Daily dump + age + s3 cp, with pre-dump and size guards |
 | `bandao-restore-drill.sh` | `/usr/local/bin/bandao-restore-drill.sh` | Pulls latest dump, restores to scratch DB, asserts counts |
 | `bandao-backup.service` | `/etc/systemd/system/bandao-backup.service` | One-shot unit invoked by the timer |
 | `bandao-backup.timer` | `/etc/systemd/system/bandao-backup.timer` | Daily 03:30 schedule |
 
-## One-time setup on the Mongo host
+## One-time setup on the backup host
 
-Assumes Debian 12 / Ubuntu 22.04+. Adjust package names for other distros.
+Any always-on Linux host that can reach the production Mongo will do; it no
+longer has to be the database host itself. Assumes Debian 12 / Ubuntu 22.04+.
+Adjust package names for other distros.
 
 ```bash
 # Tooling — mongo client, awscli v2, age.
@@ -23,7 +45,7 @@ sudo apt-get install -y mongodb-mongosh mongodb-database-tools awscli age
 ```
 
 Generate the encryption keypair on the operator's workstation (NOT on the
-Mongo host) and copy only the public key to the host:
+backup host) and copy only the public key to the host:
 
 ```bash
 # on workstation:
@@ -44,7 +66,9 @@ sudo install -m 0644 bandao-backup.timer /etc/systemd/system/
 Create `/etc/bandao-backup.env` (mode 0600, root-owned):
 
 ```
-MONGO_URI=mongodb://backup_user:<pw>@127.0.0.1:27017/?authSource=admin
+# Must reach the database production actually writes to. Since the Zeabur
+# migration this is NOT 127.0.0.1 — use the Zeabur connection string.
+MONGO_URI=mongodb://backup_user:<pw>@<zeabur-host>:<port>/?authSource=admin
 MONGO_DB=bandao
 AGE_RECIPIENT=age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 S3_BUCKET=bandao-mongo-backups-apne1
@@ -53,6 +77,11 @@ S3_ACCESS_KEY_ID=AKIAxxxxxxxxxxxxxxxx
 S3_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # optional:
 # S3_PREFIX=bandao
+
+# Guards — both optional, both strongly recommended. See "Guards" below.
+ASSERT_COLLECTION=checkin_events
+ASSERT_MIN_COUNT=1000
+MIN_ARCHIVE_BYTES=100000
 ```
 
 Lock it down:
@@ -61,6 +90,35 @@ Lock it down:
 sudo chmod 0600 /etc/bandao-backup.env
 sudo chown root:root /etc/bandao-backup.env
 ```
+
+The bucket is `bandao-mongo-backups-apne1` in AWS account `869847891424`,
+`ap-northeast-1`, under the `daily/` prefix. Created 2026-08-30 with
+versioning, SSE-S3, Block Public Access, and the lifecycle rule below.
+
+It is **dedicated to bandao** on purpose. Sharing a bucket with other
+projects is what made "is this object ours?" unanswerable without the
+decryption key — a question worth answering during an incident, not after.
+Do not point another project's backup at it.
+
+### Guards
+
+Every command in the old pipeline exited 0 while it backed up the wrong
+database for weeks, because a dump of an empty database is a valid dump.
+Two opt-in checks close that gap; set both.
+
+| Key | Effect |
+| --- | --- |
+| `ASSERT_COLLECTION` | Counts documents in this collection (via `mongosh`) **before** dumping. Nothing runs if the source does not look like production. |
+| `ASSERT_MIN_COUNT` | Minimum that count must reach. Default `1`; set it near the real row count, not to 1 — the failure being guarded against left a handful of documents behind, not zero. |
+| `MIN_ARCHIVE_BYTES` | Refuses to upload an archive smaller than this. Default `100000`. |
+
+Exit codes: `64` missing config, `65` pre-dump assertion failed, `66`
+archive below the size floor. A non-zero exit fails the systemd unit, so
+these surface wherever the timer's failures are already routed.
+
+The script stages the archive to a temp file (removed on exit) instead of
+streaming into `aws s3 cp -`, because a stream cannot be measured before it
+lands. Scratch space needed is one compressed dump — single-digit MB today.
 
 Mongo user for backups (run from `mongosh` as a dbAdmin):
 
@@ -109,13 +167,17 @@ sudo mount -t tmpfs -o size=16k,mode=0700 tmpfs /run/bandao-drill
 sudo env \
   AGE_IDENTITY_FILE=/run/bandao-drill/age.key \
   ASSERT_COLLECTION=checkin_events \
-  ASSERT_MIN_COUNT=1 \
+  ASSERT_MIN_COUNT=1000 \
   /usr/local/bin/bandao-restore-drill.sh
 
 # Always tear down:
 sudo umount /run/bandao-drill
 sudo rmdir /run/bandao-drill
 ```
+
+Set `ASSERT_MIN_COUNT` to something near the real row count rather than `1`.
+A drill that only asserts "at least one document" passes against a dump of a
+drained database, which is exactly the state that went unnoticed for weeks.
 
 A failed drill exits non-zero and writes the failure to syslog tagged
 `bandao-restore-drill`. Wire that into the operator's alerting (mailx,
