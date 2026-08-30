@@ -21,22 +21,13 @@ FROM debian:bookworm-slim AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# ca-certificates only: the api makes outbound TLS connections (Mongo,
+# Resend, customers' MSSQL) and nothing else here needs a package.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
-        curl \
-        gnupg \
-        iptables \
-    && curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg \
-        -o /usr/share/keyrings/tailscale-archive-keyring.gpg \
-    && curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.tailscale-keyring.list \
-        -o /etc/apt/sources.list.d/tailscale.list \
-    && apt-get update && apt-get install -y --no-install-recommends tailscale \
-    && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/bandao-api /usr/local/bin/bandao-api
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/bandao-api"]
