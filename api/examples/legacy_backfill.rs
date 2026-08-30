@@ -34,10 +34,22 @@
 //! written row carries the legacy document's `_id` as `legacy_source_id`,
 //! and both target collections have a partial unique index on that field —
 //! re-processing the same legacy document is a no-op.
+//!
+//! Imported rows are written straight at the repository layer, which skips
+//! the `checkin_user_status` update the live endpoints perform. The run
+//! therefore reconciles that projection itself before exiting, for every
+//! AppUser it routed a checkin document to — including AppUsers whose
+//! documents were all imported by an earlier run, since a window that is
+//! already imported is exactly the case where the projection has had time
+//! to drift. This used to be deferred to `repair_checkin_status_drift` on
+//! the next API restart, which stopped being a real mechanism once the
+//! script became an unattended hourly job with nobody to restart anything.
 
+use std::collections::HashSet;
 use std::process::ExitCode;
 use std::time::{Duration, SystemTime};
 
+use bandao_api::services::checkin_status::{RepairOutcome, reconcile_app_user};
 use bandao_api::services::legacy_backfill::{
     LegacyCheckinDoc, RoutedAction, RunSummary, build_checkin_event, build_identity_map,
     build_location_ping, legacy_query_filter, route_action,
@@ -217,6 +229,9 @@ async fn main() -> ExitCode {
     let mut summary = RunSummary::default();
     let mut newly_inserted = 0u64;
     let mut already_present = 0u64;
+    // AppUsers this run saw a checkin document for. Reconciled after the
+    // import loop; see the note there for why this is not keyed on inserts.
+    let mut touched_app_users: HashSet<ObjectId> = HashSet::new();
 
     loop {
         let advanced = match cursor.advance().await {
@@ -261,6 +276,11 @@ async fn main() -> ExitCode {
         match route_action(&doc.action) {
             RoutedAction::Checkin(event_type) => {
                 summary.record_checkin(event_type);
+                // Tracked regardless of dry-run, and regardless of whether
+                // the upsert below actually inserts: a window whose events
+                // were all imported by an earlier run is precisely when the
+                // projection has had time to drift away from them.
+                touched_app_users.insert(app_user_id);
                 if !args.dry_run {
                     let event = build_checkin_event(&doc, args.org_id, app_user_id, event_type);
                     match db.checkin_events.upsert_legacy(&event).await {
@@ -297,6 +317,29 @@ async fn main() -> ExitCode {
         }
     }
 
+    // `location_pings` play no part in the status machine, so only the
+    // checkin-routed AppUsers above are reconciled. Scoping it this way also
+    // keeps the re-seat (delete + re-insert) away from AppUsers who are
+    // submitting live events through the App right now.
+    let mut reconciled_changed = 0u64;
+    if !args.dry_run {
+        for app_user_id in &touched_app_users {
+            match reconcile_app_user(&db, *app_user_id, args.org_id).await {
+                Ok(RepairOutcome::Ok) => {}
+                Ok(RepairOutcome::Fixed | RepairOutcome::Initialised) => reconciled_changed += 1,
+                Err(err) => {
+                    // Best-effort, matching how per-document upsert failures
+                    // are handled: the projection is left as stale as it
+                    // already was, which is not worth failing an otherwise
+                    // successful import over.
+                    eprintln!(
+                        "warning: failed to reconcile checkin_user_status for AppUser {app_user_id}: {err}"
+                    );
+                }
+            }
+        }
+    }
+
     println!(
         "{} legacy_backfill run for org {} (collection `{}`, domain {}, since {} days ago{})",
         if args.dry_run { "DRY-RUN" } else { "REAL" },
@@ -328,11 +371,14 @@ async fn main() -> ExitCode {
         "  skipped (malformed document): {}",
         summary.skipped_malformed_document
     );
-    if !args.dry_run {
+    if args.dry_run {
+        println!("  would reconcile: {} AppUsers", touched_app_users.len());
+    } else {
         println!("  newly inserted: {newly_inserted}");
         println!("  already present (re-run no-op): {already_present}");
         println!(
-            "\nRestart the bandao-api process now so repair_checkin_status_drift reconciles checkin_user_status."
+            "  status reconciled: {reconciled_changed} of {} AppUsers needed a fix",
+            touched_app_users.len()
         );
     }
 

@@ -8,14 +8,15 @@
 
 mod common;
 
+use std::collections::HashSet;
 use std::time::{Duration, SystemTime};
 
 use bandao_api::domain::AppUserCheckinStatus;
+use bandao_api::services::checkin_status::reconcile_app_user;
 use bandao_api::services::legacy_backfill::{
     LegacyCheckinDoc, RoutedAction, RunSummary, build_checkin_event, build_identity_map,
     build_location_ping, legacy_query_filter, route_action,
 };
-use bandao_api::startup::repair_checkin_status_drift;
 use bson::doc;
 use bson::oid::ObjectId;
 use common::{TestApp, current_org_id};
@@ -49,6 +50,7 @@ async fn run_import(
         .expect("query legacy fixture");
 
     let mut summary = RunSummary::default();
+    let mut touched_app_users: HashSet<ObjectId> = HashSet::new();
     while cursor.advance().await.expect("advance cursor") {
         let doc: LegacyCheckinDoc = cursor
             .deserialize_current()
@@ -66,6 +68,7 @@ async fn run_import(
         match route_action(&doc.action) {
             RoutedAction::Checkin(event_type) => {
                 summary.record_checkin(event_type);
+                touched_app_users.insert(app_user_id);
                 if !dry_run {
                     let event = build_checkin_event(&doc, org_id, app_user_id, event_type);
                     db.checkin_events
@@ -87,6 +90,13 @@ async fn run_import(
             RoutedAction::Unrecognized => {
                 summary.skipped_unrecognized_action += 1;
             }
+        }
+    }
+    if !dry_run {
+        for app_user_id in &touched_app_users {
+            reconcile_app_user(&db, *app_user_id, org_id)
+                .await
+                .expect("reconcile checkin_user_status");
         }
     }
     summary
@@ -340,30 +350,35 @@ async fn real_run_routes_skips_and_reruns_are_idempotent() {
         .expect("count location_pings after rerun");
     assert_eq!(ping_count_after_rerun, 1, "rerun must not duplicate rows");
 
-    // The AppUser was created off_duty and no live event has been
-    // submitted — the imported history hasn't been reconciled into
-    // checkin_user_status yet.
-    let status_before_repair = app
+    // The import reconciles checkin_user_status itself: the AppUser was
+    // created off_duty, the imported clock_in is now their latest event, and
+    // no API restart happened in between.
+    let status = app
         .db()
         .checkin_user_status
         .find(app_user_id)
         .await
         .expect("find status")
         .expect("status row exists");
-    assert_eq!(status_before_repair.status, AppUserCheckinStatus::OffDuty);
+    assert_eq!(status.status, AppUserCheckinStatus::OnSite);
 
-    // Restarting the API runs this repair; the imported clock_in becomes
-    // the AppUser's latest event, so status should now read on_site.
-    repair_checkin_status_drift(&app.db()).await;
-
-    let status_after_repair = app
+    let latest = app
         .db()
-        .checkin_user_status
-        .find(app_user_id)
+        .checkin_events
+        .latest_for_app_user(app_user_id)
         .await
-        .expect("find status")
-        .expect("status row exists");
-    assert_eq!(status_after_repair.status, AppUserCheckinStatus::OnSite);
+        .expect("latest event")
+        .expect("an event was imported");
+    assert_eq!(
+        status.last_event_id,
+        Some(latest.id),
+        "the projection must point at the imported event, not just match its status"
+    );
+    assert_eq!(
+        status.current_shift_started_at,
+        Some(latest.occurred_at_client),
+        "an open shift is stamped from the event that opened it"
+    );
 }
 
 #[tokio::test]
@@ -406,5 +421,219 @@ async fn since_days_window_excludes_records_older_than_the_cutoff() {
     assert_eq!(
         widened.clock_out, 1,
         "override widens the window to include it"
+    );
+}
+
+/// Force `checkin_user_status` into a state that disagrees with the event
+/// log, the way an appender that never touches the projection leaves it.
+/// `last_event_id` is deliberately left pointing at a stale event.
+async fn drift_status_to_on_site(
+    app: &TestApp,
+    app_user_id: ObjectId,
+    stale_event_id: ObjectId,
+    started_at: bson::DateTime,
+) {
+    app.db()
+        .database
+        .collection::<bson::Document>("checkin_user_status")
+        .update_one(
+            doc! { "_id": app_user_id },
+            doc! { "$set": {
+                "status": "on_site",
+                "current_shift_started_at": started_at,
+                "last_event_id": stale_event_id,
+            }},
+        )
+        .await
+        .expect("drift status row");
+}
+
+async fn raw_status(app: &TestApp, app_user_id: ObjectId) -> bson::Document {
+    app.db()
+        .database
+        .collection::<bson::Document>("checkin_user_status")
+        .find_one(doc! { "_id": app_user_id })
+        .await
+        .expect("read raw status row")
+        .expect("status row exists")
+}
+
+#[tokio::test]
+async fn a_rerun_over_already_imported_documents_still_repairs_drift() {
+    // The case that motivated in-run reconciliation: by the time the fix
+    // ships, the drifted AppUsers' recent events are already imported, so a
+    // run that inserts nothing new must still correct the projection.
+    let app = TestApp::spawn().await;
+    let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
+    let org_id = ObjectId::parse_str(current_org_id(&body)).unwrap();
+    let create_body = app.create_app_user(&admin, "fang", "張正芳").await;
+    let app_user_id = ObjectId::parse_str(create_body["user"]["id"].as_str().unwrap()).unwrap();
+
+    let legacy_domain = ObjectId::new();
+    let (typed_coll, raw_coll) = legacy_fixture(&app, "legacy_fixture_rerun_drift");
+    let clock_in_at =
+        bson::DateTime::from_system_time(SystemTime::now() - Duration::from_secs(9 * 3600));
+    let clock_out_at =
+        bson::DateTime::from_system_time(SystemTime::now() - Duration::from_secs(3600));
+    raw_coll
+        .insert_one(legacy_doc("上班", "fang", legacy_domain, clock_in_at))
+        .await
+        .expect("seed clock_in");
+    raw_coll
+        .insert_one(legacy_doc("下班", "fang", legacy_domain, clock_out_at))
+        .await
+        .expect("seed clock_out");
+
+    let first = run_import(&app, &typed_coll, org_id, legacy_domain, 365, false).await;
+    assert_eq!(first.clock_in, 1);
+    assert_eq!(first.clock_out, 1);
+
+    // Rewind the projection to the frozen state the production board was
+    // stuck in: on_site since the morning's clock_in, blind to the clock_out
+    // that landed after it.
+    let clock_in_event = app
+        .db()
+        .checkin_events
+        .list_by_app_user_paginated(app_user_id, None, None, None, 50)
+        .await
+        .expect("list events")
+        .into_iter()
+        .find(|e| e.occurred_at_client == clock_in_at)
+        .expect("the imported clock_in");
+    drift_status_to_on_site(&app, app_user_id, clock_in_event.id, clock_in_at).await;
+
+    // Every document in the window is already imported — this run inserts
+    // nothing.
+    let second = run_import(&app, &typed_coll, org_id, legacy_domain, 365, false).await;
+    assert_eq!(second, first, "the rerun imports nothing new");
+
+    let status = app
+        .db()
+        .checkin_user_status
+        .find(app_user_id)
+        .await
+        .expect("find status")
+        .expect("status row exists");
+    assert_eq!(
+        status.status,
+        AppUserCheckinStatus::OffDuty,
+        "the clock_out is the latest event, so the AppUser is off duty"
+    );
+    assert_eq!(
+        status.current_shift_started_at, None,
+        "clocking out clears the shift start"
+    );
+    let latest = app
+        .db()
+        .checkin_events
+        .latest_for_app_user(app_user_id)
+        .await
+        .expect("latest event")
+        .expect("events were imported");
+    assert_eq!(status.last_event_id, Some(latest.id));
+    assert_ne!(
+        status.last_event_id,
+        Some(clock_in_event.id),
+        "the stale pointer must not survive"
+    );
+}
+
+#[tokio::test]
+async fn reconciliation_is_scoped_to_app_users_seen_in_the_run() {
+    // Reconciliation re-seats rows destructively, so it must not reach
+    // AppUsers the run had no checkin documents for.
+    let app = TestApp::spawn().await;
+    let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
+    let org_id = ObjectId::parse_str(current_org_id(&body)).unwrap();
+    let ping_only_body = app.create_app_user(&admin, "fang", "張正芳").await;
+    let ping_only_id = ObjectId::parse_str(ping_only_body["user"]["id"].as_str().unwrap()).unwrap();
+    let absent_body = app.create_app_user(&admin, "ming", "王小明").await;
+    let absent_id = ObjectId::parse_str(absent_body["user"]["id"].as_str().unwrap()).unwrap();
+
+    let legacy_domain = ObjectId::new();
+    let (typed_coll, raw_coll) = legacy_fixture(&app, "legacy_fixture_scope");
+    let now = bson::DateTime::now();
+    raw_coll
+        .insert_one(legacy_doc("路徑", "fang", legacy_domain, now))
+        .await
+        .expect("seed path ping");
+
+    // Both AppUsers are drifted; neither should be touched. Their rows have
+    // no events behind them, so a reconciliation would reset them to
+    // off_duty — staying on_site is the observable proof it didn't run.
+    let stale_event_id = ObjectId::new();
+    drift_status_to_on_site(&app, ping_only_id, stale_event_id, now).await;
+    drift_status_to_on_site(&app, absent_id, stale_event_id, now).await;
+
+    let summary = run_import(&app, &typed_coll, org_id, legacy_domain, 365, false).await;
+    assert_eq!(summary.location_pings, 1);
+    assert_eq!(
+        summary.clock_in + summary.clock_out + summary.transfer_in + summary.transfer_out,
+        0,
+        "the window holds no checkin documents, only a location ping"
+    );
+
+    for (id, label) in [
+        (ping_only_id, "an AppUser with only location_pings"),
+        (absent_id, "an AppUser with no documents at all"),
+    ] {
+        let status = app
+            .db()
+            .checkin_user_status
+            .find(id)
+            .await
+            .expect("find status")
+            .expect("status row exists");
+        assert_eq!(
+            status.status,
+            AppUserCheckinStatus::OnSite,
+            "{label} must be left untouched by reconciliation"
+        );
+        assert_eq!(status.last_event_id, Some(stale_event_id));
+    }
+}
+
+#[tokio::test]
+async fn dry_run_does_not_reconcile_status() {
+    let app = TestApp::spawn().await;
+    let (admin, body) = app.register_admin("admin@example.com", "Acme").await;
+    let org_id = ObjectId::parse_str(current_org_id(&body)).unwrap();
+    let create_body = app.create_app_user(&admin, "fang", "張正芳").await;
+    let app_user_id = ObjectId::parse_str(create_body["user"]["id"].as_str().unwrap()).unwrap();
+
+    let legacy_domain = ObjectId::new();
+    let (typed_coll, raw_coll) = legacy_fixture(&app, "legacy_fixture_dry_run_status");
+    let clock_out_at =
+        bson::DateTime::from_system_time(SystemTime::now() - Duration::from_secs(3600));
+    raw_coll
+        .insert_one(legacy_doc("下班", "fang", legacy_domain, clock_out_at))
+        .await
+        .expect("seed clock_out");
+
+    // Import for real, then drift — a dry run over the same window now has
+    // something it would visibly fix if it were allowed to write.
+    run_import(&app, &typed_coll, org_id, legacy_domain, 365, false).await;
+    let latest = app
+        .db()
+        .checkin_events
+        .latest_for_app_user(app_user_id)
+        .await
+        .expect("latest event")
+        .expect("the imported clock_out");
+    drift_status_to_on_site(&app, app_user_id, ObjectId::new(), clock_out_at).await;
+    let before = raw_status(&app, app_user_id).await;
+
+    let summary = run_import(&app, &typed_coll, org_id, legacy_domain, 365, true).await;
+    assert_eq!(summary.clock_out, 1, "the dry run does see the document");
+
+    let after = raw_status(&app, app_user_id).await;
+    assert_eq!(
+        before, after,
+        "a dry run must leave the status row byte-for-byte unchanged"
+    );
+    assert_ne!(
+        after.get_object_id("last_event_id").ok(),
+        Some(latest.id),
+        "the drifted pointer is still drifted — nothing was reconciled"
     );
 }
