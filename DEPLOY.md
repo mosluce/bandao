@@ -1,17 +1,22 @@
 # Production deployment runbook
 
-Production for **班到 (bandao)** runs entirely on Zeabur: the stateless
-services (`api`, `admin-web`) and, since the August 2026 migration, a
-Zeabur-managed MongoDB. The api reaches Mongo over a public endpoint;
-backups are dumped to AWS S3 by a separate host.
+Production for **班到 (bandao)** runs on a single cloud VM that hosts
+everything: the `api` and `admin-web` services under Zeabur's K3s, and
+MongoDB as a host-level `mongod` with no public listener. Backups are dumped
+from that same host to AWS S3.
 
-> **Two open risks, both live.** The Mongo endpoint is reachable from the
-> public internet and the connection string carries no `tls=true`, so
-> credentials and check-in data cross the internet in cleartext — the
-> Tailscale tunnel that used to carry this traffic was removed and nothing
-> replaced it. Separately, the daily backup has been dumping the drained
-> pre-migration database since roughly 2026-08-19 and no usable backup of
-> production exists. See "Backups" below.
+Concrete hostnames, IPs and tailnet names are deliberately absent from this
+file — **this repository is public.** The node is identified in the Zeabur
+dashboard, its tailnet name in the Tailscale admin console, and credentials
+in the operator's password manager. `<node-ts-ip>` and `<tailnet>` below are
+placeholders for those values.
+
+> **Do not merge this revision before the cutover in "Cutover" below is
+> complete.** It describes the topology *after* moving the data back off the
+> Zeabur-managed MongoDB. Until every step there is checked off, production
+> still runs the managed Mongo on a public endpoint with no TLS, and this
+> file would be describing a network that does not exist — the exact failure
+> that made the previous revision worthless.
 
 This file is the authoritative runbook. Changes to production topology,
 env vars, or operational procedures should land here in the same PR.
@@ -20,19 +25,24 @@ env vars, or operational procedures should land here in the same PR.
 
 ```
                 ┌────────────────────────── public internet ──────────────────────────┐
-                │                                                                     │
-   browsers ───▶│  https://bandao-admin.ccmos.tw   (admin-web, Nuxt SPA, Zeabur)      │
-   mobile   ───▶│  https://bandao-api.ccmos.tw     (api, Rust binary, Zeabur)         │
-                │                              │                                      │
-                │                              │  mongodb:// — no TLS                 │
-                │                              ▼                                      │
-                │                    MongoDB (Zeabur-managed)                         │
-                │                    └── public endpoint, SCRAM auth only             │
-                │                                                                     │
-                └─────────────────────────────────────────────────────────────────────┘
-
-     operator Mac ─▶ hourly legacy-backfill job ─▶ same public Mongo endpoint
-     backup host  ─▶ daily dump ─▶ s3://bandao-mongo-backups-apne1/daily/
+   browsers ───▶│  https://bandao-admin.ccmos.tw   (admin-web, Nuxt SPA)              │
+   mobile   ───▶│  https://bandao-api.ccmos.tw     (api, Rust binary)                 │
+                └─────────────────────────────────┬───────────────────────────────────┘
+                                                  │
+  ┌───────────────────────────────────────────────┼──────────────────────────────────┐
+  │ production node · one cloud VM · Zeabur (ZeaburOS + K3s)                         │
+  │                                               │                                  │
+  │   ┌─ K3s ─────────────────────────────────────┴──┐                               │
+  │   │  api pod          admin-web pod              │                               │
+  │   └─────────┬────────────────────────────────────┘                               │
+  │             │ <node-ts-ip>:27017 — stays on this box                             │
+  │             ▼                                                                    │
+  │   mongod 8.2 · bindIp 127.0.0.1,<node-ts-ip> · never on the public IP            │
+  │             ▲                                                                    │
+  │             └── bandao-backup.timer ──▶ s3://…/daily/*.archive.gz.age            │
+  └─────────────┬────────────────────────────────────────────────────────────────────┘
+                │ Tailscale · <tailnet>.ts.net
+   operator Mac ┘ hourly legacy-backfill (08:00–19:00)
 ```
 
 - `bandao-admin.ccmos.tw` and `bandao-api.ccmos.tw` are siblings under the
@@ -40,13 +50,35 @@ env vars, or operational procedures should land here in the same PR.
   so cookie auth survives with `SameSite=Lax`.
 - The api accepts both **cookie auth** (admin-web) and **Bearer token auth**
   (mobile app) on the same host.
-- Mongo **is** reachable from the public internet, protected only by SCRAM
-  credentials. Until the August 2026 migration it was bound to loopback plus
-  a Tailscale interface and reachable only by tagged tailnet nodes; that
-  boundary no longer exists. Two things are worth fixing: the connection
-  string should carry `tls=true` (with TLS enabled server-side), and the
-  endpoint should be restricted to the addresses that need it — the Zeabur
-  services and the operator machine running the legacy backfill.
+- **Everything is one machine.** The api pod, the admin-web pod and `mongod`
+  all live on the same VM. The api reaches Mongo at the node's own
+  Tailscale address, so that traffic never leaves the box. The api is
+  deliberately **not** a tailnet node — putting it on the tailnet would send
+  same-host traffic out through userspace WireGuard and back for no gain.
+- **The operator Mac is the only path that crosses the internet**, and it
+  crosses inside the tailnet. That single path is what Tailscale is here for.
+- **Mongo has no public listener.** `bindIp` is `127.0.0.1,<node-ts-ip>`.
+  A `0.0.0.0:27017` line in `ss -lntp` is an incident, not a config choice —
+  that socket would be carrying every check-in record in production.
+
+### How this shape came about
+
+Worth reading before anyone proposes moving Mongo again.
+
+- **Until 2026-05-07 the api was itself a tailnet node.** The image shipped
+  Tailscale and `entrypoint.sh` ran `tailscale up` with a reusable
+  `TS_AUTHKEY`; `TS_AUTHKEY` was dropped from the Zeabur service around that
+  date and the api has connected directly ever since. `tailscale status`
+  still lists 14 `bandao-api*` nodes last seen 2026-05-07 — one per rollout,
+  because the entrypoint paired `--state=mem:` with a *reusable* key and
+  nothing reaped them. Delete them; nothing joins that tag any more.
+- **In August 2026 Mongo moved to a Zeabur-managed instance** on a public
+  endpoint. An earlier revision of this file blamed that migration for the
+  loss of the encrypted path. That was wrong by three months: the api had
+  been connecting directly since May.
+- **The cutover below moves the data back to a host `mongod`.** That is what
+  actually closes the public endpoint — restoring the tunnel without closing
+  the port would have left the larger hole open.
 
 ## Repositories and ownership
 
@@ -54,9 +86,9 @@ env vars, or operational procedures should land here in the same PR.
 - `admin-web/` — Nuxt 3 SPA (`ssr: false`); `Dockerfile` is provided as a
   fallback (nginx serving `.output/public` with SPA fallback) in case
   Zeabur's Nuxt auto-detect does not handle SPA routing.
-- `infra/mongo-host/` — backup scripts + systemd units, installed on the
-  backup host (which no longer runs the database itself; the directory name
-  predates the Zeabur migration). See
+- `infra/mongo-host/` — backup scripts + systemd units. They are installed
+  on the production node itself; there is no separate backup host and there
+  never was. See
   [`infra/mongo-host/README.md`](./infra/mongo-host/README.md).
 - `openspec/changes/add-zeabur-deployment/` — proposal, design, specs, tasks
   for the change that introduced this runbook.
@@ -68,7 +100,7 @@ env vars, or operational procedures should land here in the same PR.
 | Var | Required | Production value | Notes |
 | --- | --- | --- | --- |
 | `BANDAO_LISTEN_ADDR` | yes | `0.0.0.0:8080` | Default `127.0.0.1:8080` only binds loopback. |
-| `BANDAO_MONGO_URI` | yes | `mongodb://bandao:<pw>@<zeabur-host>:<port>/bandao?authSource=admin` | Zeabur-managed Mongo's public endpoint. Add `&tls=true` once TLS is enabled server-side — it is not today. |
+| `BANDAO_MONGO_URI` | yes | `mongodb://bandao:<pw>@<node-ts-ip>:27017/bandao?authSource=admin` | The node's own Tailscale address — `mongod` does not listen on the public IP, so this is the only address that works from a pod. Percent-encode `/` `+` `@` in the password (`%2F` `%2B` `%40`) or the driver rejects the URI with `Password contains unescaped characters`; prefer generating with `openssl rand -hex 32`, which cannot produce them. |
 | `BANDAO_MONGO_DB` | yes | `bandao` | |
 | `BANDAO_COOKIE_SECURE` | yes | `true` | Production runs over HTTPS only. |
 | `BANDAO_COOKIE_DOMAIN` | no | _(unset)_ | Leave unset → host-only cookie on `bandao-api.ccmos.tw`. |
@@ -116,14 +148,14 @@ If using the bundled `admin-web/Dockerfile`, pass via Docker build arg:
 Nuxt auto-detect injects build-time env from the service's environment
 section.
 
-### Backup host (`/etc/bandao-backup.env`, mode 0600 root-owned)
+### Mongo host (`/etc/bandao-backup.env`, mode 0600 root-owned)
 
 | Var | Required | Notes |
 | --- | --- | --- |
-| `MONGO_URI` | yes | Connection string with a user holding the `backup` role. Must point at the **Zeabur** Mongo — pointing it at a local mongod is the bug described under "Backups". |
+| `MONGO_URI` | yes | `mongodb://backup_user:<pw>@127.0.0.1:27017/?authSource=admin`. **Re-verify this value even though it looks unchanged.** The same literal loopback string was the *bug* before the cutover (it reached the drained pre-migration `mongod`) and is *correct* after it. Identical text, opposite meaning — confirm with a document count, never by reading the line. |
 | `MONGO_DB` | yes | `bandao` |
 | `AGE_RECIPIENT` | yes | `age1...` public key. The matching private key lives off-host. |
-| `S3_BUCKET` | yes | `bandao-mongo-backups-apne1`, in AWS account `869847891424`. Dedicated to bandao — do not share it with another project. |
+| `S3_BUCKET` | yes | The bandao-dedicated bucket (name and account in the operator's records — not here; this repo is public). **Dedicated to bandao on purpose:** the timer historically wrote to a bucket shared with other projects, which is what made "is this object ours?" unanswerable without the decryption key. |
 | `S3_REGION` | yes | e.g. `ap-northeast-1`. |
 | `S3_ACCESS_KEY_ID` | yes | IAM user scoped to this bucket. |
 | `S3_SECRET_ACCESS_KEY` | yes | |
@@ -138,20 +170,23 @@ use placeholders.
 
 Order matters. Each step has a verifiable acceptance criterion.
 
-1. **Provision MongoDB on Zeabur.** Add the managed Mongo service to the
-   project and note its connection string. ✓ when `mongosh "<uri>"` connects
-   and `db.stats()` returns.
+1. **Install `mongod` 8.2 on the node.** Add the MongoDB 8.2 apt repo and
+   install `mongodb-org` plus `mongodb-database-tools`. ✓ when
+   `mongod --version` reports 8.2.x and `mongodump --version` reports 100.x
+   — tools older than 100.x cannot talk to an 8.2 server.
 
-2. **Restrict the endpoint.** The managed endpoint is public by default.
-   Limit it to the Zeabur services and the operator machine that runs the
-   legacy backfill, and enable TLS. ✓ when a connection from an unlisted
-   address is refused. _(Not done as of 2026-08-30.)_
+2. **Bind it to loopback and Tailscale only.** `bindIp: 127.0.0.1,<tailnet
+   IP>` and `security.authorization: enabled` in `/etc/mongod.conf`. ✓ when
+   `sudo ss -lntp | grep 27017` shows exactly those two addresses and **no**
+   `0.0.0.0` line.
 
-3. **Provision the backup host.** Any always-on Linux box that can reach the
-   Zeabur Mongo. Install `awscli` v2, `age`, `mongodb-database-tools`, and
-   `mongodb-mongosh`. It does **not** need to run `mongod`. ✓ when
-   `mongodump --uri="<zeabur uri>" --db=bandao --archive > /dev/null`
-   succeeds.
+3. **Create the three users, all in `admin`.** `root` (`root@admin`),
+   `bandao` (`readWrite@bandao` — the api's least privilege, do not widen
+   it), and `backup_user` (**`backup@admin` only**). ✓ when an unauthenticated
+   `db.getUsers()` is refused and each user authenticates. Restores run as
+   `root`; granting `backup_user` the `restore` role would let a credential
+   that sits in a plaintext file on this box call `createUser` on `admin`
+   and promote itself.
 
 4. **Provision the S3 backup bucket + IAM user.** Permissions limited to
    `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` on the single bucket.
@@ -163,8 +198,10 @@ Order matters. Each step has a verifiable acceptance criterion.
    public key into `/etc/bandao-backup.env`.
 
 6. **Install backup scripts + timer** per
-   [`infra/mongo-host/README.md`](./infra/mongo-host/README.md). Trigger
-   the first run manually; verify the encrypted archive lands in S3.
+   [`infra/mongo-host/README.md`](./infra/mongo-host/README.md). Trigger the
+   first run manually. ✓ is **not** "an object appeared in S3" — it is the
+   archive being within range of the production dataset size and the restore
+   drill passing.
 
 7. **Add the api service on Zeabur.** Source path `api/`, build with the
    bundled `Dockerfile`. Set every env var in the api table above. Configure
@@ -239,37 +276,106 @@ to be the next deploy and the next thing CI verifies.
 Mongo state is unaffected by either path. If a prod commit corrupted data,
 run a restore from S3 instead — see below.
 
+## Cutover: Zeabur-managed Mongo → host `mongod`
+
+Reverses the August 2026 migration. Runs once; delete this section and the
+merge gate at the top of the file when every box is checked.
+
+The safety property throughout: **the source is never modified.** The
+Zeabur-managed Mongo stays live and untouched until step 8, so any failure
+is recoverable by pointing the api back at it.
+
+**Verified before starting (2026-08-31).**
+
+| | source (Zeabur-managed) | target (host `mongod`) |
+| --- | --- | --- |
+| version | 8.2.11 | 7.0.32 → reinstalled as 8.2 |
+| collections | 14 | 12 |
+| `checkin_events` | 11151 | 67 |
+| `location_pings` | 21239 | 1 |
+| `app_users` | 33 | 3 |
+| `orgs` | 3 | 4 |
+
+The target's contents are the drained pre-migration database — ~88 documents
+that the daily backup has been dumping ever since. It holds no collection the
+source lacks, so the cleanup is a straight wipe. The source is two majors
+*newer*, which is why the host `mongod` is reinstalled at 8.2 rather than
+restored into: `mongorestore` supports the same or a newer server, not older.
+
+- [ ] 1. Stop both writers: `launchctl bootout gui/$(id -u)/io.no8.bandao.legacy-backfill`
+      on the operator Mac, and scale the Zeabur api service to zero.
+      Also `sudo systemctl stop bandao-backup.timer`.
+- [ ] 2. Move the 7.0 dbpath aside — `mv /var/lib/mongodb /var/lib/mongodb-7.0-drained`
+      — rather than deleting it. It is a rollback path and it costs nothing.
+- [ ] 3. Install `mongod` 8.2 + tools on a fresh dbpath; recreate the three
+      users (bootstrap steps 1–3 above). Reuse the **existing** `bandao`
+      password so no consumer config has to change.
+- [ ] 4. `mongodump` the source from the node itself, which can reach it.
+      Keep the archive. **Until the drill in step 9 passes, that file is the
+      only backup of production that has ever been verified to exist.**
+- [ ] 5. Restore into the fresh 8.2, then check every row of the table above.
+      A count that does not match is a stop, not a rounding error.
+- [ ] 6. From inside the api pod, confirm `<node-ts-ip>:27017` is reachable
+      *before* switching `BANDAO_MONGO_URI`. If a pod cannot route to the
+      node's `tailscale0` address, bind `mongod` to the CNI bridge as well.
+- [ ] 7. Join the operator Mac to the tailnet, point `api/.env` at
+      the tailnet address, **re-run `api/scripts/legacy_backfill_sync.sh`**,
+      and watch one scheduled run exit 0. The job reads the copy under
+      `$HOME`, not the repo — editing `api/.env` alone changes nothing, and
+      the failure is silent: the driver connects lazily, so a bad URI
+      surfaces only as `failed to load AppUsers` in a log nobody watches.
+- [ ] 8. Only now: remove the managed endpoint's public exposure and retire the
+      Zeabur-managed Mongo. Keep it for a few days first.
+- [ ] 9. Repoint `/etc/bandao-backup.env`, deploy the post-#88
+      `bandao-backup.sh` (the copy on the box predates it —
+      `grep -c MIN_ARCHIVE_BYTES` returns 0, so its guards are absent), set
+      `ASSERT_COLLECTION` / `ASSERT_MIN_COUNT` / `MIN_ARCHIVE_BYTES`, and run
+      the restore drill.
+- [ ] 10. Delete the 14 stale `bandao-api*` nodes from the tailnet, and turn
+      **off key expiry** for `bandao-mongo`. The hourly backfill now depends
+      on that node staying up; a key quietly expiring in ~180 days would
+      reproduce the same silent-failure shape this whole exercise is about.
+
 ## Backups
 
 The daily dump is defined in [`infra/mongo-host/`](./infra/mongo-host/):
 a systemd timer runs `bandao-backup.sh` at 03:30, which dumps Mongo,
-encrypts with `age`, and uploads to `s3://bandao-mongo-backups-apne1/daily/`.
-S3 lifecycle expires that prefix after 30 days.
+encrypts with `age`, and uploads to the `daily/` prefix of the
+bandao-dedicated bucket. S3 lifecycle expires that prefix after 30 days.
 
-> **There is no known-good backup of production.** As of 2026-08-30 the
-> bucket above is newly created and empty; no bandao dump has been confirmed
-> to land anywhere, and the host running `bandao-backup.timer` has not been
-> located — it is not the operator Mac, and the repo never recorded which
-> machine was provisioned for it.
+> **There is no known-good backup of production until cutover step 9
+> passes.** Everything below describes the intended steady state.
 >
-> A daily `*.archive.gz.age` object does land in a different bucket on this
-> script's schedule and naming pattern, sized ~6.9 KB against a production
-> dataset of ~8 MB and ~32k documents. Whether those are bandao's — written
-> by a copy of this script still pointed at the pre-migration
-> `127.0.0.1:27017` — or another project's is **unverified**: they are
-> age-encrypted and the private key is off-host by design. Either way,
-> nothing has been shown to restore bandao.
+> What was established on 2026-08-31, after two earlier revisions of this
+> file called it unknowable:
 >
-> To reach a known-good state: locate the timer host, point `MONGO_URI` at
-> the Zeabur connection string and `S3_BUCKET` at the dedicated bucket, set
-> `ASSERT_COLLECTION` / `ASSERT_MIN_COUNT` / `MIN_ARCHIVE_BYTES`, then run
-> the restore drill.
+> - **The timer runs on this node.** S3 server access logging recorded the
+>   daily `PUT` of `daily/<ts>.archive.gz.age` by the `bandao-backup`
+>   requester, from the production node's own address, at 03:33 Taipei —
+>   the 03:30 timer. There is no separate backup host. Use the access logs,
+>   not CloudTrail, to attribute S3 activity: this account records no S3
+>   data events, so backup identities show up empty there.
+> - **It has been dumping the drained pre-migration `mongod`.** That
+>   database holds ~88 documents against production's ~32.4k, which is
+>   exactly the ~6.9 KB archive size observed. The archives are bandao's;
+>   being bandao's does not make them useful.
+> - **The fix for this was merged and never deployed.** The
+>   `bandao-backup.sh` on the box predates #88 — `grep -c MIN_ARCHIVE_BYTES`
+>   returns 0 — so the `MIN_ARCHIVE_BYTES` floor that would have rejected a
+>   6.9 KB archive with exit 66 was not running. Repointing `MONGO_URI`
+>   without deploying that script leaves the same trap armed for the next
+>   time something silently drains.
 
 Never treat "an object landed in S3" as evidence the backup works. Every
 command in the pipeline exits 0 when it dumps an empty database — that is
-how this went unnoticed. Compare the object's size against the production
-dataset, keep the bucket dedicated so provenance is never in doubt, and run
-the drill.
+how this went unnoticed for months. Compare the object's size against the
+production dataset (a real dump is 1–3 MB compressed, not kilobytes), keep
+the bucket dedicated so provenance is never in doubt, and run the drill.
+
+This is the second silent-success failure in this system; the hourly legacy
+backfill has the same shape (see cutover step 7). When adding any scheduled
+job here, assume "exit 0" means nothing and give it an assertion about the
+data it moved.
 
 ## Restoring Mongo from S3
 
@@ -280,7 +386,7 @@ recovery source. **Practice this monthly** via the drill script — see
 1. Confirm which dump to restore from (`aws s3 ls s3://$S3_BUCKET/daily/`).
 2. Stop writes by pausing the api Zeabur service or scaling it to zero.
 3. Mount the operator's `age` private key at a tmpfs path (see drill
-   instructions). Never persist the key on the backup host.
+   instructions). Never persist the key on the node.
 4. Stream the dump back into the live database:
 
    ```bash
