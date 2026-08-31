@@ -177,25 +177,66 @@ aws s3 ls s3://$S3_BUCKET/daily/
 
 ## Monthly restore drill
 
-The drill must NOT keep the private key on the host. Mount it just for the
-run, then remove:
+The drill needs two things the daily backup does not, and both must live on
+a tmpfs that is torn down afterwards: the `age` **private key**, and a Mongo
+credential that can **write**. `backup_user` holds `backup` only — it reads.
+`mongorestore` creating the scratch database fails as `(Unauthorized) not
+authorized on bandao_restore_drill_… to execute command { create: … }`, which
+is the role restriction working, not a bug.
+
+Point the drill at `root` through a throwaway env file. The script reads
+`BANDAO_BACKUP_ENV` for exactly this. **A variable passed on the command line
+will not work**: the script does `set -a; . "$ENV_FILE"; set +a`, so the file
+is sourced *after* the environment and its `MONGO_URI` wins.
 
 ```bash
-# Pull the encrypted private key from the operator's secret store into a
-# tmpfs path:
 sudo mkdir -p /run/bandao-drill
-sudo mount -t tmpfs -o size=16k,mode=0700 tmpfs /run/bandao-drill
-# (paste / scp the key into /run/bandao-drill/age.key with mode 0400)
+sudo mount -t tmpfs -o size=64k,mode=0700 tmpfs /run/bandao-drill
+```
+
+Send the private key straight onto the tmpfs, never through a file on disk:
+
+```bash
+# from the operator's workstation, over Tailscale SSH
+cat ~/path/to/bandao-backup.key | ssh root@<mongo-host> \
+  'install -m 0400 /dev/stdin /run/bandao-drill/age.key'
+```
+
+Build the drill's env file from the real one with `MONGO_URI` swapped. The
+password goes through a pipe and `printf` is a shell builtin, so it never
+appears in `ps` output or shell history:
+
+```bash
+read -rs -p "root pw: " ROOT_PW; echo
+{ sudo grep -v '^MONGO_URI=' /etc/bandao-backup.env
+  printf 'MONGO_URI=mongodb://root:%s@127.0.0.1:27017/?authSource=admin\n' "$ROOT_PW"
+} | sudo install -m 0600 /dev/stdin /run/bandao-drill/drill.env
+unset ROOT_PW
 
 sudo env \
+  BANDAO_BACKUP_ENV=/run/bandao-drill/drill.env \
   AGE_IDENTITY_FILE=/run/bandao-drill/age.key \
-  ASSERT_COLLECTION=checkin_events \
-  ASSERT_MIN_COUNT=1000 \
   /usr/local/bin/bandao-restore-drill.sh
 
-# Always tear down:
+# Always tear down — this disposes of the key and the root credential together:
 sudo umount /run/bandao-drill
 sudo rmdir /run/bandao-drill
+```
+
+`ASSERT_COLLECTION` and `ASSERT_MIN_COUNT` are inherited from the copied file,
+so they do not need passing separately.
+
+Generate `root`'s password with `openssl rand -hex 32`. A `/` or `+` in it
+must be percent-encoded here or `mongorestore` fails with `error parsing uri:
+unescaped slash in password` — and, worse, a password that is *encoded when it
+should not be* fails as a plain authentication error with nothing pointing at
+the cause.
+
+A passing run ends with:
+
+```
+32512 document(s) restored successfully. 0 document(s) failed to restore.
+drill OK: daily/<stamp>.archive.gz.age restored, checkin_events count=11160
 ```
 
 Set `ASSERT_MIN_COUNT` to something near the real row count rather than `1`.

@@ -183,10 +183,12 @@ Order matters. Each step has a verifiable acceptance criterion.
 3. **Create the three users, all in `admin`.** `root` (`root@admin`),
    `bandao` (`readWrite@bandao` — the api's least privilege, do not widen
    it), and `backup_user` (**`backup@admin` only**). ✓ when an unauthenticated
-   `db.getUsers()` is refused and each user authenticates. Restores run as
-   `root`; granting `backup_user` the `restore` role would let a credential
-   that sits in a plaintext file on this box call `createUser` on `admin`
-   and promote itself.
+   `db.getUsers()` is refused and each user authenticates. Restores and the
+   monthly drill run as `root`; granting `backup_user` the `restore` role
+   would let a credential that sits in a plaintext file on this box call
+   `createUser` on `admin` and promote itself. Generate the passwords with
+   `openssl rand -hex 32` — base64 emits `/` and `+`, which have to be
+   percent-encoded inside every connection string that ever carries them.
 
 4. **Provision the S3 backup bucket + IAM user.** Permissions limited to
    `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` on the single bucket.
@@ -394,8 +396,10 @@ recovery source. **Practice this monthly** via the drill script — see
 
 1. Confirm which dump to restore from (`aws s3 ls s3://$S3_BUCKET/daily/`).
 2. Stop writes by pausing the api Zeabur service or scaling it to zero.
-3. Mount the operator's `age` private key at a tmpfs path (see drill
-   instructions). Never persist the key on the node.
+3. Mount the operator's `age` private key at a tmpfs path, and point
+   `BANDAO_BACKUP_ENV` at a throwaway env file carrying `root`'s `MONGO_URI` —
+   `backup_user` can read but not restore (see drill instructions). Never
+   persist either on the node.
 4. Stream the dump back into the live database:
 
    ```bash
