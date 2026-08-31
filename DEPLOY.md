@@ -11,13 +11,6 @@ dashboard, its tailnet name in the Tailscale admin console, and credentials
 in the operator's password manager. `<node-ts-ip>` and `<tailnet>` below are
 placeholders for those values.
 
-> **Do not merge this revision before the cutover in "Cutover" below is
-> complete.** It describes the topology *after* moving the data back off the
-> Zeabur-managed MongoDB. Until every step there is checked off, production
-> still runs the managed Mongo on a public endpoint with no TLS, and this
-> file would be describing a network that does not exist — the exact failure
-> that made the previous revision worthless.
-
 This file is the authoritative runbook. Changes to production topology,
 env vars, or operational procedures should land here in the same PR.
 
@@ -76,9 +69,11 @@ Worth reading before anyone proposes moving Mongo again.
   endpoint. An earlier revision of this file blamed that migration for the
   loss of the encrypted path. That was wrong by three months: the api had
   been connecting directly since May.
-- **The cutover below moves the data back to a host `mongod`.** That is what
-  actually closes the public endpoint — restoring the tunnel without closing
-  the port would have left the larger hole open.
+- **On 2026-08-31 the data moved back to a host `mongod`** and the public
+  endpoint was closed. Both halves mattered: restoring the tunnel while
+  leaving the port open would have fixed the smaller hole and left the
+  larger one — a Mongo endpoint reachable from anywhere, protected by SCRAM
+  alone.
 
 ## Repositories and ownership
 
@@ -278,73 +273,6 @@ to be the next deploy and the next thing CI verifies.
 Mongo state is unaffected by either path. If a prod commit corrupted data,
 run a restore from S3 instead — see below.
 
-## Cutover: Zeabur-managed Mongo → host `mongod`
-
-Reverses the August 2026 migration. Runs once; delete this section and the
-merge gate at the top of the file when every box is checked.
-
-The safety property throughout: **the source is never modified.** The
-Zeabur-managed Mongo stays live and untouched until step 8, so any failure
-is recoverable by pointing the api back at it.
-
-**Verified before starting (2026-08-31).**
-
-| | source (Zeabur-managed) | target (host `mongod`) |
-| --- | --- | --- |
-| version | 8.2.11 | 7.0.32 → reinstalled as 8.2 |
-| collections | 14 | 12 |
-| `checkin_events` | 11151 | 67 |
-| `location_pings` | 21239 | 1 |
-| `app_users` | 33 | 3 |
-| `orgs` | 3 | 4 |
-
-The target's contents are the drained pre-migration database — ~88 documents
-that the daily backup has been dumping ever since. It holds no collection the
-source lacks, so the cleanup is a straight wipe. The source is two majors
-*newer*, which is why the host `mongod` is reinstalled at 8.2 rather than
-restored into: `mongorestore` supports the same or a newer server, not older.
-
-- [ ] 1. Stop both writers: `launchctl bootout gui/$(id -u)/io.no8.bandao.legacy-backfill`
-      on the operator Mac, and scale the Zeabur api service to zero.
-      Also `sudo systemctl stop bandao-backup.timer`.
-- [ ] 2. Move the 7.0 dbpath aside — `mv /var/lib/mongodb /var/lib/mongodb-7.0-drained`
-      — rather than deleting it. It is a rollback path and it costs nothing.
-- [ ] 3. Install `mongod` 8.2 + tools on a fresh dbpath; recreate the three
-      users (bootstrap steps 1–3 above). Reuse the **existing** `bandao`
-      password so no consumer config has to change.
-- [ ] 4. `mongodump` the source from the node itself, which can reach it.
-      Keep the archive. **Until the drill in step 9 passes, that file is the
-      only backup of production that has ever been verified to exist.**
-- [ ] 5. Restore into the fresh 8.2, then check every row of the table above.
-      A count that does not match is a stop, not a rounding error.
-- [ ] 6. From inside the api pod, confirm `<node-ts-ip>:27017` is reachable
-      *before* switching `BANDAO_MONGO_URI`. If a pod cannot route to the
-      node's `tailscale0` address, bind `mongod` to the CNI bridge as well.
-- [ ] 7. Join the operator Mac to the tailnet, point `api/.env` at
-      the tailnet address, **re-run `api/scripts/legacy_backfill_sync.sh`**,
-      and watch one scheduled run exit 0. The job reads the copy under
-      `$HOME`, not the repo — editing `api/.env` alone changes nothing, and
-      the failure is silent: the driver connects lazily, so a bad URI
-      surfaces only as `failed to load AppUsers` in a log nobody watches.
-- [ ] 8. Only now: remove the managed endpoint's public exposure and retire the
-      Zeabur-managed Mongo. Keep it for a few days first.
-- [ ] 9. Deploy the post-#88 `bandao-backup.sh` **before** repointing
-      `/etc/bandao-backup.env` — the copy on the box predates it
-      (`grep -c MIN_ARCHIVE_BYTES` returns 0), and fixing the URI without the
-      guards leaves the trap armed. The repo is not checked out on the node,
-      so fetch the scripts from GitHub raw and check the shebang and byte
-      count before installing. Then set `ASSERT_COLLECTION` /
-      `ASSERT_MIN_COUNT` / `MIN_ARCHIVE_BYTES`, run the service once, and run
-      the restore drill. The one-shot run is what proves the URI: the new
-      archive lands at ~1.1 MB beside the 6.7 KB ones.
-- [ ] 10. Delete the 14 stale `bandao-api*` nodes from the tailnet, then
-      drop the now-dead `tag:bandao-api` rules from the policy (that order —
-      Tailscale refuses to undefine a tag while devices still carry it). Key
-      expiry needs no action: `bandao-mongo` is tagged, and tagged devices do
-      not expire. Also delete the empty bucket created on 2026-08-30 for a
-      dedicated-bucket plan that was dropped in favour of access logging —
-      an unreferenced bucket is just a thing to misread later.
-
 ## Backups
 
 The daily dump is defined in [`infra/mongo-host/`](./infra/mongo-host/):
@@ -352,11 +280,15 @@ a systemd timer runs `bandao-backup.sh` at 03:30, which dumps Mongo,
 encrypts with `age`, and uploads to the `daily/` prefix of the shared ccmos
 backup bucket. S3 lifecycle expires that prefix after 30 days.
 
-> **There is no known-good backup of production until cutover step 9
-> passes.** Everything below describes the intended steady state.
+> **The pipeline was broken for months and was repaired on 2026-08-31.**
+> It now passes end to end: a 1.1 MB archive against ~32.4k documents, and a
+> restore drill returning `32512 document(s) restored successfully, 0
+> failures`. That drill is the first end-to-end verification this backup has
+> ever had — keep running it monthly, because everything above it in the
+> chain can pass while the archive is worthless.
 >
-> What was established on 2026-08-31, after two earlier revisions of this
-> file called it unknowable:
+> What was established while repairing it, after two earlier revisions of
+> this file called it unknowable:
 >
 > - **The timer runs on this node.** S3 server access logging recorded the
 >   daily `PUT` of `daily/<ts>.archive.gz.age` by the `bandao-backup`
@@ -384,7 +316,8 @@ side by side in `aws s3 ls` and the fault is visible at a glance. Then run the
 drill, which is the only check that proves the archive reads back.
 
 This is the second silent-success failure in this system; the hourly legacy
-backfill has the same shape (see cutover step 7). When adding any scheduled
+backfill has the same shape: its driver connects lazily, so a wrong URI
+surfaces only as `failed to load AppUsers` in a log nobody reads. When adding any scheduled
 job here, assume "exit 0" means nothing and give it an assertion about the
 data it moved.
 

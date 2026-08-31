@@ -12,12 +12,17 @@ Daily encrypted dump → S3 + monthly restore drill.
 > those logs, not CloudTrail, to attribute S3 activity here; this account
 > records no S3 data events.
 >
-> **There is no known-good backup until the restore drill passes once.**
-> The pipeline has been dumping the drained pre-migration database — ~88
-> documents against production's ~32.4k, hence the ~6.9 KB archives — and
-> the `bandao-backup.sh` deployed on the box predates the guards below
-> (`grep -c MIN_ARCHIVE_BYTES` returns 0). Fixing `MONGO_URI` without also
-> deploying this script leaves the same trap armed.
+> **Repaired 2026-08-31, and verified.** For months the pipeline dumped the
+> drained pre-migration database — ~88 documents against production's
+> ~32.4k, hence ~6.9 KB archives — while every command exited 0. Two faults
+> were stacked: the wrong `MONGO_URI`, and a deployed `bandao-backup.sh`
+> that predated the guards below, so nothing rejected the undersized result.
+> Fixing either alone would have left the other armed.
+>
+> A correct archive is **~1.1 MB**, and the restore drill now passes
+> (`32512 document(s) restored successfully, 0 failures`). Run it monthly:
+> it is the only step that proves the archive reads back, and everything
+> before it can pass on an archive nobody can restore.
 
 ## Files
 
