@@ -155,7 +155,7 @@ section.
 | `MONGO_URI` | yes | `mongodb://backup_user:<pw>@127.0.0.1:27017/?authSource=admin`. **Re-verify this value even though it looks unchanged.** The same literal loopback string was the *bug* before the cutover (it reached the drained pre-migration `mongod`) and is *correct* after it. Identical text, opposite meaning — confirm with a document count, never by reading the line. |
 | `MONGO_DB` | yes | `bandao` |
 | `AGE_RECIPIENT` | yes | `age1...` public key. The matching private key lives off-host. |
-| `S3_BUCKET` | yes | The bandao-dedicated bucket (name and account in the operator's records — not here; this repo is public). **Dedicated to bandao on purpose:** the timer historically wrote to a bucket shared with other projects, which is what made "is this object ours?" unanswerable without the decryption key. |
+| `S3_BUCKET` | yes | The shared ccmos backup bucket (name and account in the operator's records — not here; this repo is public). Sharing is deliberate: provenance is established by S3 server access logging, which names the requester and source IP of each `PUT`, not by which bucket an object landed in. |
 | `S3_REGION` | yes | e.g. `ap-northeast-1`. |
 | `S3_ACCESS_KEY_ID` | yes | IAM user scoped to this bucket. |
 | `S3_SECRET_ACCESS_KEY` | yes | |
@@ -326,22 +326,29 @@ restored into: `mongorestore` supports the same or a newer server, not older.
       surfaces only as `failed to load AppUsers` in a log nobody watches.
 - [ ] 8. Only now: remove the managed endpoint's public exposure and retire the
       Zeabur-managed Mongo. Keep it for a few days first.
-- [ ] 9. Repoint `/etc/bandao-backup.env`, deploy the post-#88
-      `bandao-backup.sh` (the copy on the box predates it —
-      `grep -c MIN_ARCHIVE_BYTES` returns 0, so its guards are absent), set
-      `ASSERT_COLLECTION` / `ASSERT_MIN_COUNT` / `MIN_ARCHIVE_BYTES`, and run
-      the restore drill.
-- [ ] 10. Delete the 14 stale `bandao-api*` nodes from the tailnet, and turn
-      **off key expiry** for `bandao-mongo`. The hourly backfill now depends
-      on that node staying up; a key quietly expiring in ~180 days would
-      reproduce the same silent-failure shape this whole exercise is about.
+- [ ] 9. Deploy the post-#88 `bandao-backup.sh` **before** repointing
+      `/etc/bandao-backup.env` — the copy on the box predates it
+      (`grep -c MIN_ARCHIVE_BYTES` returns 0), and fixing the URI without the
+      guards leaves the trap armed. The repo is not checked out on the node,
+      so fetch the scripts from GitHub raw and check the shebang and byte
+      count before installing. Then set `ASSERT_COLLECTION` /
+      `ASSERT_MIN_COUNT` / `MIN_ARCHIVE_BYTES`, run the service once, and run
+      the restore drill. The one-shot run is what proves the URI: the new
+      archive lands at ~1.1 MB beside the 6.7 KB ones.
+- [ ] 10. Delete the 14 stale `bandao-api*` nodes from the tailnet, then
+      drop the now-dead `tag:bandao-api` rules from the policy (that order —
+      Tailscale refuses to undefine a tag while devices still carry it). Key
+      expiry needs no action: `bandao-mongo` is tagged, and tagged devices do
+      not expire. Also delete the empty bucket created on 2026-08-30 for a
+      dedicated-bucket plan that was dropped in favour of access logging —
+      an unreferenced bucket is just a thing to misread later.
 
 ## Backups
 
 The daily dump is defined in [`infra/mongo-host/`](./infra/mongo-host/):
 a systemd timer runs `bandao-backup.sh` at 03:30, which dumps Mongo,
-encrypts with `age`, and uploads to the `daily/` prefix of the
-bandao-dedicated bucket. S3 lifecycle expires that prefix after 30 days.
+encrypts with `age`, and uploads to the `daily/` prefix of the shared ccmos
+backup bucket. S3 lifecycle expires that prefix after 30 days.
 
 > **There is no known-good backup of production until cutover step 9
 > passes.** Everything below describes the intended steady state.
@@ -369,8 +376,10 @@ bandao-dedicated bucket. S3 lifecycle expires that prefix after 30 days.
 Never treat "an object landed in S3" as evidence the backup works. Every
 command in the pipeline exits 0 when it dumps an empty database — that is
 how this went unnoticed for months. Compare the object's size against the
-production dataset (a real dump is 1–3 MB compressed, not kilobytes), keep
-the bucket dedicated so provenance is never in doubt, and run the drill.
+production dataset — after the cutover a real dump is **~1.1 MB** compressed
+against ~32.4k documents, where the broken ones were **6.7 KB**; the two sit
+side by side in `aws s3 ls` and the fault is visible at a glance. Then run the
+drill, which is the only check that proves the archive reads back.
 
 This is the second silent-success failure in this system; the hourly legacy
 backfill has the same shape (see cutover step 7). When adding any scheduled

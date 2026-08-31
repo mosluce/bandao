@@ -69,7 +69,7 @@ Create `/etc/bandao-backup.env` (mode 0600, root-owned):
 MONGO_URI=mongodb://backup_user:<pw>@127.0.0.1:27017/?authSource=admin
 MONGO_DB=bandao
 AGE_RECIPIENT=age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-S3_BUCKET=<bandao-dedicated bucket>
+S3_BUCKET=<shared ccmos backup bucket>
 S3_REGION=ap-northeast-1
 S3_ACCESS_KEY_ID=AKIAxxxxxxxxxxxxxxxx
 S3_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -96,10 +96,19 @@ account id is the starting point for cross-account enumeration. The bucket
 sits in `ap-northeast-1` under the `daily/` prefix, created with versioning,
 SSE-S3, Block Public Access, and the lifecycle rule below.
 
-It is **dedicated to bandao** on purpose. Sharing a bucket with other
-projects is what made "is this object ours?" unanswerable without the
-decryption key — a question worth answering during an incident, not after.
-Do not point another project's backup at it.
+It is **shared with other ccmos projects**, and that is a deliberate
+decision rather than an oversight. Sharing once made "is this object ours?"
+unanswerable — the archives are age-encrypted and the private key is off-host
+by design, so nothing about an object identifies its source. What actually
+answered it was **S3 server access logging**, which records the requester and
+source IP of every `PUT`. A dedicated bucket infers provenance from where an
+object landed; the access log states it, and covers the other projects in the
+bucket too.
+
+So the three controls that matter here are the access log (provenance), the
+size guard below (was the right database dumped), and the restore drill (does
+it come back). Bucket isolation was a proxy for the first and buys nothing
+once real logging exists. If you ever turn access logging off, revisit this.
 
 ### Guards
 
