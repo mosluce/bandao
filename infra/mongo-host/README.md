@@ -1,27 +1,28 @@
 # Mongo host backup pipeline
 
-Daily encrypted dump → S3 + monthly restore drill, packaged for the operator
-to drop onto a host that can reach the production database.
+Daily encrypted dump → S3 + monthly restore drill.
 
-> **There is no known-good backup of production, and this pipeline's current
-> state is unverified.** As of 2026-08-30 the bucket named below,
-> `bandao-mongo-backups-apne1`, is newly created and empty. No bandao dump
-> has been confirmed to land anywhere.
+> **"Mongo host" is the production node itself** — the same box that runs
+> the `api` and `admin-web` pods and `mongod`. There is no separate backup
+> host and there never was; two
+> earlier revisions of this README were written as though one existed, and
+> a third recorded it as unlocatable. It was located on 2026-08-31 from S3
+> server access logs: the `bandao-backup` requester, writing from the
+> production node's own address at 03:33 Taipei — the 03:30 timer. Use
+> those logs, not CloudTrail, to attribute S3 activity here; this account
+> records no S3 data events.
 >
-> What is known: a daily `*.archive.gz.age` object does land in a *different*
-> bucket on the same schedule and naming pattern this script produces, sized
-> ~6.9 KB against a production dataset of ~8 MB and ~32k documents. Whether
-> those objects are bandao's — written by a copy of this script whose
-> `MONGO_URI` still points at the pre-migration `127.0.0.1:27017` — or belong
-> to another project entirely has **not** been established; they are
-> age-encrypted and the private key is off-host by design. Either way, no
-> object anywhere has been shown to restore bandao.
+> **Repaired 2026-08-31, and verified.** For months the pipeline dumped the
+> drained pre-migration database — ~88 documents against production's
+> ~32.4k, hence ~6.9 KB archives — while every command exited 0. Two faults
+> were stacked: the wrong `MONGO_URI`, and a deployed `bandao-backup.sh`
+> that predated the guards below, so nothing rejected the undersized result.
+> Fixing either alone would have left the other armed.
 >
-> To get to a known-good state: find the host running `bandao-backup.timer`,
-> point `MONGO_URI` at the Zeabur connection string and `S3_BUCKET` at the
-> dedicated bucket below, set the guards, then run the restore drill. A
-> dedicated bucket is what makes the next such question answerable from
-> `aws s3 ls` alone.
+> A correct archive is **~1.1 MB**, and the restore drill now passes
+> (`32512 document(s) restored successfully, 0 failures`). Run it monthly:
+> it is the only step that proves the archive reads back, and everything
+> before it can pass on an archive nobody can restore.
 
 ## Files
 
@@ -32,11 +33,10 @@ to drop onto a host that can reach the production database.
 | `bandao-backup.service` | `/etc/systemd/system/bandao-backup.service` | One-shot unit invoked by the timer |
 | `bandao-backup.timer` | `/etc/systemd/system/bandao-backup.timer` | Daily 03:30 schedule |
 
-## One-time setup on the backup host
+## One-time setup
 
-Any always-on Linux host that can reach the production Mongo will do; it no
-longer has to be the database host itself. Assumes Debian 12 / Ubuntu 22.04+.
-Adjust package names for other distros.
+Runs on the production node. Assumes Debian 12 / Ubuntu 22.04+; adjust
+package names for other distros.
 
 ```bash
 # Tooling — mongo client, awscli v2, age.
@@ -45,7 +45,7 @@ sudo apt-get install -y mongodb-mongosh mongodb-database-tools awscli age
 ```
 
 Generate the encryption keypair on the operator's workstation (NOT on the
-backup host) and copy only the public key to the host:
+node) and copy only the public key to the node:
 
 ```bash
 # on workstation:
@@ -66,12 +66,15 @@ sudo install -m 0644 bandao-backup.timer /etc/systemd/system/
 Create `/etc/bandao-backup.env` (mode 0600, root-owned):
 
 ```
-# Must reach the database production actually writes to. Since the Zeabur
-# migration this is NOT 127.0.0.1 — use the Zeabur connection string.
-MONGO_URI=mongodb://backup_user:<pw>@<zeabur-host>:<port>/?authSource=admin
+# Must reach the database production actually writes to. Loopback is correct
+# again since the cutover back to a host mongod — but this exact string was
+# ALSO what the broken pipeline used, back when it resolved to a drained
+# mongod on the same address. Never verify this line by reading it; verify it
+# with the document count the guards below assert.
+MONGO_URI=mongodb://backup_user:<pw>@127.0.0.1:27017/?authSource=admin
 MONGO_DB=bandao
 AGE_RECIPIENT=age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-S3_BUCKET=bandao-mongo-backups-apne1
+S3_BUCKET=<shared ccmos backup bucket>
 S3_REGION=ap-northeast-1
 S3_ACCESS_KEY_ID=AKIAxxxxxxxxxxxxxxxx
 S3_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -91,14 +94,26 @@ sudo chmod 0600 /etc/bandao-backup.env
 sudo chown root:root /etc/bandao-backup.env
 ```
 
-The bucket is `bandao-mongo-backups-apne1` in AWS account `869847891424`,
-`ap-northeast-1`, under the `daily/` prefix. Created 2026-08-30 with
-versioning, SSE-S3, Block Public Access, and the lifecycle rule below.
+The bucket name and AWS account are **not recorded here — this repository is
+public.** They live in the operator's password manager alongside the IAM
+credentials; a bucket name is globally unique and directly probeable, and an
+account id is the starting point for cross-account enumeration. The bucket
+sits in `ap-northeast-1` under the `daily/` prefix, created with versioning,
+SSE-S3, Block Public Access, and the lifecycle rule below.
 
-It is **dedicated to bandao** on purpose. Sharing a bucket with other
-projects is what made "is this object ours?" unanswerable without the
-decryption key — a question worth answering during an incident, not after.
-Do not point another project's backup at it.
+It is **shared with other ccmos projects**, and that is a deliberate
+decision rather than an oversight. Sharing once made "is this object ours?"
+unanswerable — the archives are age-encrypted and the private key is off-host
+by design, so nothing about an object identifies its source. What actually
+answered it was **S3 server access logging**, which records the requester and
+source IP of every `PUT`. A dedicated bucket infers provenance from where an
+object landed; the access log states it, and covers the other projects in the
+bucket too.
+
+So the three controls that matter here are the access log (provenance), the
+size guard below (was the right database dumped), and the restore drill (does
+it come back). Bucket isolation was a proxy for the first and buys nothing
+once real logging exists. If you ever turn access logging off, revisit this.
 
 ### Guards
 
@@ -120,7 +135,7 @@ The script stages the archive to a temp file (removed on exit) instead of
 streaming into `aws s3 cp -`, because a stream cannot be measured before it
 lands. Scratch space needed is one compressed dump — single-digit MB today.
 
-Mongo user for backups (run from `mongosh` as a dbAdmin):
+Mongo user for backups (run from `mongosh` as `root`):
 
 ```javascript
 use admin
@@ -130,6 +145,19 @@ db.createUser({
   roles: [ { role: "backup", db: "admin" } ]
 })
 ```
+
+**`backup` only — do not add `restore`.** The user found on the box in
+August 2026 carried both, which this README never documented. `restore` is
+not a harmless complement to `backup`: it grants `createUser` and
+`createRole` on `admin`, so a credential kept in plaintext in
+`/etc/bandao-backup.env` — beside the S3 keys, on a host that is also
+reachable over the tailnet — could promote itself to `root`. Restores and
+drills run as `root`, which is an operator-driven procedure, not a
+scheduled one.
+
+Generate the password with `openssl rand -hex 32`, not `-base64`: base64
+emits `/` and `+`, which have to be percent-encoded inside a connection
+string and are easy to get silently wrong.
 
 Enable the timer:
 
@@ -154,25 +182,66 @@ aws s3 ls s3://$S3_BUCKET/daily/
 
 ## Monthly restore drill
 
-The drill must NOT keep the private key on the host. Mount it just for the
-run, then remove:
+The drill needs two things the daily backup does not, and both must live on
+a tmpfs that is torn down afterwards: the `age` **private key**, and a Mongo
+credential that can **write**. `backup_user` holds `backup` only — it reads.
+`mongorestore` creating the scratch database fails as `(Unauthorized) not
+authorized on bandao_restore_drill_… to execute command { create: … }`, which
+is the role restriction working, not a bug.
+
+Point the drill at `root` through a throwaway env file. The script reads
+`BANDAO_BACKUP_ENV` for exactly this. **A variable passed on the command line
+will not work**: the script does `set -a; . "$ENV_FILE"; set +a`, so the file
+is sourced *after* the environment and its `MONGO_URI` wins.
 
 ```bash
-# Pull the encrypted private key from the operator's secret store into a
-# tmpfs path:
 sudo mkdir -p /run/bandao-drill
-sudo mount -t tmpfs -o size=16k,mode=0700 tmpfs /run/bandao-drill
-# (paste / scp the key into /run/bandao-drill/age.key with mode 0400)
+sudo mount -t tmpfs -o size=64k,mode=0700 tmpfs /run/bandao-drill
+```
+
+Send the private key straight onto the tmpfs, never through a file on disk:
+
+```bash
+# from the operator's workstation, over Tailscale SSH
+cat ~/path/to/bandao-backup.key | ssh root@<mongo-host> \
+  'install -m 0400 /dev/stdin /run/bandao-drill/age.key'
+```
+
+Build the drill's env file from the real one with `MONGO_URI` swapped. The
+password goes through a pipe and `printf` is a shell builtin, so it never
+appears in `ps` output or shell history:
+
+```bash
+read -rs -p "root pw: " ROOT_PW; echo
+{ sudo grep -v '^MONGO_URI=' /etc/bandao-backup.env
+  printf 'MONGO_URI=mongodb://root:%s@127.0.0.1:27017/?authSource=admin\n' "$ROOT_PW"
+} | sudo install -m 0600 /dev/stdin /run/bandao-drill/drill.env
+unset ROOT_PW
 
 sudo env \
+  BANDAO_BACKUP_ENV=/run/bandao-drill/drill.env \
   AGE_IDENTITY_FILE=/run/bandao-drill/age.key \
-  ASSERT_COLLECTION=checkin_events \
-  ASSERT_MIN_COUNT=1000 \
   /usr/local/bin/bandao-restore-drill.sh
 
-# Always tear down:
+# Always tear down — this disposes of the key and the root credential together:
 sudo umount /run/bandao-drill
 sudo rmdir /run/bandao-drill
+```
+
+`ASSERT_COLLECTION` and `ASSERT_MIN_COUNT` are inherited from the copied file,
+so they do not need passing separately.
+
+Generate `root`'s password with `openssl rand -hex 32`. A `/` or `+` in it
+must be percent-encoded here or `mongorestore` fails with `error parsing uri:
+unescaped slash in password` — and, worse, a password that is *encoded when it
+should not be* fails as a plain authentication error with nothing pointing at
+the cause.
+
+A passing run ends with:
+
+```
+32512 document(s) restored successfully. 0 document(s) failed to restore.
+drill OK: daily/<stamp>.archive.gz.age restored, checkin_events count=11160
 ```
 
 Set `ASSERT_MIN_COUNT` to something near the real row count rather than `1`.
